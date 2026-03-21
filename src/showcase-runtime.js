@@ -1,0 +1,1551 @@
+import {
+  clothGarmentKinds,
+  clothProfileNames,
+  createClothContinuityEnvelope,
+  createClothRepresentationPlan,
+  selectClothRepresentationBand,
+} from "../../gpu-cloth/dist/index.js";
+import {
+  fluidBodyKinds,
+  fluidProfileNames,
+  createFluidContinuityEnvelope,
+  createFluidRepresentationPlan,
+  selectFluidRepresentationBand,
+} from "../../gpu-fluid/dist/index.js";
+import {
+  createLightingBandPlan,
+  defaultLightingProfile,
+  getLightingProfile,
+  lightingDistanceBands,
+} from "../../gpu-lighting/dist/index.js";
+import {
+  createDeviceProfile,
+  createGpuPerformanceGovernor,
+  createQualityLadderAdapter,
+} from "../../gpu-performance/dist/index.js";
+import { createGpuDebugSession } from "../../gpu-debug/dist/index.js";
+import {
+  createPhysicsSimulationPlan,
+  createPhysicsWorldSnapshot,
+  defaultPhysicsWorkerProfile,
+  getPhysicsWorkerManifest,
+} from "../../gpu-physics/dist/browser.js";
+
+import { loadGltfModel } from "./gltf-loader.js";
+
+const STYLE_ID = "plasius-shared-3d-showcase-style";
+const DEFAULT_TITLE = "Flag by the Sea";
+const DEFAULT_SUBTITLE =
+  "Shared 3D validation scene using GLTF ships, cloth, fluid continuity, adaptive performance, and telemetry.";
+const CAMERA_PRESETS = Object.freeze({
+  integrated: Object.freeze({ yaw: -0.55, pitch: 0.34, distance: 27, target: [0, 2.2, 0] }),
+  lighting: Object.freeze({ yaw: -0.28, pitch: 0.28, distance: 23, target: [0, 2.8, 0] }),
+  cloth: Object.freeze({ yaw: -1.1, pitch: 0.25, distance: 15, target: [-8.4, 5.3, -1.5] }),
+  fluid: Object.freeze({ yaw: -0.4, pitch: 0.18, distance: 18, target: [0, 1.2, 6] }),
+  physics: Object.freeze({ yaw: -0.12, pitch: 0.27, distance: 16, target: [0, 1.8, 6.8] }),
+  performance: Object.freeze({ yaw: -0.65, pitch: 0.36, distance: 24, target: [0, 2.2, 0] }),
+  debug: Object.freeze({ yaw: -0.7, pitch: 0.32, distance: 24, target: [0, 2.2, 0] }),
+});
+export const showcaseFocusModes = Object.freeze(Object.keys(CAMERA_PRESETS));
+
+const SCENE_NOTES = Object.freeze([
+  "Ships are loaded from a GLTF asset and carry physics metadata from node extras.",
+  "Near-field lighting uses the ray-traced-primary shadow and reflection path before stepping down by distance band.",
+  "Cloth and fluid continuity stay coherent across near, mid, far, and horizon bands.",
+  "Performance pressure reduces visual detail before authoritative collision motion is touched.",
+]);
+
+const UNIT_BOX_MESH = Object.freeze({
+  positions: Object.freeze([
+    -0.5, -0.5, -0.5,
+     0.5, -0.5, -0.5,
+     0.5, 0.5, -0.5,
+    -0.5, 0.5, -0.5,
+    -0.5, -0.5, 0.5,
+     0.5, -0.5, 0.5,
+     0.5, 0.5, 0.5,
+    -0.5, 0.5, 0.5,
+  ]),
+  indices: Object.freeze([
+    0, 1, 2, 0, 2, 3,
+    5, 4, 7, 5, 7, 6,
+    4, 0, 3, 4, 3, 7,
+    1, 5, 6, 1, 6, 2,
+    3, 2, 6, 3, 6, 7,
+    4, 5, 1, 4, 1, 0,
+  ]),
+});
+
+export function resolveShowcaseAssetUrl(baseUrl = import.meta.url) {
+  return new URL("../assets/brigantine.gltf", baseUrl);
+}
+
+function injectStyles() {
+  if (document.getElementById(STYLE_ID)) {
+    return;
+  }
+
+  const style = document.createElement("style");
+  style.id = STYLE_ID;
+  style.textContent = `
+    :root {
+      color-scheme: light;
+      --plasius-paper: #f4f7f8;
+      --plasius-ink: #152028;
+      --plasius-muted: #5c6f7b;
+      --plasius-accent: #8f5634;
+      --plasius-panel: rgba(255, 255, 255, 0.82);
+      --plasius-border: rgba(21, 32, 40, 0.12);
+      --plasius-shadow: 0 20px 48px rgba(15, 24, 31, 0.16);
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Fraunces", "Iowan Old Style", serif;
+      color: var(--plasius-ink);
+      background:
+        radial-gradient(circle at top left, rgba(255, 247, 238, 0.92), transparent 34%),
+        linear-gradient(180deg, #f6f8fb 0%, #d2dee6 48%, #b6c4ce 100%);
+    }
+    .plasius-demo {
+      width: min(1560px, calc(100vw - 32px));
+      margin: 0 auto;
+      padding: 28px 0 40px;
+      display: grid;
+      gap: 20px;
+    }
+    .plasius-demo__hero,
+    .plasius-demo__layout {
+      display: grid;
+      gap: 20px;
+    }
+    .plasius-demo__hero {
+      grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.85fr);
+      align-items: start;
+    }
+    .plasius-panel {
+      border: 1px solid var(--plasius-border);
+      border-radius: 24px;
+      background: var(--plasius-panel);
+      box-shadow: var(--plasius-shadow);
+      backdrop-filter: blur(12px);
+    }
+    .plasius-demo__hero-card,
+    .plasius-demo__status {
+      padding: 20px 22px;
+    }
+    .plasius-demo__eyebrow {
+      margin: 0 0 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      font-size: 12px;
+      color: rgba(21, 32, 40, 0.56);
+    }
+    .plasius-demo h1,
+    .plasius-demo h2,
+    .plasius-demo h3 {
+      margin: 0;
+    }
+    .plasius-demo__lead {
+      margin: 12px 0 0;
+      color: var(--plasius-muted);
+      line-height: 1.6;
+      max-width: 760px;
+    }
+    .plasius-demo__status-badge {
+      width: fit-content;
+      margin: 0;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(143, 86, 52, 0.12);
+      color: var(--plasius-accent);
+      font-weight: 700;
+    }
+    .plasius-demo__status-text {
+      margin: 10px 0 0;
+      color: var(--plasius-muted);
+      line-height: 1.6;
+    }
+    .plasius-demo__layout {
+      grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.68fr);
+      align-items: start;
+    }
+    .plasius-demo__canvas-panel {
+      padding: 18px;
+      position: relative;
+    }
+    .plasius-demo__canvas {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      display: block;
+      border-radius: 20px;
+      border: 1px solid rgba(21, 32, 40, 0.08);
+      background: linear-gradient(180deg, #dce8ef 0%, #a9bfd0 42%, #0f5168 42%, #092433 100%);
+    }
+    .plasius-demo__toolbar {
+      position: absolute;
+      top: 26px;
+      left: 26px;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .plasius-demo button,
+    .plasius-demo label,
+    .plasius-demo select {
+      font-family: "JetBrains Mono", monospace;
+      font-size: 13px;
+    }
+    .plasius-demo button,
+    .plasius-demo .plasius-toggle,
+    .plasius-demo select {
+      border: 1px solid rgba(21, 32, 40, 0.12);
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.84);
+      color: var(--plasius-ink);
+      padding: 10px 14px;
+    }
+    .plasius-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .plasius-demo__sidebar {
+      display: grid;
+      gap: 18px;
+    }
+    .plasius-demo__card {
+      padding: 18px;
+    }
+    .plasius-demo__metrics,
+    .plasius-demo__metrics li {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .plasius-demo__metrics {
+      margin-top: 12px;
+      display: grid;
+      gap: 8px;
+      color: var(--plasius-muted);
+      line-height: 1.55;
+    }
+    .plasius-demo__metrics li {
+      border-top: 1px solid rgba(21, 32, 40, 0.08);
+      padding-top: 8px;
+    }
+    .plasius-demo__legend {
+      position: absolute;
+      right: 24px;
+      bottom: 24px;
+      padding: 10px 14px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.84);
+      border: 1px solid rgba(21, 32, 40, 0.1);
+      color: var(--plasius-muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+    .plasius-demo__legend strong {
+      display: block;
+      color: var(--plasius-ink);
+      margin-bottom: 4px;
+    }
+    .plasius-demo__footer {
+      margin-top: 4px;
+      color: rgba(21, 32, 40, 0.66);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    @media (max-width: 1200px) {
+      .plasius-demo__hero,
+      .plasius-demo__layout {
+        grid-template-columns: 1fr;
+      }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function mix(a, b, t) {
+  return a + (b - a) * t;
+}
+
+function vec3(x = 0, y = 0, z = 0) {
+  return { x, y, z };
+}
+
+function addVec3(a, b) {
+  return vec3(a.x + b.x, a.y + b.y, a.z + b.z);
+}
+
+function subVec3(a, b) {
+  return vec3(a.x - b.x, a.y - b.y, a.z - b.z);
+}
+
+function scaleVec3(a, s) {
+  return vec3(a.x * s, a.y * s, a.z * s);
+}
+
+function dotVec3(a, b) {
+  return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+function crossVec3(a, b) {
+  return vec3(
+    a.y * b.z - a.z * b.y,
+    a.z * b.x - a.x * b.z,
+    a.x * b.y - a.y * b.x
+  );
+}
+
+function lengthVec3(a) {
+  return Math.hypot(a.x, a.y, a.z);
+}
+
+function normalizeVec3(a) {
+  const length = lengthVec3(a) || 1;
+  return vec3(a.x / length, a.y / length, a.z / length);
+}
+
+function reflectVec3(vector, normal) {
+  const unitNormal = normalizeVec3(normal);
+  return subVec3(vector, scaleVec3(unitNormal, 2 * dotVec3(vector, unitNormal)));
+}
+
+function rotateY(point, angle) {
+  const cosine = Math.cos(angle);
+  const sine = Math.sin(angle);
+  return vec3(
+    point.x * cosine - point.z * sine,
+    point.y,
+    point.x * sine + point.z * cosine
+  );
+}
+
+function transformPoint(point, transform) {
+  const scale =
+    typeof transform.scale === "number"
+      ? { x: transform.scale, y: transform.scale, z: transform.scale }
+      : transform.scale;
+  const scaled = vec3(point.x * scale.x, point.y * scale.y, point.z * scale.z);
+  const rotated = rotateY(scaled, transform.rotationY);
+  return addVec3(rotated, transform.position);
+}
+
+function projectPoint(point, camera, viewport) {
+  const relative = subVec3(point, camera.eye);
+  const viewX = dotVec3(relative, camera.right);
+  const viewY = dotVec3(relative, camera.up);
+  const viewZ = dotVec3(relative, camera.forward);
+  if (viewZ <= 0.1) {
+    return null;
+  }
+  const focal = 1 / Math.tan((camera.fov * Math.PI) / 360);
+  const ndcX = (viewX * focal) / (viewZ * camera.aspect);
+  const ndcY = (viewY * focal) / viewZ;
+  return {
+    x: (ndcX * 0.5 + 0.5) * viewport.width,
+    y: (-ndcY * 0.5 + 0.5) * viewport.height,
+    depth: viewZ,
+  };
+}
+
+function colorToRgba(color, alpha = 1) {
+  const r = Math.round(clamp(color.r, 0, 1) * 255);
+  const g = Math.round(clamp(color.g, 0, 1) * 255);
+  const b = Math.round(clamp(color.b, 0, 1) * 255);
+  return `rgba(${r}, ${g}, ${b}, ${clamp(alpha, 0, 1)})`;
+}
+
+function projectShadowPoint(point, lightDir, planeY) {
+  const shadowDir = scaleVec3(lightDir, -1);
+  if (Math.abs(shadowDir.y) < 0.0001) {
+    return null;
+  }
+
+  const distance = (planeY - point.y) / shadowDir.y;
+  if (!Number.isFinite(distance) || distance < 0) {
+    return null;
+  }
+
+  return addVec3(point, scaleVec3(shadowDir, distance));
+}
+
+function shadeColor(base, normal, lightDir, heightBias = 0, accent = 0) {
+  const diffuse = clamp(dotVec3(normalizeVec3(normal), lightDir), 0, 1);
+  const brightness = 0.24 + diffuse * 0.72 + heightBias * 0.08 + accent;
+  return {
+    r: clamp(base.r * brightness, 0, 1),
+    g: clamp(base.g * brightness, 0, 1),
+    b: clamp(base.b * (brightness + 0.03), 0, 1),
+  };
+}
+
+function buildCamera(state, canvas) {
+  const preset = CAMERA_PRESETS[state.focus] ?? CAMERA_PRESETS.integrated;
+  const yaw = state.camera.yaw ?? preset.yaw;
+  const pitch = state.camera.pitch ?? preset.pitch;
+  const distance = state.camera.distance ?? preset.distance;
+  const target = state.camera.target ?? vec3(...preset.target);
+  const eye = vec3(
+    target.x + Math.sin(yaw) * Math.cos(pitch) * distance,
+    target.y + Math.sin(pitch) * distance,
+    target.z + Math.cos(yaw) * Math.cos(pitch) * distance
+  );
+  const forward = normalizeVec3(subVec3(target, eye));
+  const right = normalizeVec3(crossVec3(forward, vec3(0, 1, 0)));
+  const up = normalizeVec3(crossVec3(right, forward));
+  return {
+    eye,
+    target,
+    forward,
+    right,
+    up,
+    fov: 54,
+    aspect: canvas.width / canvas.height,
+  };
+}
+
+function buildTrianglesFromMesh(mesh, transform, baseColor, camera, viewport, triangles, accent = 0) {
+  for (let index = 0; index < mesh.indices.length; index += 3) {
+    const aIndex = mesh.indices[index] * 3;
+    const bIndex = mesh.indices[index + 1] * 3;
+    const cIndex = mesh.indices[index + 2] * 3;
+
+    const a = transformPoint(
+      vec3(mesh.positions[aIndex], mesh.positions[aIndex + 1], mesh.positions[aIndex + 2]),
+      transform
+    );
+    const b = transformPoint(
+      vec3(mesh.positions[bIndex], mesh.positions[bIndex + 1], mesh.positions[bIndex + 2]),
+      transform
+    );
+    const c = transformPoint(
+      vec3(mesh.positions[cIndex], mesh.positions[cIndex + 1], mesh.positions[cIndex + 2]),
+      transform
+    );
+
+    const ab = subVec3(b, a);
+    const ac = subVec3(c, a);
+    const normal = normalizeVec3(crossVec3(ab, ac));
+    const viewDir = normalizeVec3(subVec3(camera.eye, a));
+    if (dotVec3(normal, viewDir) <= 0) {
+      continue;
+    }
+
+    const projected = [projectPoint(a, camera, viewport), projectPoint(b, camera, viewport), projectPoint(c, camera, viewport)];
+    if (projected.some((value) => value === null)) {
+      continue;
+    }
+
+    triangles.push({
+      points: projected,
+      depth: (projected[0].depth + projected[1].depth + projected[2].depth) / 3,
+      worldCenter: scaleVec3(addVec3(addVec3(a, b), c), 1 / 3),
+      normal,
+      baseColor,
+      accent,
+    });
+  }
+}
+
+function createPerformanceGovernor() {
+  const fluidDetail = createQualityLadderAdapter({
+    id: "fluid-detail",
+    domain: "geometry",
+    levels: [
+      { id: "low", config: { nearResolution: 10, midResolution: 6, splashCount: 10 }, estimatedCostMs: 0.8 },
+      { id: "medium", config: { nearResolution: 16, midResolution: 8, splashCount: 18 }, estimatedCostMs: 1.4 },
+      { id: "high", config: { nearResolution: 24, midResolution: 12, splashCount: 28 }, estimatedCostMs: 2.4 },
+    ],
+    initialLevel: "high",
+  });
+
+  const clothDetail = createQualityLadderAdapter({
+    id: "cloth-detail",
+    domain: "cloth",
+    levels: [
+      { id: "low", config: { cols: 10, rows: 7 }, estimatedCostMs: 0.7 },
+      { id: "medium", config: { cols: 16, rows: 11 }, estimatedCostMs: 1.3 },
+      { id: "high", config: { cols: 24, rows: 16 }, estimatedCostMs: 2.1 },
+    ],
+    initialLevel: "high",
+  });
+
+  const lightingDetail = createQualityLadderAdapter({
+    id: "lighting-detail",
+    domain: "lighting",
+    levels: [
+      { id: "low", config: { shadowStrength: 0.18, reflectionStrength: 0.08 }, estimatedCostMs: 0.5 },
+      { id: "medium", config: { shadowStrength: 0.34, reflectionStrength: 0.16 }, estimatedCostMs: 1.0 },
+      { id: "high", config: { shadowStrength: 0.5, reflectionStrength: 0.24 }, estimatedCostMs: 1.8 },
+    ],
+    initialLevel: "high",
+  });
+
+  const governor = createGpuPerformanceGovernor({
+    device: createDeviceProfile({
+      deviceClass: "desktop",
+      mode: "flat",
+      refreshRateHz: 60,
+      supportedFrameRates: [60, 90],
+      supportsWebGpu: true,
+    }),
+    modules: [fluidDetail, clothDetail, lightingDetail],
+    adaptation: {
+      sampleWindowSize: 10,
+      minimumSamplesBeforeAdjustment: 4,
+      degradeCooldownFrames: 1,
+      upgradeCooldownFrames: 4,
+      minStableFramesForRecovery: 3,
+    },
+  });
+
+  return { governor, fluidDetail, clothDetail, lightingDetail };
+}
+
+function buildDemoDom(root, options) {
+  root.innerHTML = `
+    <main class="plasius-demo">
+      <section class="plasius-demo__hero">
+        <section class="plasius-panel plasius-demo__hero-card">
+          <p class="plasius-demo__eyebrow">${options.packageName}</p>
+          <h1>${options.title}</h1>
+          <p class="plasius-demo__lead">${options.subtitle}</p>
+        </section>
+        <section class="plasius-panel plasius-demo__status">
+          <p id="demoStatus" class="plasius-demo__status-badge">Booting 3D scene…</p>
+          <p id="demoDetails" class="plasius-demo__status-text">
+            Preparing GLTF assets, cloth and fluid continuity plans, and adaptive quality metadata.
+          </p>
+        </section>
+      </section>
+      <section class="plasius-demo__layout">
+        <section class="plasius-panel plasius-demo__canvas-panel">
+          <canvas id="demoCanvas" class="plasius-demo__canvas" width="1280" height="720"></canvas>
+          <div class="plasius-demo__toolbar">
+            <button id="pauseButton" type="button">Pause</button>
+            <label class="plasius-toggle">
+              <input id="stressToggle" type="checkbox" />
+              Stress mode
+            </label>
+            <label class="plasius-toggle">
+              Focus
+              <select id="focusMode">
+                <option value="integrated">integrated</option>
+                <option value="lighting">lighting</option>
+                <option value="cloth">cloth</option>
+                <option value="fluid">fluid</option>
+                <option value="physics">physics</option>
+                <option value="performance">performance</option>
+                <option value="debug">debug</option>
+              </select>
+            </label>
+          </div>
+          <div class="plasius-demo__legend">
+            <strong>Scene</strong>
+            GLTF ships carry collision metadata.<br />
+            Flag cloth and ocean waves scale by distance band.<br />
+            Ray-traced shadow and reflection style is preserved near the camera.
+          </div>
+        </section>
+        <aside class="plasius-demo__sidebar">
+          <section class="plasius-panel plasius-demo__card">
+            <h2>Scene State</h2>
+            <ul id="sceneMetrics" class="plasius-demo__metrics"></ul>
+          </section>
+          <section class="plasius-panel plasius-demo__card">
+            <h2>Quality + Budgets</h2>
+            <ul id="qualityMetrics" class="plasius-demo__metrics"></ul>
+          </section>
+          <section class="plasius-panel plasius-demo__card">
+            <h2>Debug Telemetry</h2>
+            <ul id="debugMetrics" class="plasius-demo__metrics"></ul>
+          </section>
+          <section class="plasius-panel plasius-demo__card">
+            <h2>Notes</h2>
+            <ul id="sceneNotes" class="plasius-demo__metrics"></ul>
+          </section>
+        </aside>
+      </section>
+      <p class="plasius-demo__footer">
+        This visual example is shared across the GPU packages to keep manual validation fast and consistent.
+      </p>
+    </main>
+  `;
+
+  return {
+    status: root.querySelector("#demoStatus"),
+    details: root.querySelector("#demoDetails"),
+    canvas: root.querySelector("#demoCanvas"),
+    pauseButton: root.querySelector("#pauseButton"),
+    stressToggle: root.querySelector("#stressToggle"),
+    focusMode: root.querySelector("#focusMode"),
+    sceneMetrics: root.querySelector("#sceneMetrics"),
+    qualityMetrics: root.querySelector("#qualityMetrics"),
+    debugMetrics: root.querySelector("#debugMetrics"),
+    sceneNotes: root.querySelector("#sceneNotes"),
+  };
+}
+
+function buildClothSurface(model, state, meshDetail) {
+  const clothPlan = createClothRepresentationPlan({
+    garmentId: "shore-flag",
+    kind: state.focus === "cloth" ? "flag" : clothGarmentKinds[0],
+    profile: state.focus === "cloth" ? "cinematic" : clothProfileNames[0],
+    supportsRayTracing: true,
+    nearFieldMaxMeters: 18,
+    midFieldMaxMeters: 55,
+    farFieldMaxMeters: 180,
+  });
+  const cameraDistance = lengthVec3(subVec3(state.camera.target, state.camera.eye ?? vec3(...CAMERA_PRESETS[state.focus].target)));
+  const band = selectClothRepresentationBand(cameraDistance, clothPlan.thresholds);
+  const representation =
+    clothPlan.representations.find((entry) => entry.band === band) ?? clothPlan.representations[0];
+  const continuity = createClothContinuityEnvelope({ garmentId: "shore-flag" });
+
+  const cols = meshDetail.cols;
+  const rows = meshDetail.rows;
+  const origin = vec3(-3.5, 5.9, 2.4);
+  const width = 4.8;
+  const height = 2.7;
+  const positions = [];
+  const indices = [];
+  const time = state.time;
+
+  for (let row = 0; row < rows; row += 1) {
+    for (let column = 0; column < cols; column += 1) {
+      const u = column / (cols - 1);
+      const v = row / (rows - 1);
+      const gust = Math.sin(time * 1.9 + v * 3.2 + u * 2.1) * continuity.broadMotionFloor;
+      const wrinkle = Math.sin(time * 4.4 + u * 9.2 + v * 5.6) * continuity.wrinkleFloor * 0.22;
+      const x = origin.x + u * 1.8 + gust * 0.55 * (u * 0.9);
+      const y = origin.y - height * v + wrinkle * 0.2;
+      const z = origin.z + width * u + gust * 0.72 * (u * 0.85);
+      const flap = Math.cos(time * 2.7 + u * 7.4 + v * 3.8) * continuity.broadMotionFloor * 0.28;
+      positions.push(vec3(x + flap, y, z));
+    }
+  }
+
+  for (let row = 0; row < rows - 1; row += 1) {
+    for (let column = 0; column < cols - 1; column += 1) {
+      const a = row * cols + column;
+      const b = a + 1;
+      const c = a + cols + 1;
+      const d = a + cols;
+      indices.push(a, b, c, a, c, d);
+    }
+  }
+
+  return {
+    clothPlan,
+    band,
+    representation,
+    continuity,
+    positions,
+    indices,
+    grid: { rows, cols },
+  };
+}
+
+function sampleWave(x, z, time) {
+  return (
+    Math.sin(x * 0.18 + time * 1.2) * 0.55 +
+    Math.cos(z * 0.12 + time * 0.9) * 0.35 +
+    Math.sin((x + z) * 0.08 + time * 1.6) * 0.22
+  );
+}
+
+function buildWaterBands(state, fluidDetail) {
+  const fluidPlan = createFluidRepresentationPlan({
+    fluidBodyId: "harbor",
+    kind: state.focus === "fluid" ? "ocean" : fluidBodyKinds[0],
+    profile: state.focus === "fluid" ? "cinematic" : fluidProfileNames[0],
+    supportsRayTracing: true,
+    nearFieldMaxMeters: 40,
+    midFieldMaxMeters: 150,
+    farFieldMaxMeters: 600,
+  });
+
+  const bandMeshes = [];
+  const bandExtents = Object.freeze([
+    { band: "near", width: 20, depth: 18, step: 1, y: 0.2 },
+    { band: "mid", width: 34, depth: 28, step: 2, y: 0.05 },
+    { band: "far", width: 54, depth: 42, step: 3.5, y: -0.05 },
+    { band: "horizon", width: 80, depth: 76, step: 7, y: -0.14 },
+  ]);
+
+  for (const bandSpec of bandExtents) {
+    const representation =
+      fluidPlan.representations.find((entry) => entry.band === bandSpec.band) ??
+      fluidPlan.representations[0];
+    const continuity = createFluidContinuityEnvelope({ fluidBodyId: "harbor" });
+    const bandResolution =
+      bandSpec.band === "near"
+        ? fluidDetail.nearResolution
+        : bandSpec.band === "mid"
+          ? fluidDetail.midResolution
+          : bandSpec.band === "far"
+            ? 5
+            : 3;
+    const cols = Math.max(4, bandResolution * 2);
+    const rows = Math.max(4, bandResolution + 2);
+    const positions = [];
+    const indices = [];
+    const originX = -bandSpec.width * 0.5;
+    const originZ = -6;
+    for (let row = 0; row < rows; row += 1) {
+      for (let column = 0; column < cols; column += 1) {
+        const u = column / (cols - 1);
+        const v = row / (rows - 1);
+        const x = originX + bandSpec.width * u;
+        const z = originZ + bandSpec.depth * v;
+        const y =
+          bandSpec.y +
+          sampleWave(x, z, state.time) *
+            continuity.amplitudeFloor *
+            (bandSpec.band === "near" ? 0.9 : bandSpec.band === "mid" ? 0.55 : 0.3);
+        positions.push(vec3(x, y, z));
+      }
+    }
+    for (let row = 0; row < rows - 1; row += 1) {
+      for (let column = 0; column < cols - 1; column += 1) {
+        const a = row * cols + column;
+        const b = a + 1;
+        const c = a + cols + 1;
+        const d = a + cols;
+        indices.push(a, b, c, a, c, d);
+      }
+    }
+
+    bandMeshes.push({
+      band: bandSpec.band,
+      representation,
+      continuity,
+      rows,
+      cols,
+      positions,
+      indices,
+      color:
+        bandSpec.band === "near"
+          ? { r: 0.12, g: 0.36, b: 0.46 }
+          : bandSpec.band === "mid"
+            ? { r: 0.15, g: 0.42, b: 0.54 }
+            : bandSpec.band === "far"
+              ? { r: 0.22, g: 0.48, b: 0.6 }
+              : { r: 0.34, g: 0.58, b: 0.7 },
+    });
+  }
+
+  return { fluidPlan, bandMeshes };
+}
+
+function createSceneState(options) {
+  const { governor, fluidDetail, clothDetail, lightingDetail } = createPerformanceGovernor();
+  const physicsProfile = defaultPhysicsWorkerProfile;
+  const physicsPlan = createPhysicsSimulationPlan(physicsProfile);
+  const physicsManifest = getPhysicsWorkerManifest(physicsProfile);
+  const debugSession = createGpuDebugSession({
+    enabled: true,
+    adapter: {
+      label: "3D showcase",
+      memoryCapacityHintBytes: 6 * 1024 * 1024 * 1024,
+      coreCountHint: 12,
+    },
+  });
+  debugSession.trackAllocation({
+    id: "showcase.color",
+    owner: "renderer",
+    category: "texture",
+    sizeBytes: 1280 * 720 * 4,
+    label: "Main color buffer",
+  });
+  debugSession.trackAllocation({
+    id: "showcase.shadow-impression",
+    owner: "lighting",
+    category: "texture",
+    sizeBytes: 12 * 1024 * 1024,
+    label: "Shadow impression atlas",
+  });
+
+  return {
+    focus: options.focus,
+    governor,
+    fluidDetail,
+    clothDetail,
+    lightingDetail,
+    debugSession,
+    time: 0,
+    lastTimeMs: null,
+    paused: false,
+    stress: false,
+    camera: {
+      ...CAMERA_PRESETS[options.focus],
+      target: vec3(...CAMERA_PRESETS[options.focus].target),
+    },
+    ships: [
+      {
+        id: "northwind",
+        position: vec3(-5.2, 0, 7.2),
+        velocity: vec3(2.1, 0, -1.6),
+        rotationY: 0.42,
+        angularVelocity: 0.18,
+        tint: { r: 0.62, g: 0.39, b: 0.23 },
+      },
+      {
+        id: "tidecaller",
+        position: vec3(4.8, 0, 4.4),
+        velocity: vec3(-1.85, 0, 1.25),
+        rotationY: -2.62,
+        angularVelocity: -0.14,
+        tint: { r: 0.48, g: 0.28, b: 0.19 },
+      },
+    ],
+    sprays: [],
+    frame: 0,
+    collisionCount: 0,
+    collisionFlash: 0,
+    physics: {
+      profile: physicsProfile,
+      plan: physicsPlan,
+      manifest: physicsManifest,
+      snapshot: null,
+    },
+    shipModel: null,
+  };
+}
+
+function setListContent(element, values) {
+  element.innerHTML = values.map((value) => `<li>${value}</li>`).join("");
+}
+
+function drawSkyAndShore(ctx, canvas, state, nearLighting, reflectionStrength, shadowStrength) {
+  const premiumShadows = nearLighting.primaryShadowSource === "ray-traced-primary";
+  const sky = ctx.createLinearGradient(0, 0, 0, canvas.height * 0.5);
+  sky.addColorStop(0, premiumShadows ? "#f0f7fb" : "#e8f1f7");
+  sky.addColorStop(0.6, premiumShadows ? "#c7d9e5" : "#b9ceda");
+  sky.addColorStop(1, premiumShadows ? "#84a7bd" : "#7b9bb0");
+  ctx.fillStyle = sky;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const shoreline = ctx.createLinearGradient(0, canvas.height * 0.45, 0, canvas.height);
+  shoreline.addColorStop(0, premiumShadows ? "#235064" : "#264c5f");
+  shoreline.addColorStop(0.52, premiumShadows ? "#153e53" : "#173d4f");
+  shoreline.addColorStop(1, "#0b2433");
+  ctx.fillStyle = shoreline;
+  ctx.fillRect(0, canvas.height * 0.45, canvas.width, canvas.height * 0.55);
+
+  const sunX = mix(canvas.width * 0.16, canvas.width * 0.84, (Math.sin(state.time * 0.12) + 1) * 0.5);
+  const sunY = canvas.height * 0.14 + Math.cos(state.time * 0.12) * 22;
+  const sun = ctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 90);
+  sun.addColorStop(0, "rgba(255, 244, 210, 0.9)");
+  sun.addColorStop(1, "rgba(255, 244, 210, 0)");
+  ctx.fillStyle = sun;
+  ctx.beginPath();
+  ctx.arc(sunX, sunY, 90, 0, Math.PI * 2);
+  ctx.fill();
+
+  const track = ctx.createLinearGradient(sunX, canvas.height * 0.46, sunX, canvas.height * 0.96);
+  track.addColorStop(0, `rgba(255, 243, 214, ${0.08 + reflectionStrength * 0.18})`);
+  track.addColorStop(0.42, `rgba(224, 242, 255, ${0.04 + reflectionStrength * 0.2})`);
+  track.addColorStop(1, "rgba(224, 242, 255, 0)");
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.fillStyle = track;
+  ctx.beginPath();
+  ctx.ellipse(sunX, canvas.height * 0.72, 46 + shadowStrength * 60, canvas.height * 0.26, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  if (state.collisionFlash > 0.01) {
+    ctx.fillStyle = `rgba(255, 243, 228, ${state.collisionFlash * 0.14})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+}
+
+function drawTriangles(ctx, triangles, lightDir, reflectionStrength, camera, shadowStrength) {
+  triangles.sort((left, right) => right.depth - left.depth);
+  for (const triangle of triangles) {
+    const surfaceNormal = normalizeVec3(triangle.normal);
+    const shaded = shadeColor(
+      triangle.baseColor,
+      surfaceNormal,
+      lightDir,
+      clamp((triangle.worldCenter.y + 3) / 10, 0, 1),
+      triangle.accent
+    );
+    const reflection = triangle.worldCenter.y < 0.8 ? reflectionStrength : 0;
+    const viewDir = normalizeVec3(subVec3(camera.eye, triangle.worldCenter));
+    const reflectedLight = reflectVec3(scaleVec3(lightDir, -1), surfaceNormal);
+    const gloss = triangle.worldCenter.y < 0.9 ? 1 : triangle.accent > 0.05 ? 0.55 : 0.3;
+    const specular = Math.pow(clamp(dotVec3(reflectedLight, viewDir), 0, 1), triangle.worldCenter.y < 0.9 ? 18 : 12) * gloss;
+    const occlusion = triangle.worldCenter.y < 0.9 ? shadowStrength * 0.035 : 0;
+    const fill = colorToRgba(
+      {
+        r: clamp(shaded.r + reflection * 0.08 + specular * 0.14 - occlusion, 0, 1),
+        g: clamp(shaded.g + reflection * 0.08 + specular * 0.15 - occlusion, 0, 1),
+        b: clamp(shaded.b + reflection * 0.16 + specular * 0.2 - occlusion * 0.5, 0, 1),
+      },
+      0.98
+    );
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    ctx.moveTo(triangle.points[0].x, triangle.points[0].y);
+    ctx.lineTo(triangle.points[1].x, triangle.points[1].y);
+    ctx.lineTo(triangle.points[2].x, triangle.points[2].y);
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+function renderProjectedShadow(ctx, worldPoints, camera, viewport, lightDir, options = {}) {
+  const planeY = options.planeY ?? 0;
+  const projected = worldPoints
+    .map((point) => projectShadowPoint(point, lightDir, planeY))
+    .filter(Boolean)
+    .map((point) => projectPoint(point, camera, viewport))
+    .filter(Boolean);
+
+  if (projected.length < 3) {
+    return;
+  }
+
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  ctx.fillStyle = options.color ?? `rgba(12, 24, 36, ${clamp(options.alpha ?? 0.16, 0, 0.5)})`;
+  ctx.shadowColor = options.color ?? "rgba(12, 24, 36, 0.22)";
+  ctx.shadowBlur = options.blur ?? 18;
+  ctx.beginPath();
+  ctx.moveTo(projected[0].x, projected[0].y);
+  for (let index = 1; index < projected.length; index += 1) {
+    ctx.lineTo(projected[index].x, projected[index].y);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function pushHarborGeometry(camera, viewport, triangles) {
+  const harborObjects = [
+    {
+      position: vec3(-8.2, 1.1, -0.9),
+      rotationY: -0.16,
+      scale: { x: 5.4, y: 2.4, z: 4.2 },
+      color: { r: 0.48, g: 0.4, b: 0.32 },
+      accent: 0.06,
+    },
+    {
+      position: vec3(-5.7, 0.45, 1.4),
+      rotationY: -0.08,
+      scale: { x: 6.8, y: 0.3, z: 2.1 },
+      color: { r: 0.5, g: 0.34, b: 0.22 },
+      accent: 0.04,
+    },
+    {
+      position: vec3(-10.4, 0.28, 0.8),
+      rotationY: 0.22,
+      scale: { x: 1.2, y: 0.9, z: 1.2 },
+      color: { r: 0.34, g: 0.32, b: 0.36 },
+      accent: 0.02,
+    },
+  ];
+
+  for (const object of harborObjects) {
+    buildTrianglesFromMesh(
+      UNIT_BOX_MESH,
+      {
+        position: object.position,
+        rotationY: object.rotationY,
+        scale: object.scale,
+      },
+      object.color,
+      camera,
+      viewport,
+      triangles,
+      object.accent
+    );
+  }
+}
+
+function renderShipRigging(ctx, ship, camera, viewport) {
+  const transform = { position: ship.position, rotationY: ship.rotationY, scale: 1.1 };
+  const mastBase = transformPoint(vec3(0, 0.38, -0.4), transform);
+  const mastTop = transformPoint(vec3(0, 3.8, -0.2), transform);
+  const aftBase = transformPoint(vec3(-0.25, 0.32, -1.9), transform);
+  const aftTop = transformPoint(vec3(-0.15, 2.7, -1.75), transform);
+  const sailA = transformPoint(vec3(0.08, 3.2, -0.2), transform);
+  const sailB = transformPoint(vec3(0.12, 1.2, -0.5), transform);
+  const sailC = transformPoint(vec3(2.25, 2.25, 0.15), transform);
+  const projected = [mastBase, mastTop, aftBase, aftTop, sailA, sailB, sailC].map((point) =>
+    projectPoint(point, camera, viewport)
+  );
+  if (projected.some((value) => value === null)) {
+    return;
+  }
+
+  ctx.strokeStyle = "rgba(73, 54, 45, 0.94)";
+  ctx.lineWidth = 3.5;
+  ctx.beginPath();
+  ctx.moveTo(projected[0].x, projected[0].y);
+  ctx.lineTo(projected[1].x, projected[1].y);
+  ctx.moveTo(projected[2].x, projected[2].y);
+  ctx.lineTo(projected[3].x, projected[3].y);
+  ctx.stroke();
+
+  ctx.fillStyle = "rgba(238, 232, 214, 0.88)";
+  ctx.beginPath();
+  ctx.moveTo(projected[4].x, projected[4].y);
+  ctx.lineTo(projected[5].x, projected[5].y);
+  ctx.lineTo(projected[6].x, projected[6].y);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function renderClothAccent(ctx, cloth, camera, viewport) {
+  const projected = cloth.positions.map((point) => projectPoint(point, camera, viewport));
+  ctx.strokeStyle = "rgba(255, 241, 226, 0.92)";
+  ctx.lineWidth = 1.7;
+
+  for (
+    let row = 0;
+    row < cloth.grid.rows;
+    row += Math.max(1, Math.floor(cloth.grid.rows / 5))
+  ) {
+    ctx.beginPath();
+    let started = false;
+    for (let column = 0; column < cloth.grid.cols; column += 1) {
+      const point = projected[row * cloth.grid.cols + column];
+      if (!point) {
+        continue;
+      }
+      if (!started) {
+        ctx.moveTo(point.x, point.y);
+        started = true;
+      } else {
+        ctx.lineTo(point.x, point.y);
+      }
+    }
+    if (started) {
+      ctx.stroke();
+    }
+  }
+
+  const borderIndices = [
+    0,
+    cloth.grid.cols - 1,
+    cloth.grid.rows * cloth.grid.cols - 1,
+    (cloth.grid.rows - 1) * cloth.grid.cols,
+  ];
+  ctx.fillStyle = "rgba(164, 44, 28, 0.95)";
+  for (const index of borderIndices) {
+    const point = projected[index];
+    if (!point) {
+      continue;
+    }
+    ctx.beginPath();
+    ctx.arc(point.x, point.y, 2.8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function renderWaterHighlights(ctx, waterBands, camera, viewport) {
+  for (const band of waterBands) {
+    if (band.band === "horizon") {
+      continue;
+    }
+    const interval = band.band === "near" ? 2 : 3;
+    const alpha = band.band === "near" ? 0.22 : 0.14;
+    ctx.strokeStyle = `rgba(232, 247, 255, ${alpha})`;
+    ctx.lineWidth = band.band === "near" ? 1.3 : 0.9;
+    for (let row = interval; row < band.rows - 1; row += interval) {
+      ctx.beginPath();
+      let started = false;
+      for (let column = 0; column < band.cols; column += 1) {
+        const point = projectPoint(
+          band.positions[row * band.cols + column],
+          camera,
+          viewport
+        );
+        if (!point) {
+          continue;
+        }
+        if (!started) {
+          ctx.moveTo(point.x, point.y);
+          started = true;
+        } else {
+          ctx.lineTo(point.x, point.y);
+        }
+      }
+      if (started) {
+        ctx.stroke();
+      }
+    }
+  }
+}
+
+function spawnSpray(state, point, intensity) {
+  const count = state.fluidDetail.getSnapshot().currentLevel.config.splashCount;
+  for (let index = 0; index < count; index += 1) {
+    const angle = (index / count) * Math.PI * 2;
+    const speed = 0.9 + Math.random() * intensity * 0.45;
+    state.sprays.push({
+      position: vec3(point.x, point.y, point.z),
+      velocity: vec3(Math.cos(angle) * speed * 0.35, 1.1 + Math.random() * 0.8, Math.sin(angle) * speed * 0.25),
+      life: 1.2 + Math.random() * 0.4,
+    });
+  }
+}
+
+function updateShips(state, dt, shipModel) {
+  const physics = shipModel.physics;
+  const halfExtents = physics.halfExtents ?? [1.35, 0.95, 3.9];
+  let collided = false;
+  for (const ship of state.ships) {
+    ship.position = addVec3(ship.position, scaleVec3(ship.velocity, dt));
+    ship.rotationY += ship.angularVelocity * dt;
+    ship.velocity = scaleVec3(ship.velocity, 1 - (physics.linearDamping ?? 0.04) * dt);
+    ship.angularVelocity *= 1 - (physics.angularDamping ?? 0.08) * dt;
+    ship.position.y = sampleWave(ship.position.x, ship.position.z, state.time) * 0.22 + (physics.waterline ?? 0.42);
+    if (Math.abs(ship.position.x) > 10) {
+      ship.velocity.x *= -1;
+      ship.angularVelocity *= -1;
+    }
+    if (ship.position.z < 2 || ship.position.z > 16) {
+      ship.velocity.z *= -1;
+      ship.angularVelocity *= -1;
+    }
+  }
+
+  const [a, b] = state.ships;
+  const dx = b.position.x - a.position.x;
+  const dz = b.position.z - a.position.z;
+  const overlapX = Math.abs(dx) < halfExtents[0] * 1.7;
+  const overlapZ = Math.abs(dz) < halfExtents[2] * 0.8;
+  if (overlapX && overlapZ) {
+    const restitution = physics.restitution ?? 0.22;
+    const swapX = a.velocity.x;
+    const swapZ = a.velocity.z;
+    a.velocity.x = -b.velocity.x * (0.86 + restitution);
+    a.velocity.z = -b.velocity.z * (0.82 + restitution);
+    b.velocity.x = -swapX * (0.86 + restitution);
+    b.velocity.z = -swapZ * (0.82 + restitution);
+    a.angularVelocity += 0.55;
+    b.angularVelocity -= 0.55;
+    const contactPoint = vec3((a.position.x + b.position.x) * 0.5, (a.position.y + b.position.y) * 0.5 + 0.1, (a.position.z + b.position.z) * 0.5);
+    spawnSpray(state, contactPoint, Math.abs(dx) + Math.abs(dz));
+    state.collisionCount += 1;
+    collided = true;
+  }
+  state.collisionFlash = collided ? 1 : Math.max(0, state.collisionFlash - dt * 1.8);
+}
+
+function updateSpray(state, dt) {
+  state.sprays = state.sprays
+    .map((particle) => {
+      const nextVelocity = vec3(particle.velocity.x, particle.velocity.y - 4.2 * dt, particle.velocity.z);
+      const nextPosition = addVec3(particle.position, scaleVec3(nextVelocity, dt));
+      return {
+        position: nextPosition,
+        velocity: nextVelocity,
+        life: particle.life - dt,
+      };
+    })
+    .filter((particle) => particle.life > 0 && particle.position.y > -0.2);
+}
+
+function recordTelemetry(state, frameTimeMs) {
+  const frameId = `showcase-${state.frame}`;
+  const quality = {
+    fluid: state.fluidDetail.getSnapshot(),
+    cloth: state.clothDetail.getSnapshot(),
+    lighting: state.lightingDetail.getSnapshot(),
+  };
+  const synthetic = frameTimeMs + state.sprays.length * 0.1 + (state.stress ? 6.5 : 0);
+  const decision = state.governor.recordFrame({ frameTimeMs: synthetic });
+  const queueDepth = Math.min(32, Math.round(6 + state.sprays.length / 2 + (state.stress ? 10 : 0)));
+  const readyLaneDepth = Math.min(
+    16,
+    4 + Math.round(Math.max(0, Math.sin(state.time * 1.7 + 0.8)) * 9)
+  );
+  state.debugSession.recordQueue({
+    owner: "renderer",
+    queueClass: "render",
+    depth: queueDepth,
+    capacity: 32,
+    frameId,
+  });
+  state.debugSession.recordReadyLane({
+    owner: "lighting",
+    queueClass: "lighting",
+    laneId: "critical",
+    priority: 920,
+    depth: readyLaneDepth,
+    capacity: 16,
+    frameId,
+  });
+  state.debugSession.recordDispatch({
+    owner: "lighting",
+    queueClass: "lighting",
+    jobType: "lighting.integration",
+    frameId,
+    durationMs: quality.lighting.currentLevel.estimatedCostMs ?? 1.2,
+    workgroups: { x: quality.fluid.currentLevel.config.nearResolution, y: 1, z: 1 },
+    workgroupSize: { x: 8, y: 8, z: 1 },
+  });
+  state.debugSession.recordDependencyUnlock({
+    owner: "scene",
+    queueClass: "render",
+    sourceJobType: "physics.resolve",
+    unlockedJobType: "lighting.integration",
+    priority: 920,
+    unlockCount: 2 + Math.round(Math.max(0, Math.sin(state.time * 1.1)) * 4),
+    frameId,
+  });
+  state.debugSession.recordPipelinePhase({
+    owner: "scene",
+    pipeline: "scene-preparation",
+    stage: "stable-visual-snapshot",
+    frameId,
+    durationMs: synthetic * 0.38,
+    snapshotAgeMs: Math.max(0, synthetic - 8),
+  });
+  state.debugSession.recordFrame({
+    frameId,
+    frameTimeMs: synthetic,
+    targetFrameTimeMs: 16.67,
+    gpuBusyMs: synthetic * 0.56,
+    dropped: synthetic > 18,
+  });
+  return decision;
+}
+
+function renderSprays(ctx, sprays, camera, viewport) {
+  for (const spray of sprays) {
+    const projected = projectPoint(spray.position, camera, viewport);
+    if (!projected) {
+      continue;
+    }
+    const radius = clamp((1 / projected.depth) * 260, 1.5, 7.5);
+    ctx.fillStyle = `rgba(225, 243, 250, ${clamp(spray.life / 1.6, 0, 0.9)})`;
+    ctx.beginPath();
+    ctx.arc(projected.x, projected.y, radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+function renderFlagPole(ctx, camera, viewport) {
+  const base = projectPoint(vec3(-3.5, 0.7, 2.4), camera, viewport);
+  const top = projectPoint(vec3(-3.5, 6.3, 2.4), camera, viewport);
+  if (!base || !top) {
+    return;
+  }
+  ctx.strokeStyle = "rgba(77, 52, 41, 0.95)";
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.moveTo(base.x, base.y);
+  ctx.lineTo(top.x, top.y);
+  ctx.stroke();
+}
+
+function renderShipShadow(ctx, shipModel, ship, state, camera, viewport, lightDir, shadowStrength) {
+  const bounds = shipModel.bounds;
+  const keelY = (shipModel.physics.waterline ?? 0.42) - 0.28;
+  const transform = { position: ship.position, rotationY: ship.rotationY, scale: 1.1 };
+  const hullCorners = [
+    vec3(bounds.min[0], keelY, bounds.min[2]),
+    vec3(bounds.max[0], keelY, bounds.min[2]),
+    vec3(bounds.max[0], keelY, bounds.max[2]),
+    vec3(bounds.min[0], keelY, bounds.max[2]),
+  ].map((point) => transformPoint(point, transform));
+
+  renderProjectedShadow(ctx, hullCorners, camera, viewport, lightDir, {
+    planeY: sampleWave(ship.position.x, ship.position.z, state.time) * 0.24 - 0.03,
+    alpha: 0.08 + shadowStrength * 0.2,
+    blur: 14 + shadowStrength * 24,
+  });
+}
+
+function renderFlagShadow(ctx, cloth, camera, viewport, lightDir, shadowStrength) {
+  const clothPoints = [
+    cloth.positions[0],
+    cloth.positions[cloth.grid.cols - 1],
+    cloth.positions[cloth.positions.length - 1],
+    cloth.positions[cloth.positions.length - cloth.grid.cols],
+  ];
+
+  renderProjectedShadow(ctx, clothPoints, camera, viewport, lightDir, {
+    planeY: 0.56,
+    alpha: 0.05 + shadowStrength * 0.16,
+    blur: 12 + shadowStrength * 20,
+  });
+}
+
+function renderScene(ctx, canvas, state, shipModel, dom) {
+  const viewport = { width: canvas.width, height: canvas.height };
+  const camera = buildCamera(state, canvas);
+  state.camera.eye = camera.eye;
+  const lightingPlan = createLightingBandPlan({
+    profile: state.focus === "lighting" ? defaultLightingProfile : getLightingProfile(defaultLightingProfile).name,
+    importance: state.focus === "lighting" ? "critical" : "high",
+  });
+  const nearLighting = lightingPlan.bands.find((entry) => entry.band === "near") ?? lightingPlan.bands[0];
+  const lightDir = normalizeVec3(vec3(-0.45, 0.85, -0.24));
+  const lightingSnapshot = state.lightingDetail.getSnapshot();
+  const reflectionStrength = lightingSnapshot.currentLevel.config.reflectionStrength;
+  const shadowStrength = lightingSnapshot.currentLevel.config.shadowStrength;
+  drawSkyAndShore(ctx, canvas, state, nearLighting, reflectionStrength, shadowStrength);
+
+  const triangles = [];
+  pushHarborGeometry(camera, viewport, triangles);
+  const water = buildWaterBands(state, state.fluidDetail.getSnapshot().currentLevel.config);
+  for (const bandMesh of water.bandMeshes) {
+    const bandAccent = bandMesh.band === "near" ? 0.06 : bandMesh.band === "mid" ? 0.04 : 0;
+    for (let index = 0; index < bandMesh.indices.length; index += 3) {
+      const a = bandMesh.positions[bandMesh.indices[index]];
+      const b = bandMesh.positions[bandMesh.indices[index + 1]];
+      const c = bandMesh.positions[bandMesh.indices[index + 2]];
+      const normal = normalizeVec3(crossVec3(subVec3(b, a), subVec3(c, a)));
+      const projected = [projectPoint(a, camera, viewport), projectPoint(b, camera, viewport), projectPoint(c, camera, viewport)];
+      if (projected.some((value) => value === null)) {
+        continue;
+      }
+      triangles.push({
+        points: projected,
+        depth: (projected[0].depth + projected[1].depth + projected[2].depth) / 3,
+        worldCenter: scaleVec3(addVec3(addVec3(a, b), c), 1 / 3),
+        normal,
+        baseColor: bandMesh.color,
+        accent: bandAccent,
+      });
+    }
+  }
+
+  const cloth = buildClothSurface(state, state, state.clothDetail.getSnapshot().currentLevel.config);
+  for (let index = 0; index < cloth.indices.length; index += 3) {
+    const a = cloth.positions[cloth.indices[index]];
+    const b = cloth.positions[cloth.indices[index + 1]];
+    const c = cloth.positions[cloth.indices[index + 2]];
+    const normal = normalizeVec3(crossVec3(subVec3(b, a), subVec3(c, a)));
+    const projected = [projectPoint(a, camera, viewport), projectPoint(b, camera, viewport), projectPoint(c, camera, viewport)];
+    if (projected.some((value) => value === null)) {
+      continue;
+    }
+    triangles.push({
+      points: projected,
+      depth: (projected[0].depth + projected[1].depth + projected[2].depth) / 3,
+      worldCenter: scaleVec3(addVec3(addVec3(a, b), c), 1 / 3),
+      normal,
+      baseColor: { r: 0.76, g: 0.24, b: 0.18 },
+      accent: cloth.band === "near" ? 0.1 : 0.04,
+    });
+  }
+
+  for (const ship of state.ships) {
+    buildTrianglesFromMesh(
+      shipModel,
+      { position: ship.position, rotationY: ship.rotationY, scale: 1.1 },
+      ship.tint,
+      camera,
+      viewport,
+      triangles,
+      nearLighting.rtParticipation.directShadows === "premium" ? 0.08 : 0.02
+    );
+  }
+
+  for (const ship of state.ships) {
+    renderShipShadow(ctx, shipModel, ship, state, camera, viewport, lightDir, shadowStrength);
+  }
+  renderFlagShadow(ctx, cloth, camera, viewport, lightDir, shadowStrength);
+
+  drawTriangles(ctx, triangles, lightDir, reflectionStrength, camera, shadowStrength);
+  renderWaterHighlights(ctx, water.bandMeshes, camera, viewport);
+  renderFlagPole(ctx, camera, viewport);
+  renderClothAccent(ctx, cloth, camera, viewport);
+  for (const ship of state.ships) {
+    renderShipRigging(ctx, ship, camera, viewport);
+  }
+  renderSprays(ctx, state.sprays, camera, viewport);
+
+  const debugSnapshot = state.debugSession.getSnapshot();
+  const quality = {
+    fluid: state.fluidDetail.getSnapshot(),
+    cloth: state.clothDetail.getSnapshot(),
+    lighting: lightingSnapshot,
+  };
+
+  const sceneMetrics = [
+    `focus: ${state.focus}`,
+    `ships: ${state.ships.length} active GLTF hulls`,
+    `physics snapshot: ${state.physics.snapshot.stage} (${state.physics.snapshot.stability})`,
+    `physics contacts: ${state.physics.snapshot.contactCount ?? 0}`,
+    `cloth band: ${cloth.band} -> ${cloth.representation.output}`,
+    `fluid near band: ${water.bandMeshes[0].representation.output}`,
+    `lighting profile: ${lightingPlan.profile} (${lightingDistanceBands.length} bands)`,
+  ];
+  const qualityMetrics = [
+    `fluid detail: ${quality.fluid.currentLevel.id} (${quality.fluid.currentLevel.config.nearResolution} near cells)`,
+    `cloth detail: ${quality.cloth.currentLevel.id} (${quality.cloth.currentLevel.config.cols}x${quality.cloth.currentLevel.config.rows})`,
+    `lighting detail: ${quality.lighting.currentLevel.id}`,
+    `near shadows: ${nearLighting.primaryShadowSource}`,
+    `near reflections: ${nearLighting.rtParticipation.reflections}`,
+    `governor pressure: ${state.lastDecision.pressureLevel}`,
+    `frame avg: ${state.lastDecision.metrics.averageFrameTimeMs.toFixed(2)} ms`,
+  ];
+  const debugMetrics = [
+    `queue samples: ${debugSnapshot.queues.sampleCount}`,
+    `dispatch avg: ${(debugSnapshot.dispatch.averageDurationMs ?? 0).toFixed(2)} ms`,
+    `ready lane peak: ${debugSnapshot.dag.peakReadyLaneDepth.toFixed(1)}`,
+    `pipeline samples: ${debugSnapshot.pipeline.sampleCount}`,
+    `tracked memory: ${(debugSnapshot.memory.totalTrackedBytes / (1024 * 1024)).toFixed(1)} MB`,
+  ];
+  const sceneNotes =
+    state.focus === "physics"
+      ? [
+          "Stable world snapshots are taken after the authoritative rigid-body commit and before visual follow-up work.",
+          "The ships collide on GLTF-derived hull volumes while cloth and fluid remain downstream visual consumers.",
+          "Near-field lighting keeps the ray-traced-primary shadow impression so the collision read stays crisp.",
+        ]
+      : SCENE_NOTES;
+
+  setListContent(dom.sceneMetrics, sceneMetrics);
+  setListContent(dom.qualityMetrics, qualityMetrics);
+  setListContent(dom.debugMetrics, debugMetrics);
+  setListContent(dom.sceneNotes, sceneNotes);
+
+  dom.status.textContent = `3D scene live · ${state.lastDecision.metrics.fps.toFixed(1)} FPS`;
+  dom.details.textContent =
+    state.focus === "physics"
+      ? `Stable world snapshots are emitted from ${state.physics.plan.snapshotStageId} after the authoritative solver; GLTF ships collide on ${shipModel.physics.shape ?? "box"} volumes while visual follow-up remains downstream.`
+      : `GLTF ships are colliding with ${shipModel.physics.shape ?? "box"} physics volumes; cloth and fluid remain continuous while the governor pressure is ${state.lastDecision.pressureLevel}.`;
+}
+
+function updateSceneState(state, dt, shipModel) {
+  updateShips(state, dt, shipModel);
+  updateSpray(state, dt);
+  updatePhysicsSnapshot(state, shipModel);
+}
+
+function syncTextState(state, shipModel) {
+  const snapshot = {
+    coordinateSystem: "right-handed world; +x right, +y up, +z forward from the shore",
+    focus: state.focus,
+    stress: state.stress,
+    ships: state.ships.map((ship) => ({
+      id: ship.id,
+      x: Number(ship.position.x.toFixed(2)),
+      y: Number(ship.position.y.toFixed(2)),
+      z: Number(ship.position.z.toFixed(2)),
+      vx: Number(ship.velocity.x.toFixed(2)),
+      vz: Number(ship.velocity.z.toFixed(2)),
+    })),
+    shipPhysics: shipModel.physics,
+    sprays: state.sprays.length,
+    pressure: state.lastDecision?.pressureLevel ?? "stable",
+    physics: {
+      profile: state.physics.profile,
+      snapshotStageId: state.physics.plan.snapshotStageId,
+      workerJobCount: state.physics.manifest.jobs.length,
+      snapshot: state.physics.snapshot,
+    },
+  };
+  window.render_game_to_text = () => JSON.stringify(snapshot);
+  window.advanceTime = (ms) => {
+    const step = Math.max(1, Math.round(ms / (1000 / 60)));
+    for (let index = 0; index < step; index += 1) {
+      state.frame += 1;
+      state.time += 1 / 60;
+      updateSceneState(state, 1 / 60, shipModel);
+      state.lastDecision = recordTelemetry(state, 16.67 + (state.stress ? 6.5 : 0));
+    }
+  };
+}
+
+export async function mountGpuShowcase(options = {}) {
+  injectStyles();
+  const root = options.root ?? document.body;
+  const focus = options.focus ?? new URLSearchParams(window.location.search).get("focus") ?? "integrated";
+  const dom = buildDemoDom(root, {
+    packageName: options.packageName ?? "@plasius/gpu-demo-viewer",
+    title: options.title ?? DEFAULT_TITLE,
+    subtitle: options.subtitle ?? DEFAULT_SUBTITLE,
+  });
+  dom.focusMode.value = focus;
+
+  const state = createSceneState({ focus });
+  const shipModel = await loadGltfModel(resolveShowcaseAssetUrl());
+  state.shipModel = shipModel;
+  updatePhysicsSnapshot(state, shipModel);
+  state.lastDecision = recordTelemetry(state, 16.4);
+  syncTextState(state, shipModel);
+
+  const ctx = dom.canvas.getContext("2d");
+  const renderFrame = (nowMs) => {
+    if (!state.paused) {
+      if (state.lastTimeMs == null) {
+        state.lastTimeMs = nowMs;
+      }
+      const dt = Math.min(0.033, (nowMs - state.lastTimeMs) / 1000);
+      state.lastTimeMs = nowMs;
+      state.time += dt;
+      state.frame += 1;
+      updateSceneState(state, dt, shipModel);
+      const syntheticFrame = 14.2 + state.sprays.length * 0.1 + (state.stress ? 6.4 : 0);
+      state.lastDecision = recordTelemetry(state, syntheticFrame);
+    }
+
+    renderScene(ctx, dom.canvas, state, shipModel, dom);
+    syncTextState(state, shipModel);
+    requestAnimationFrame(renderFrame);
+  };
+
+  dom.pauseButton.addEventListener("click", () => {
+    state.paused = !state.paused;
+    dom.pauseButton.textContent = state.paused ? "Resume" : "Pause";
+  });
+  dom.stressToggle.addEventListener("change", () => {
+    state.stress = dom.stressToggle.checked;
+  });
+  dom.focusMode.addEventListener("change", () => {
+    state.focus = dom.focusMode.value;
+    Object.assign(state.camera, {
+      ...CAMERA_PRESETS[state.focus],
+      target: vec3(...CAMERA_PRESETS[state.focus].target),
+    });
+  });
+
+  requestAnimationFrame(renderFrame);
+  return {
+    state,
+    shipModel,
+    canvas: dom.canvas,
+  };
+}
+
+function updatePhysicsSnapshot(state, shipModel) {
+  state.physics.snapshot = createPhysicsWorldSnapshot({
+    frameId: `showcase-${state.frame}`,
+    tick: state.frame,
+    simulationTimeMs: Number((state.time * 1000).toFixed(2)),
+    profile: state.physics.profile,
+    authoritativeTransformRevision: state.frame,
+    secondarySimulationRevision: state.frame,
+    animationInputRevision: state.frame,
+    bodyCount: state.ships.length + 2,
+    dynamicBodyCount: state.ships.length,
+    contactCount: state.collisionFlash > 0.02 ? 1 : 0,
+    metadata: {
+      collisionCount: state.collisionCount,
+      snapshotStageId: state.physics.plan.snapshotStageId,
+      rigidBodyShape: shipModel.physics.shape ?? "box",
+    },
+  });
+}
