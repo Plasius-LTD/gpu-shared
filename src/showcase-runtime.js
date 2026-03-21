@@ -4,32 +4,32 @@ import {
   createClothContinuityEnvelope,
   createClothRepresentationPlan,
   selectClothRepresentationBand,
-} from "../../gpu-cloth/dist/index.js";
+} from "@plasius/gpu-cloth";
 import {
   fluidBodyKinds,
   fluidProfileNames,
   createFluidContinuityEnvelope,
   createFluidRepresentationPlan,
   selectFluidRepresentationBand,
-} from "../../gpu-fluid/dist/index.js";
+} from "@plasius/gpu-fluid";
 import {
   createLightingBandPlan,
   defaultLightingProfile,
   getLightingProfile,
   lightingDistanceBands,
-} from "../../gpu-lighting/dist/index.js";
+} from "@plasius/gpu-lighting";
 import {
   createDeviceProfile,
   createGpuPerformanceGovernor,
   createQualityLadderAdapter,
-} from "../../gpu-performance/dist/index.js";
-import { createGpuDebugSession } from "../../gpu-debug/dist/index.js";
+} from "@plasius/gpu-performance";
+import { createGpuDebugSession } from "@plasius/gpu-debug";
 import {
   createPhysicsSimulationPlan,
   createPhysicsWorldSnapshot,
   defaultPhysicsWorkerProfile,
   getPhysicsWorkerManifest,
-} from "../../gpu-physics/dist/browser.js";
+} from "@plasius/gpu-physics/browser";
 
 import { loadGltfModel } from "./gltf-loader.js";
 

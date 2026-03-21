@@ -52,6 +52,14 @@
   ],
   "author": "Plasius LTD <development@plasius.co.uk>",
   "license": "Apache-2.0",
+  "dependencies": {
+    "@plasius/gpu-cloth": "^0.1.0",
+    "@plasius/gpu-debug": "^0.1.1",
+    "@plasius/gpu-fluid": "https://registry.npmjs.org/@plasius/gpu-fluid/-/gpu-fluid-0.1.0.tgz",
+    "@plasius/gpu-lighting": "^0.1.9",
+    "@plasius/gpu-performance": "^0.1.2",
+    "@plasius/gpu-physics": "^0.1.9"
+  },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
     "c8": "^10.1.3",
