@@ -597,7 +597,163 @@ function buildDemoDom(root, options) {
   };
 }
 
-function buildClothSurface(model, state, meshDetail) {
+function buildSceneSnapshot(state, shipModel) {
+  return Object.freeze({
+    focus: state.focus,
+    frame: state.frame,
+    time: state.time,
+    stress: state.stress,
+    collisions: state.contactCount,
+    collisionCount: state.collisionCount,
+    collisionFlash: state.collisionFlash,
+    sprays: Object.freeze(
+      state.sprays.map((spray) =>
+        Object.freeze({
+          life: spray.life,
+          position: Object.freeze({ ...spray.position }),
+          velocity: Object.freeze({ ...spray.velocity }),
+        })
+      )
+    ),
+    ships: Object.freeze(
+      state.ships.map((ship) =>
+        Object.freeze({
+          id: ship.id,
+          position: Object.freeze({ ...ship.position }),
+          velocity: Object.freeze({ ...ship.velocity }),
+          rotationY: ship.rotationY,
+          angularVelocity: ship.angularVelocity,
+          tint: Object.freeze({ ...ship.tint }),
+        })
+      )
+    ),
+    waveImpulses: Object.freeze(
+      state.waveImpulses.map((impulse) =>
+        Object.freeze({
+          x: impulse.x,
+          z: impulse.z,
+          strength: impulse.strength,
+          radius: impulse.radius,
+          life: impulse.life,
+        })
+      )
+    ),
+    physics: Object.freeze({
+      profile: state.physics.profile,
+      plan: state.physics.plan,
+      manifest: state.physics.manifest,
+      snapshot: state.physics.snapshot,
+      shipPhysics: shipModel?.physics ?? null,
+    }),
+  });
+}
+
+function resolveSceneDescription(state, options, shipModel) {
+  const scene = buildSceneSnapshot(state, shipModel);
+  if (typeof options.describeState !== "function") {
+    return { scene, description: null };
+  }
+
+  const description = options.describeState(state.packageState, scene) ?? null;
+  return { scene, description };
+}
+
+function updatePackageState(state, options, shipModel, dt) {
+  if (typeof options.updateState !== "function") {
+    return;
+  }
+
+  const scene = buildSceneSnapshot(state, shipModel);
+  const nextState = options.updateState(state.packageState, scene, dt);
+  if (typeof nextState !== "undefined") {
+    state.packageState = nextState;
+  }
+}
+
+function normalizeColorOverride(color, fallback) {
+  if (!color || typeof color !== "object") {
+    return fallback;
+  }
+
+  return {
+    r: typeof color.r === "number" ? color.r : fallback.r,
+    g: typeof color.g === "number" ? color.g : fallback.g,
+    b: typeof color.b === "number" ? color.b : fallback.b,
+  };
+}
+
+function readVisualNumber(value, fallback) {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function resolveVisualConfig(nearLighting, lightingSnapshot, customVisuals = {}) {
+  const premiumShadows = nearLighting.primaryShadowSource === "ray-traced-primary";
+  const defaults = {
+    skyTop: premiumShadows ? "#f0f7fb" : "#e8f1f7",
+    skyMid: premiumShadows ? "#c7d9e5" : "#b9ceda",
+    skyBottom: premiumShadows ? "#84a7bd" : "#7b9bb0",
+    seaTop: premiumShadows ? "#235064" : "#264c5f",
+    seaMid: premiumShadows ? "#153e53" : "#173d4f",
+    seaBottom: "#0b2433",
+    sunCore: "rgba(255, 244, 210, 0.9)",
+    reflectionStrength: lightingSnapshot.currentLevel.config.reflectionStrength,
+    shadowAccent: lightingSnapshot.currentLevel.config.shadowStrength,
+    waveAmplitude: 1,
+    waveDirection: { x: 0.86, z: 0.34 },
+    wavePhaseSpeed: 1,
+    wakeStrength: 0.24,
+    wakeLength: 15,
+    collisionRippleStrength: 0.34,
+    waterNear: { r: 0.12, g: 0.36, b: 0.46 },
+    waterFar: { r: 0.28, g: 0.56, b: 0.68 },
+    harborWall: { r: 0.48, g: 0.4, b: 0.32 },
+    harborDeck: { r: 0.5, g: 0.34, b: 0.22 },
+    harborTower: { r: 0.34, g: 0.32, b: 0.36 },
+    flagColor: { r: 0.76, g: 0.24, b: 0.18 },
+    flagMotion: 1,
+  };
+
+  return {
+    skyTop: typeof customVisuals.skyTop === "string" ? customVisuals.skyTop : defaults.skyTop,
+    skyMid: typeof customVisuals.skyMid === "string" ? customVisuals.skyMid : defaults.skyMid,
+    skyBottom:
+      typeof customVisuals.skyBottom === "string" ? customVisuals.skyBottom : defaults.skyBottom,
+    seaTop: typeof customVisuals.seaTop === "string" ? customVisuals.seaTop : defaults.seaTop,
+    seaMid: typeof customVisuals.seaMid === "string" ? customVisuals.seaMid : defaults.seaMid,
+    seaBottom:
+      typeof customVisuals.seaBottom === "string" ? customVisuals.seaBottom : defaults.seaBottom,
+    sunCore:
+      typeof customVisuals.sunCore === "string" ? customVisuals.sunCore : defaults.sunCore,
+    reflectionStrength: readVisualNumber(
+      customVisuals.reflectionStrength,
+      defaults.reflectionStrength
+    ),
+    shadowAccent: readVisualNumber(customVisuals.shadowAccent, defaults.shadowAccent),
+    waveAmplitude: readVisualNumber(customVisuals.waveAmplitude, defaults.waveAmplitude),
+    waveDirection:
+      customVisuals.waveDirection &&
+      typeof customVisuals.waveDirection.x === "number" &&
+      typeof customVisuals.waveDirection.z === "number"
+        ? { x: customVisuals.waveDirection.x, z: customVisuals.waveDirection.z }
+        : defaults.waveDirection,
+    wavePhaseSpeed: readVisualNumber(customVisuals.wavePhaseSpeed, defaults.wavePhaseSpeed),
+    wakeStrength: readVisualNumber(customVisuals.wakeStrength, defaults.wakeStrength),
+    wakeLength: readVisualNumber(customVisuals.wakeLength, defaults.wakeLength),
+    collisionRippleStrength: readVisualNumber(
+      customVisuals.collisionRippleStrength,
+      defaults.collisionRippleStrength
+    ),
+    waterNear: normalizeColorOverride(customVisuals.waterNear, defaults.waterNear),
+    waterFar: normalizeColorOverride(customVisuals.waterFar, defaults.waterFar),
+    harborWall: normalizeColorOverride(customVisuals.harborWall, defaults.harborWall),
+    harborDeck: normalizeColorOverride(customVisuals.harborDeck, defaults.harborDeck),
+    harborTower: normalizeColorOverride(customVisuals.harborTower, defaults.harborTower),
+    flagColor: normalizeColorOverride(customVisuals.flagColor, defaults.flagColor),
+    flagMotion: readVisualNumber(customVisuals.flagMotion, defaults.flagMotion),
+  };
+}
+
+function buildClothSurface(model, state, meshDetail, visuals) {
   const clothPlan = createClothRepresentationPlan({
     garmentId: "shore-flag",
     kind: state.focus === "cloth" ? "flag" : clothGarmentKinds[0],
@@ -626,12 +782,23 @@ function buildClothSurface(model, state, meshDetail) {
     for (let column = 0; column < cols; column += 1) {
       const u = column / (cols - 1);
       const v = row / (rows - 1);
-      const gust = Math.sin(time * 1.9 + v * 3.2 + u * 2.1) * continuity.broadMotionFloor;
-      const wrinkle = Math.sin(time * 4.4 + u * 9.2 + v * 5.6) * continuity.wrinkleFloor * 0.22;
+      const gust =
+        Math.sin(time * 1.9 + v * 3.2 + u * 2.1) *
+        continuity.broadMotionFloor *
+        visuals.flagMotion;
+      const wrinkle =
+        Math.sin(time * 4.4 + u * 9.2 + v * 5.6) *
+        continuity.wrinkleFloor *
+        0.22 *
+        Math.max(0.55, visuals.flagMotion);
       const x = origin.x + u * 1.8 + gust * 0.55 * (u * 0.9);
       const y = origin.y - height * v + wrinkle * 0.2;
       const z = origin.z + width * u + gust * 0.72 * (u * 0.85);
-      const flap = Math.cos(time * 2.7 + u * 7.4 + v * 3.8) * continuity.broadMotionFloor * 0.28;
+      const flap =
+        Math.cos(time * 2.7 + u * 7.4 + v * 3.8) *
+        continuity.broadMotionFloor *
+        0.28 *
+        visuals.flagMotion;
       positions.push(vec3(x + flap, y, z));
     }
   }
@@ -651,21 +818,102 @@ function buildClothSurface(model, state, meshDetail) {
     band,
     representation,
     continuity,
+    color: visuals.flagColor,
     positions,
     indices,
     grid: { rows, cols },
   };
 }
 
-function sampleWave(x, z, time) {
+function resolveWaveDirection(state) {
+  const direction = state.demoVisuals?.waveDirection;
+  if (
+    direction &&
+    typeof direction === "object" &&
+    typeof direction.x === "number" &&
+    typeof direction.z === "number"
+  ) {
+    return normalizeVec3(vec3(direction.x, 0, direction.z));
+  }
+
+  return normalizeVec3(vec3(0.86, 0, 0.34));
+}
+
+function sampleShipWake(state, x, z, time) {
+  const wakeStrength = readVisualNumber(state.demoVisuals?.wakeStrength, 0.24);
+  const wakeLength = readVisualNumber(state.demoVisuals?.wakeLength, 15);
+  let total = 0;
+
+  for (const ship of state.ships) {
+    const speed = Math.hypot(ship.velocity.x, ship.velocity.z);
+    if (speed <= 0.05) {
+      continue;
+    }
+
+    const direction = normalizeVec3(vec3(ship.velocity.x, 0, ship.velocity.z));
+    const behind = scaleVec3(direction, -1);
+    const lateral = vec3(-direction.z, 0, direction.x);
+    const delta = vec3(x - ship.position.x, 0, z - ship.position.z);
+    const along = dotVec3(delta, behind);
+    if (along < 0 || along > wakeLength) {
+      continue;
+    }
+
+    const cross = Math.abs(dotVec3(delta, lateral));
+    const width = 0.9 + along * 0.2;
+    if (cross > width * 3.2) {
+      continue;
+    }
+
+    const envelope =
+      Math.exp(-along * 0.14) * Math.exp(-((cross * cross) / Math.max(0.4, width * width * 2.4)));
+    total += Math.sin(along * 1.6 - time * 4.2) * speed * wakeStrength * envelope;
+  }
+
+  return total;
+}
+
+function sampleWaveImpulses(state, x, z, time) {
+  const rippleStrength = readVisualNumber(state.demoVisuals?.collisionRippleStrength, 0.34);
+  let total = 0;
+
+  for (const impulse of state.waveImpulses) {
+    const dx = x - impulse.x;
+    const dz = z - impulse.z;
+    const distance = Math.hypot(dx, dz);
+    const radius = impulse.radius + (1 - impulse.life) * 4.8;
+    if (distance > radius * 2.8) {
+      continue;
+    }
+
+    const phase = distance * 1.8 - (1 - impulse.life) * 10 - time * 0.4;
+    const envelope = Math.exp(-distance / Math.max(0.1, radius)) * impulse.life;
+    total += Math.sin(phase) * impulse.strength * rippleStrength * envelope * 0.18;
+  }
+
+  return total;
+}
+
+function sampleWave(state, x, z, time) {
+  const direction = resolveWaveDirection(state);
+  const lateral = vec3(-direction.z, 0, direction.x);
+  const along = x * direction.x + z * direction.z;
+  const cross = x * lateral.x + z * lateral.z;
+  const phaseSpeed = readVisualNumber(state.demoVisuals?.wavePhaseSpeed, 1);
+  const amplitude = readVisualNumber(state.demoVisuals?.waveAmplitude, 1);
+  const base =
+    Math.sin(along * 0.22 - time * 1.12 * phaseSpeed) * 0.42 +
+    Math.cos(along * 0.11 + cross * 0.07 - time * 0.78 * phaseSpeed) * 0.26 +
+    Math.sin(cross * 0.19 - time * 1.34 * phaseSpeed) * 0.16;
+
   return (
-    Math.sin(x * 0.18 + time * 1.2) * 0.55 +
-    Math.cos(z * 0.12 + time * 0.9) * 0.35 +
-    Math.sin((x + z) * 0.08 + time * 1.6) * 0.22
+    base * amplitude +
+    sampleShipWake(state, x, z, time) +
+    sampleWaveImpulses(state, x, z, time)
   );
 }
 
-function buildWaterBands(state, fluidDetail) {
+function buildWaterBands(state, fluidDetail, visuals) {
   const fluidPlan = createFluidRepresentationPlan({
     fluidBodyId: "harbor",
     kind: state.focus === "fluid" ? "ocean" : fluidBodyKinds[0],
@@ -711,7 +959,7 @@ function buildWaterBands(state, fluidDetail) {
         const z = originZ + bandSpec.depth * v;
         const y =
           bandSpec.y +
-          sampleWave(x, z, state.time) *
+          sampleWave(state, x, z, state.time) *
             continuity.amplitudeFloor *
             (bandSpec.band === "near" ? 0.9 : bandSpec.band === "mid" ? 0.55 : 0.3);
         positions.push(vec3(x, y, z));
@@ -737,12 +985,20 @@ function buildWaterBands(state, fluidDetail) {
       indices,
       color:
         bandSpec.band === "near"
-          ? { r: 0.12, g: 0.36, b: 0.46 }
+          ? visuals.waterNear
           : bandSpec.band === "mid"
-            ? { r: 0.15, g: 0.42, b: 0.54 }
+            ? {
+                r: mix(visuals.waterNear.r, visuals.waterFar.r, 0.4),
+                g: mix(visuals.waterNear.g, visuals.waterFar.g, 0.4),
+                b: mix(visuals.waterNear.b, visuals.waterFar.b, 0.4),
+              }
             : bandSpec.band === "far"
-              ? { r: 0.22, g: 0.48, b: 0.6 }
-              : { r: 0.34, g: 0.58, b: 0.7 },
+              ? visuals.waterFar
+              : {
+                  r: mix(visuals.waterFar.r, 0.76, 0.2),
+                  g: mix(visuals.waterFar.g, 0.78, 0.2),
+                  b: mix(visuals.waterFar.b, 0.82, 0.2),
+                },
     });
   }
 
@@ -784,6 +1040,9 @@ function createSceneState(options) {
     clothDetail,
     lightingDetail,
     debugSession,
+    packageState: undefined,
+    demoDescription: null,
+    demoVisuals: null,
     time: 0,
     lastTimeMs: null,
     paused: false,
@@ -811,7 +1070,9 @@ function createSceneState(options) {
       },
     ],
     sprays: [],
+    waveImpulses: [],
     frame: 0,
+    contactCount: 0,
     collisionCount: 0,
     collisionFlash: 0,
     physics: {
@@ -828,26 +1089,26 @@ function setListContent(element, values) {
   element.innerHTML = values.map((value) => `<li>${value}</li>`).join("");
 }
 
-function drawSkyAndShore(ctx, canvas, state, nearLighting, reflectionStrength, shadowStrength) {
+function drawSkyAndShore(ctx, canvas, state, nearLighting, reflectionStrength, shadowStrength, visuals) {
   const premiumShadows = nearLighting.primaryShadowSource === "ray-traced-primary";
   const sky = ctx.createLinearGradient(0, 0, 0, canvas.height * 0.5);
-  sky.addColorStop(0, premiumShadows ? "#f0f7fb" : "#e8f1f7");
-  sky.addColorStop(0.6, premiumShadows ? "#c7d9e5" : "#b9ceda");
-  sky.addColorStop(1, premiumShadows ? "#84a7bd" : "#7b9bb0");
+  sky.addColorStop(0, visuals.skyTop);
+  sky.addColorStop(0.6, visuals.skyMid);
+  sky.addColorStop(1, visuals.skyBottom);
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   const shoreline = ctx.createLinearGradient(0, canvas.height * 0.45, 0, canvas.height);
-  shoreline.addColorStop(0, premiumShadows ? "#235064" : "#264c5f");
-  shoreline.addColorStop(0.52, premiumShadows ? "#153e53" : "#173d4f");
-  shoreline.addColorStop(1, "#0b2433");
+  shoreline.addColorStop(0, visuals.seaTop);
+  shoreline.addColorStop(0.52, visuals.seaMid);
+  shoreline.addColorStop(1, visuals.seaBottom);
   ctx.fillStyle = shoreline;
   ctx.fillRect(0, canvas.height * 0.45, canvas.width, canvas.height * 0.55);
 
   const sunX = mix(canvas.width * 0.16, canvas.width * 0.84, (Math.sin(state.time * 0.12) + 1) * 0.5);
   const sunY = canvas.height * 0.14 + Math.cos(state.time * 0.12) * 22;
   const sun = ctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 90);
-  sun.addColorStop(0, "rgba(255, 244, 210, 0.9)");
+  sun.addColorStop(0, visuals.sunCore);
   sun.addColorStop(1, "rgba(255, 244, 210, 0)");
   ctx.fillStyle = sun;
   ctx.beginPath();
@@ -934,27 +1195,27 @@ function renderProjectedShadow(ctx, worldPoints, camera, viewport, lightDir, opt
   ctx.restore();
 }
 
-function pushHarborGeometry(camera, viewport, triangles) {
+function pushHarborGeometry(camera, viewport, triangles, visuals) {
   const harborObjects = [
     {
       position: vec3(-8.2, 1.1, -0.9),
       rotationY: -0.16,
       scale: { x: 5.4, y: 2.4, z: 4.2 },
-      color: { r: 0.48, g: 0.4, b: 0.32 },
+      color: visuals.harborWall,
       accent: 0.06,
     },
     {
       position: vec3(-5.7, 0.45, 1.4),
       rotationY: -0.08,
       scale: { x: 6.8, y: 0.3, z: 2.1 },
-      color: { r: 0.5, g: 0.34, b: 0.22 },
+      color: visuals.harborDeck,
       accent: 0.04,
     },
     {
       position: vec3(-10.4, 0.28, 0.8),
       rotationY: 0.22,
       scale: { x: 1.2, y: 0.9, z: 1.2 },
-      color: { r: 0.34, g: 0.32, b: 0.36 },
+      color: visuals.harborTower,
       accent: 0.02,
     },
   ];
@@ -1045,7 +1306,7 @@ function renderClothAccent(ctx, cloth, camera, viewport) {
     cloth.grid.rows * cloth.grid.cols - 1,
     (cloth.grid.rows - 1) * cloth.grid.cols,
   ];
-  ctx.fillStyle = "rgba(164, 44, 28, 0.95)";
+  ctx.fillStyle = colorToRgba(cloth.color, 0.95);
   for (const index of borderIndices) {
     const point = projected[index];
     if (!point) {
@@ -1109,12 +1370,15 @@ function updateShips(state, dt, shipModel) {
   const physics = shipModel.physics;
   const halfExtents = physics.halfExtents ?? [1.35, 0.95, 3.9];
   let collided = false;
+  state.contactCount = 0;
   for (const ship of state.ships) {
     ship.position = addVec3(ship.position, scaleVec3(ship.velocity, dt));
     ship.rotationY += ship.angularVelocity * dt;
     ship.velocity = scaleVec3(ship.velocity, 1 - (physics.linearDamping ?? 0.04) * dt);
     ship.angularVelocity *= 1 - (physics.angularDamping ?? 0.08) * dt;
-    ship.position.y = sampleWave(ship.position.x, ship.position.z, state.time) * 0.22 + (physics.waterline ?? 0.42);
+    ship.position.y =
+      sampleWave(state, ship.position.x, ship.position.z, state.time) * 0.22 +
+      (physics.waterline ?? 0.42);
     if (Math.abs(ship.position.x) > 10) {
       ship.velocity.x *= -1;
       ship.angularVelocity *= -1;
@@ -1142,10 +1406,27 @@ function updateShips(state, dt, shipModel) {
     b.angularVelocity -= 0.55;
     const contactPoint = vec3((a.position.x + b.position.x) * 0.5, (a.position.y + b.position.y) * 0.5 + 0.1, (a.position.z + b.position.z) * 0.5);
     spawnSpray(state, contactPoint, Math.abs(dx) + Math.abs(dz));
+    state.waveImpulses.push({
+      x: contactPoint.x,
+      z: contactPoint.z,
+      strength: Math.min(1.4, 0.2 + (Math.abs(dx) + Math.abs(dz)) * 0.18),
+      radius: 0.8,
+      life: 1,
+    });
     state.collisionCount += 1;
+    state.contactCount = 1;
     collided = true;
   }
   state.collisionFlash = collided ? 1 : Math.max(0, state.collisionFlash - dt * 1.8);
+}
+
+function updateWaveImpulses(state, dt) {
+  state.waveImpulses = state.waveImpulses
+    .map((impulse) => ({
+      ...impulse,
+      life: impulse.life - dt * 0.55,
+    }))
+    .filter((impulse) => impulse.life > 0);
 }
 
 function updateSpray(state, dt) {
@@ -1268,7 +1549,7 @@ function renderShipShadow(ctx, shipModel, ship, state, camera, viewport, lightDi
   ].map((point) => transformPoint(point, transform));
 
   renderProjectedShadow(ctx, hullCorners, camera, viewport, lightDir, {
-    planeY: sampleWave(ship.position.x, ship.position.z, state.time) * 0.24 - 0.03,
+    planeY: sampleWave(state, ship.position.x, ship.position.z, state.time) * 0.24 - 0.03,
     alpha: 0.08 + shadowStrength * 0.2,
     blur: 14 + shadowStrength * 24,
   });
@@ -1300,13 +1581,31 @@ function renderScene(ctx, canvas, state, shipModel, dom) {
   const nearLighting = lightingPlan.bands.find((entry) => entry.band === "near") ?? lightingPlan.bands[0];
   const lightDir = normalizeVec3(vec3(-0.45, 0.85, -0.24));
   const lightingSnapshot = state.lightingDetail.getSnapshot();
-  const reflectionStrength = lightingSnapshot.currentLevel.config.reflectionStrength;
-  const shadowStrength = lightingSnapshot.currentLevel.config.shadowStrength;
-  drawSkyAndShore(ctx, canvas, state, nearLighting, reflectionStrength, shadowStrength);
+  const visuals = resolveVisualConfig(
+    nearLighting,
+    lightingSnapshot,
+    state.demoDescription?.visuals
+  );
+  state.demoVisuals = visuals;
+  const reflectionStrength = visuals.reflectionStrength;
+  const shadowStrength = visuals.shadowAccent;
+  drawSkyAndShore(
+    ctx,
+    canvas,
+    state,
+    nearLighting,
+    reflectionStrength,
+    shadowStrength,
+    visuals
+  );
 
   const triangles = [];
-  pushHarborGeometry(camera, viewport, triangles);
-  const water = buildWaterBands(state, state.fluidDetail.getSnapshot().currentLevel.config);
+  pushHarborGeometry(camera, viewport, triangles, visuals);
+  const water = buildWaterBands(
+    state,
+    state.fluidDetail.getSnapshot().currentLevel.config,
+    visuals
+  );
   for (const bandMesh of water.bandMeshes) {
     const bandAccent = bandMesh.band === "near" ? 0.06 : bandMesh.band === "mid" ? 0.04 : 0;
     for (let index = 0; index < bandMesh.indices.length; index += 3) {
@@ -1329,7 +1628,12 @@ function renderScene(ctx, canvas, state, shipModel, dom) {
     }
   }
 
-  const cloth = buildClothSurface(state, state, state.clothDetail.getSnapshot().currentLevel.config);
+  const cloth = buildClothSurface(
+    state,
+    state,
+    state.clothDetail.getSnapshot().currentLevel.config,
+    visuals
+  );
   for (let index = 0; index < cloth.indices.length; index += 3) {
     const a = cloth.positions[cloth.indices[index]];
     const b = cloth.positions[cloth.indices[index + 1]];
@@ -1344,7 +1648,7 @@ function renderScene(ctx, canvas, state, shipModel, dom) {
       depth: (projected[0].depth + projected[1].depth + projected[2].depth) / 3,
       worldCenter: scaleVec3(addVec3(addVec3(a, b), c), 1 / 3),
       normal,
-      baseColor: { r: 0.76, g: 0.24, b: 0.18 },
+      baseColor: cloth.color,
       accent: cloth.band === "near" ? 0.1 : 0.04,
     });
   }
@@ -1415,21 +1719,37 @@ function renderScene(ctx, canvas, state, shipModel, dom) {
           "Near-field lighting keeps the ray-traced-primary shadow impression so the collision read stays crisp.",
         ]
       : SCENE_NOTES;
+  const custom = state.demoDescription ?? null;
 
-  setListContent(dom.sceneMetrics, sceneMetrics);
-  setListContent(dom.qualityMetrics, qualityMetrics);
-  setListContent(dom.debugMetrics, debugMetrics);
-  setListContent(dom.sceneNotes, sceneNotes);
+  setListContent(
+    dom.sceneMetrics,
+    Array.isArray(custom?.sceneMetrics) ? custom.sceneMetrics : sceneMetrics
+  );
+  setListContent(
+    dom.qualityMetrics,
+    Array.isArray(custom?.qualityMetrics) ? custom.qualityMetrics : qualityMetrics
+  );
+  setListContent(
+    dom.debugMetrics,
+    Array.isArray(custom?.debugMetrics) ? custom.debugMetrics : debugMetrics
+  );
+  setListContent(dom.sceneNotes, Array.isArray(custom?.notes) ? custom.notes : sceneNotes);
 
-  dom.status.textContent = `3D scene live · ${state.lastDecision.metrics.fps.toFixed(1)} FPS`;
+  dom.status.textContent =
+    typeof custom?.status === "string"
+      ? custom.status
+      : `3D scene live · ${state.lastDecision.metrics.fps.toFixed(1)} FPS`;
   dom.details.textContent =
-    state.focus === "physics"
-      ? `Stable world snapshots are emitted from ${state.physics.plan.snapshotStageId} after the authoritative solver; GLTF ships collide on ${shipModel.physics.shape ?? "box"} volumes while visual follow-up remains downstream.`
-      : `GLTF ships are colliding with ${shipModel.physics.shape ?? "box"} physics volumes; cloth and fluid remain continuous while the governor pressure is ${state.lastDecision.pressureLevel}.`;
+    typeof custom?.details === "string"
+      ? custom.details
+      : state.focus === "physics"
+        ? `Stable world snapshots are emitted from ${state.physics.plan.snapshotStageId} after the authoritative solver; GLTF ships collide on ${shipModel.physics.shape ?? "box"} volumes while visual follow-up remains downstream.`
+        : `GLTF ships are colliding with ${shipModel.physics.shape ?? "box"} physics volumes; cloth and fluid remain continuous while the governor pressure is ${state.lastDecision.pressureLevel}.`;
 }
 
 function updateSceneState(state, dt, shipModel) {
   updateShips(state, dt, shipModel);
+  updateWaveImpulses(state, dt);
   updateSpray(state, dt);
   updatePhysicsSnapshot(state, shipModel);
 }
@@ -1449,6 +1769,7 @@ function syncTextState(state, shipModel) {
     })),
     shipPhysics: shipModel.physics,
     sprays: state.sprays.length,
+    waveImpulses: state.waveImpulses.length,
     pressure: state.lastDecision?.pressureLevel ?? "stable",
     physics: {
       profile: state.physics.profile,
@@ -1456,6 +1777,7 @@ function syncTextState(state, shipModel) {
       workerJobCount: state.physics.manifest.jobs.length,
       snapshot: state.physics.snapshot,
     },
+    package: state.demoDescription?.textState ?? null,
   };
   window.render_game_to_text = () => JSON.stringify(snapshot);
   window.advanceTime = (ms) => {
@@ -1483,8 +1805,11 @@ export async function mountGpuShowcase(options = {}) {
   const state = createSceneState({ focus });
   const shipModel = await loadGltfModel(resolveShowcaseAssetUrl());
   state.shipModel = shipModel;
+  state.packageState =
+    typeof options.createState === "function" ? options.createState() : undefined;
   updatePhysicsSnapshot(state, shipModel);
   state.lastDecision = recordTelemetry(state, 16.4);
+  state.demoDescription = resolveSceneDescription(state, options, shipModel).description;
   syncTextState(state, shipModel);
 
   const ctx = dom.canvas.getContext("2d");
@@ -1498,10 +1823,12 @@ export async function mountGpuShowcase(options = {}) {
       state.time += dt;
       state.frame += 1;
       updateSceneState(state, dt, shipModel);
+      updatePackageState(state, options, shipModel, dt);
       const syntheticFrame = 14.2 + state.sprays.length * 0.1 + (state.stress ? 6.4 : 0);
       state.lastDecision = recordTelemetry(state, syntheticFrame);
     }
 
+    state.demoDescription = resolveSceneDescription(state, options, shipModel).description;
     renderScene(ctx, dom.canvas, state, shipModel, dom);
     syncTextState(state, shipModel);
     requestAnimationFrame(renderFrame);
@@ -1544,6 +1871,7 @@ function updatePhysicsSnapshot(state, shipModel) {
     contactCount: state.collisionFlash > 0.02 ? 1 : 0,
     metadata: {
       collisionCount: state.collisionCount,
+      contactCount: state.contactCount,
       snapshotStageId: state.physics.plan.snapshotStageId,
       rigidBodyShape: shipModel.physics.shape ?? "box",
     },
