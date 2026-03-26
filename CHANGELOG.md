@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [0.1.3] - 2026-03-26
+
+- **Added**
   - Public-contract tests that lock the package export surface for the shared
     runtime and bundled brigantine asset.
   - Public `destroy()` teardown hook on `mountGpuShowcase()` so browser consumers can clean up the shared runtime safely on route/page unmount.
@@ -70,3 +84,4 @@ All notable changes to this project will be documented in this file.
 [0.1.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v0.1.0
 [0.1.1]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v0.1.1
 [0.1.2]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v0.1.2
+[0.1.3]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v0.1.3
