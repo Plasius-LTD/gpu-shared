@@ -31,6 +31,18 @@ test("showcase asset resolution targets the shared brigantine asset", () => {
   assert.equal(url.href, "file:///tmp/assets/brigantine.gltf");
 });
 
+test("showcase asset resolution falls back to an inline asset when the base URL is invalid", () => {
+  const url = resolveShowcaseAssetUrl("");
+  assert.match(url.href, /^data:application\/json;base64,/);
+});
+
+test("loadGltfModel can load the inline fallback asset URL", async () => {
+  const model = await loadGltfModel(resolveShowcaseAssetUrl(""));
+  assert.equal(model.name, "brigantine");
+  assert.equal(model.indices.length > 0, true);
+  assert.equal(model.physics.shape, "box");
+});
+
 test("loadGltfModel delegates through the shared loader", async () => {
   const originalFetch = globalThis.fetch;
   const positions = new Float32Array([

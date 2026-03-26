@@ -31,6 +31,7 @@ import {
   getPhysicsWorkerManifest,
 } from "@plasius/gpu-physics/browser";
 
+import { resolveShowcaseAssetUrl } from "./asset-url.js";
 import { loadGltfModel } from "./gltf-loader.js";
 
 const STYLE_ID = "plasius-shared-3d-showcase-style";
@@ -75,10 +76,6 @@ const UNIT_BOX_MESH = Object.freeze({
     4, 5, 1, 4, 1, 0,
   ]),
 });
-
-export function resolveShowcaseAssetUrl(baseUrl = import.meta.url) {
-  return new URL("../assets/brigantine.gltf", baseUrl);
-}
 
 function injectStyles() {
   if (document.getElementById(STYLE_ID)) {

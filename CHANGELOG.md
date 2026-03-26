@@ -30,7 +30,9 @@ All notable changes to this project will be documented in this file.
   - README usage now documents the shared teardown contract for public consumers.
 
 - **Fixed**
-  - (placeholder)
+  - Shared brigantine asset resolution now falls back to an inline browser-safe
+    data URL when a consuming bundler does not provide a valid module base URL,
+    preventing `Invalid URL` crashes in hosted GPU demo catalogs.
 
 - **Security**
   - (placeholder)

@@ -1,3 +1,5 @@
+export { resolveShowcaseAssetUrl } from "./asset-url.js";
+
 export const showcaseFocusModes = Object.freeze([
   "integrated",
   "lighting",
@@ -7,10 +9,6 @@ export const showcaseFocusModes = Object.freeze([
   "performance",
   "debug",
 ]);
-
-export function resolveShowcaseAssetUrl(baseUrl = import.meta.url) {
-  return new URL("../assets/brigantine.gltf", baseUrl);
-}
 
 export async function loadGltfModel(url) {
   const module = await import("./gltf-loader.js");
