@@ -40,6 +40,7 @@ export interface MountGpuShowcaseResult {
   readonly state: Record<string, unknown>;
   readonly shipModel: GltfModel;
   readonly canvas: HTMLCanvasElement;
+  destroy(): void;
 }
 
 export const showcaseFocusModes: readonly ShowcaseFocusMode[];

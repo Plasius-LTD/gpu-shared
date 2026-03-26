@@ -34,12 +34,15 @@ npm install @plasius/gpu-shared
 ```js
 import { mountGpuShowcase } from "@plasius/gpu-shared";
 
-await mountGpuShowcase({
+const showcase = await mountGpuShowcase({
   root: document.getElementById("app"),
   packageName: "@plasius/gpu-demo-viewer",
   title: "Flag by the Sea",
   subtitle: "Shared 3D validation scene for the gpu-* family.",
 });
+
+// Teardown is safe to call repeatedly from a route/page cleanup.
+showcase.destroy();
 ```
 
 For browser-only demos served without a bundler, keep the import surface on the
@@ -94,6 +97,7 @@ surface for these family demos.
 ## API
 
 - `mountGpuShowcase(options)`
+  - Returns `{ state, shipModel, canvas, destroy() }`
 - `loadGltfModel(url)`
 - `resolveShowcaseAssetUrl(baseUrl?)`
 - `showcaseFocusModes`

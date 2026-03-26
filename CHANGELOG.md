@@ -7,11 +7,13 @@ All notable changes to this project will be documented in this file.
 - **Added**
   - Public-contract tests that lock the package export surface for the shared
     runtime and bundled brigantine asset.
+  - Public `destroy()` teardown hook on `mountGpuShowcase()` so browser consumers can clean up the shared runtime safely on route/page unmount.
 
 - **Changed**
   - Documented the import-map pattern for browser demos so consumers stay on the
     published `@plasius/gpu-shared` package surface instead of deep internal
     paths.
+  - README usage now documents the shared teardown contract for public consumers.
 
 - **Fixed**
   - (placeholder)

@@ -1794,6 +1794,9 @@ function syncTextState(state, shipModel) {
 export async function mountGpuShowcase(options = {}) {
   injectStyles();
   const root = options.root ?? document.body;
+  const previousMarkup = root.innerHTML;
+  const previousRenderGameToText = window.render_game_to_text;
+  const previousAdvanceTime = window.advanceTime;
   const focus = options.focus ?? new URLSearchParams(window.location.search).get("focus") ?? "integrated";
   const dom = buildDemoDom(root, {
     packageName: options.packageName ?? "@plasius/gpu-demo-viewer",
@@ -1813,7 +1816,14 @@ export async function mountGpuShowcase(options = {}) {
   syncTextState(state, shipModel);
 
   const ctx = dom.canvas.getContext("2d");
+  let destroyed = false;
+  let frameHandle = null;
+
   const renderFrame = (nowMs) => {
+    if (destroyed) {
+      return;
+    }
+
     if (!state.paused) {
       if (state.lastTimeMs == null) {
         state.lastTimeMs = nowMs;
@@ -1831,29 +1841,59 @@ export async function mountGpuShowcase(options = {}) {
     state.demoDescription = resolveSceneDescription(state, options, shipModel).description;
     renderScene(ctx, dom.canvas, state, shipModel, dom);
     syncTextState(state, shipModel);
-    requestAnimationFrame(renderFrame);
+    frameHandle = requestAnimationFrame(renderFrame);
   };
 
-  dom.pauseButton.addEventListener("click", () => {
+  const handlePauseClick = () => {
     state.paused = !state.paused;
     dom.pauseButton.textContent = state.paused ? "Resume" : "Pause";
-  });
-  dom.stressToggle.addEventListener("change", () => {
+  };
+  const handleStressChange = () => {
     state.stress = dom.stressToggle.checked;
-  });
-  dom.focusMode.addEventListener("change", () => {
+  };
+  const handleFocusChange = () => {
     state.focus = dom.focusMode.value;
     Object.assign(state.camera, {
       ...CAMERA_PRESETS[state.focus],
       target: vec3(...CAMERA_PRESETS[state.focus].target),
     });
-  });
+  };
 
-  requestAnimationFrame(renderFrame);
+  dom.pauseButton.addEventListener("click", handlePauseClick);
+  dom.stressToggle.addEventListener("change", handleStressChange);
+  dom.focusMode.addEventListener("change", handleFocusChange);
+
+  frameHandle = requestAnimationFrame(renderFrame);
   return {
     state,
     shipModel,
     canvas: dom.canvas,
+    destroy() {
+      if (destroyed) {
+        return;
+      }
+
+      destroyed = true;
+      if (frameHandle != null) {
+        cancelAnimationFrame(frameHandle);
+      }
+      dom.pauseButton.removeEventListener("click", handlePauseClick);
+      dom.stressToggle.removeEventListener("change", handleStressChange);
+      dom.focusMode.removeEventListener("change", handleFocusChange);
+      root.innerHTML = previousMarkup;
+
+      if (typeof previousRenderGameToText === "function") {
+        window.render_game_to_text = previousRenderGameToText;
+      } else {
+        delete window.render_game_to_text;
+      }
+
+      if (typeof previousAdvanceTime === "function") {
+        window.advanceTime = previousAdvanceTime;
+      } else {
+        delete window.advanceTime;
+      }
+    },
   };
 }
 
