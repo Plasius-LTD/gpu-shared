@@ -42,6 +42,20 @@ await mountGpuShowcase({
 });
 ```
 
+For browser-only demos served without a bundler, keep the import surface on the
+published package name and resolve it with an import map rather than importing a
+viewer-private or workspace-private source file:
+
+```html
+<script type="importmap">
+  {
+    "imports": {
+      "@plasius/gpu-shared": "../node_modules/@plasius/gpu-shared/dist/index.js"
+    }
+  }
+</script>
+```
+
 ## Asset Helpers
 
 ```js

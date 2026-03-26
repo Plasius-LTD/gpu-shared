@@ -5,10 +5,13 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - **Added**
-  - (placeholder)
+  - Public-contract tests that lock the package export surface for the shared
+    runtime and bundled brigantine asset.
 
 - **Changed**
-  - (placeholder)
+  - Documented the import-map pattern for browser demos so consumers stay on the
+    published `@plasius/gpu-shared` package surface instead of deep internal
+    paths.
 
 - **Fixed**
   - (placeholder)
