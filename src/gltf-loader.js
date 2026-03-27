@@ -76,6 +76,40 @@ function computeBounds(positions) {
   return { min, max };
 }
 
+function resolveBrowserRequestBaseUrl() {
+  if (typeof document !== "undefined" && typeof document.baseURI === "string" && document.baseURI.length > 0) {
+    return document.baseURI;
+  }
+  if (
+    typeof window !== "undefined" &&
+    typeof window.location?.href === "string" &&
+    window.location.href.length > 0
+  ) {
+    return window.location.href;
+  }
+  return null;
+}
+
+function resolveFetchBaseUrl(requestUrl, responseUrl) {
+  if (typeof responseUrl === "string" && responseUrl.length > 0) {
+    try {
+      return new URL(responseUrl);
+    } catch {
+      // Keep trying the other candidates when an environment reports a malformed response URL.
+    }
+  }
+
+  try {
+    return new URL(requestUrl);
+  } catch {
+    const browserBaseUrl = resolveBrowserRequestBaseUrl();
+    if (browserBaseUrl) {
+      return new URL(requestUrl, browserBaseUrl);
+    }
+    throw new Error(`Unable to resolve a stable base URL for glTF asset loading: ${String(requestUrl)}`);
+  }
+}
+
 export async function loadGltfModel(url) {
   const response = await fetch(url);
   if (!response.ok) {
@@ -83,6 +117,7 @@ export async function loadGltfModel(url) {
   }
 
   const document = await response.json();
+  const baseUrl = resolveFetchBaseUrl(url, response.url);
   const buffers = await Promise.all(
     (document.buffers ?? []).map(async (buffer) => {
       if (typeof buffer.uri !== "string") {
@@ -91,7 +126,7 @@ export async function loadGltfModel(url) {
       if (buffer.uri.startsWith("data:")) {
         return decodeDataUri(buffer.uri);
       }
-      const nested = await fetch(new URL(buffer.uri, url));
+      const nested = await fetch(new URL(buffer.uri, baseUrl));
       if (!nested.ok) {
         throw new Error(`Failed to load glTF buffer: ${nested.status} ${nested.statusText}`);
       }

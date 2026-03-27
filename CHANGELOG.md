@@ -11,7 +11,9 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Fixed**
-  - (placeholder)
+  - Shared asset and glTF buffer loading now resolve reliably in browser consumers
+    when the initial request URL is relative, using the fetched response URL as
+    the stable base for nested asset requests.
 
 - **Security**
   - (placeholder)

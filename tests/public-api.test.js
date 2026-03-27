@@ -122,6 +122,110 @@ test("loadGltfModel delegates through the shared loader", async () => {
   }
 });
 
+test("loadGltfModel resolves external buffers against response.url when the request URL is relative", async () => {
+  const originalFetch = globalThis.fetch;
+  const originalWindow = globalThis.window;
+  const positions = new Float32Array([
+    0, 0, 0,
+    1, 0, 0,
+    0, 1, 0,
+  ]);
+  const indices = new Uint16Array([0, 1, 2]);
+  const bytes = Buffer.concat([
+    Buffer.from(positions.buffer),
+    Buffer.from(indices.buffer),
+  ]);
+  const document = {
+    asset: { version: "2.0" },
+    buffers: [{ uri: "./brigantine.bin" }],
+    bufferViews: [
+      { buffer: 0, byteOffset: 0, byteLength: positions.byteLength },
+      {
+        buffer: 0,
+        byteOffset: positions.byteLength,
+        byteLength: indices.byteLength,
+      },
+    ],
+    accessors: [
+      {
+        bufferView: 0,
+        componentType: 5126,
+        count: 3,
+        type: "VEC3",
+      },
+      {
+        bufferView: 1,
+        componentType: 5123,
+        count: 3,
+        type: "SCALAR",
+      },
+    ],
+    meshes: [
+      {
+        primitives: [
+          {
+            attributes: { POSITION: 0 },
+            indices: 1,
+          },
+        ],
+      },
+    ],
+    nodes: [
+      {
+        name: "ship",
+        mesh: 0,
+        extras: {
+          physics: {
+            shape: "box",
+          },
+        },
+      },
+    ],
+    scenes: [{ nodes: [0] }],
+    scene: 0,
+  };
+  const fetchCalls = [];
+
+  globalThis.window = { location: { href: "https://plasius.co.uk/gpu-demo" } };
+  globalThis.fetch = async (input) => {
+    const href = input instanceof URL ? input.href : String(input);
+    fetchCalls.push(href);
+
+    if (fetchCalls.length === 1) {
+      assert.equal(href, "/assets/brigantine.gltf");
+      return {
+        ok: true,
+        url: "https://plasius.co.uk/assets/brigantine.gltf",
+        async json() {
+          return document;
+        },
+      };
+    }
+
+    assert.equal(href, "https://plasius.co.uk/assets/brigantine.bin");
+    return {
+      ok: true,
+      async arrayBuffer() {
+        return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+      },
+    };
+  };
+
+  try {
+    const model = await loadGltfModel("/assets/brigantine.gltf");
+    assert.deepEqual(fetchCalls, [
+      "/assets/brigantine.gltf",
+      "https://plasius.co.uk/assets/brigantine.bin",
+    ]);
+    assert.equal(model.name, "ship");
+    assert.equal(model.indices.length, 3);
+    assert.equal(model.physics.shape, "box");
+  } finally {
+    globalThis.fetch = originalFetch;
+    globalThis.window = originalWindow;
+  }
+});
+
 test("mountGpuShowcase delegates to the injected runtime loader", async () => {
   const calls = [];
   const destroy = () => undefined;

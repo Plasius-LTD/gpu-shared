@@ -1,10 +1,37 @@
 const INLINE_BRIGANTINE_GLTF_URL =
   "data:application/json;base64,ewogICJhc3NldCI6IHsKICAgICJ2ZXJzaW9uIjogIjIuMCIsCiAgICAiZ2VuZXJhdG9yIjogIlBsYXNpdXMgZGVtbyBhc3NldCBnZW5lcmF0b3IiCiAgfSwKICAic2NlbmUiOiAwLAogICJzY2VuZXMiOiBbCiAgICB7CiAgICAgICJub2RlcyI6IFswXQogICAgfQogIF0sCiAgIm5vZGVzIjogWwogICAgewogICAgICAibWVzaCI6IDAsCiAgICAgICJuYW1lIjogImJyaWdhbnRpbmUiLAogICAgICAiZXh0cmFzIjogewogICAgICAgICJwaHlzaWNzIjogewogICAgICAgICAgInNoYXBlIjogImJveCIsCiAgICAgICAgICAiaGFsZkV4dGVudHMiOiBbMS4zNSwgMC45NSwgMy45XSwKICAgICAgICAgICJtYXNzIjogMzIwMCwKICAgICAgICAgICJyZXN0aXR1dGlvbiI6IDAuMjIsCiAgICAgICAgICAibGluZWFyRGFtcGluZyI6IDAuMDQsCiAgICAgICAgICAiYW5ndWxhckRhbXBpbmciOiAwLjA4LAogICAgICAgICAgIndhdGVybGluZSI6IDAuNDIKICAgICAgICB9CiAgICAgIH0KICAgIH0KICBdLAogICJtZXNoZXMiOiBbCiAgICB7CiAgICAgICJuYW1lIjogImJyaWdhbnRpbmUtaHVsbCIsCiAgICAgICJwcmltaXRpdmVzIjogWwogICAgICAgIHsKICAgICAgICAgICJhdHRyaWJ1dGVzIjogewogICAgICAgICAgICAiUE9TSVRJT04iOiAwCiAgICAgICAgICB9LAogICAgICAgICAgImluZGljZXMiOiAxLAogICAgICAgICAgIm1hdGVyaWFsIjogMAogICAgICAgIH0KICAgICAgXQogICAgfQogIF0sCiAgIm1hdGVyaWFscyI6IFsKICAgIHsKICAgICAgIm5hbWUiOiAicGFpbnRlZC1odWxsIiwKICAgICAgInBick1ldGFsbGljUm91Z2huZXNzIjogewogICAgICAgICJiYXNlQ29sb3JGYWN0b3IiOiBbMC41NiwgMC4zMywgMC4yMiwgMV0sCiAgICAgICAgIm1ldGFsbGljRmFjdG9yIjogMC4wOCwKICAgICAgICAicm91Z2huZXNzRmFjdG9yIjogMC45MgogICAgICB9CiAgICB9CiAgXSwKICAiYnVmZmVycyI6IFsKICAgIHsKICAgICAgInVyaSI6ICJkYXRhOmFwcGxpY2F0aW9uL29jdGV0LXN0cmVhbTtiYXNlNjQsbXBtWnZ3QUFBTC9OekV6QW1wbVpQd0FBQUwvTnpFekF6Y3lzdnpNenM3NHpNN08vemN5c1B6TXpzNzR6TTdPL0FBQ2d2ODNNVEwzTnpNdy9BQUNnUDgzTVRMM056TXcvQUFBQUFPeFJPTDR6TTROQUFBQUFBR1ptNWo0QUFIQkFNek56dnpNenN6NmFtUm5BTXpOelB6TXpzejZhbVJuQXpjeE12ejBLMXo3TnpFdy96Y3hNUHowSzF6N056RXcvQUFBQUFETXpjejltWm1hL0FBQUNBQU1BQUFBREFBRUFBZ0FFQUFVQUFnQUZBQU1BQkFBSEFBVUFCQUFHQUFjQUJRQUhBQVlBQUFBQkFBa0FBQUFKQUFnQUNBQUpBQXdBQWdBSUFBd0FBd0FNQUFrQUFnQU1BQW9BQXdBTEFBd0FBZ0FLQUFRQUF3QUZBQXNBQ2dBTUFBc0FBQUFJQUFJQUFRQURBQWtBQkFBS0FBWUFCUUFHQUFzQUFnQUtBQXNBQWdBTEFBTUEiLAogICAgICAiYnl0ZUxlbmd0aCI6IDI5NAogICAgfQogIF0sCiAgImJ1ZmZlclZpZXdzIjogWwogICAgewogICAgICAiYnVmZmVyIjogMCwKICAgICAgImJ5dGVPZmZzZXQiOiAwLAogICAgICAiYnl0ZUxlbmd0aCI6IDE1NiwKICAgICAgInRhcmdldCI6IDM0OTYyCiAgICB9LAogICAgewogICAgICAiYnVmZmVyIjogMCwKICAgICAgImJ5dGVPZmZzZXQiOiAxNTYsCiAgICAgICJieXRlTGVuZ3RoIjogMTM4LAogICAgICAidGFyZ2V0IjogMzQ5NjMKICAgIH0KICBdLAogICJhY2Nlc3NvcnMiOiBbCiAgICB7CiAgICAgICJidWZmZXJWaWV3IjogMCwKICAgICAgImJ5dGVPZmZzZXQiOiAwLAogICAgICAiY29tcG9uZW50VHlwZSI6IDUxMjYsCiAgICAgICJjb3VudCI6IDEzLAogICAgICAidHlwZSI6ICJWRUMzIiwKICAgICAgIm1pbiI6IFstMS4zNSwgLTAuNSwgLTMuMl0sCiAgICAgICJtYXgiOiBbMS4zNSwgMC45NSwgNC4xXQogICAgfSwKICAgIHsKICAgICAgImJ1ZmZlclZpZXciOiAxLAogICAgICAiYnl0ZU9mZnNldCI6IDAsCiAgICAgICJjb21wb25lbnRUeXBlIjogNTEyMywKICAgICAgImNvdW50IjogNjksCiAgICAgICJ0eXBlIjogIlNDQUxBUiIsCiAgICAgICJtYXgiOiBbMTJdLAogICAgICAibWluIjogWzBdCiAgICB9CiAgXQp9Cg==";
 
+function createInlineShowcaseAssetUrl() {
+  return new URL(INLINE_BRIGANTINE_GLTF_URL);
+}
+
+function getBrowserBaseUrl() {
+  if (typeof document !== "undefined" && typeof document.baseURI === "string" && document.baseURI.length > 0) {
+    return document.baseURI;
+  }
+  if (
+    typeof window !== "undefined" &&
+    typeof window.location?.href === "string" &&
+    window.location.href.length > 0
+  ) {
+    return window.location.href;
+  }
+  return null;
+}
+
 export function resolveShowcaseAssetUrl(baseUrl = import.meta.url) {
   try {
     return new URL("../assets/brigantine.gltf", baseUrl);
   } catch {
-    return new URL(INLINE_BRIGANTINE_GLTF_URL);
+    const browserBaseUrl = getBrowserBaseUrl();
+    if (browserBaseUrl) {
+      try {
+        const normalizedBaseUrl = new URL(baseUrl, browserBaseUrl);
+        return new URL("../assets/brigantine.gltf", normalizedBaseUrl);
+      } catch {
+        return createInlineShowcaseAssetUrl();
+      }
+    }
+    return createInlineShowcaseAssetUrl();
   }
 }
