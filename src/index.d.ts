@@ -34,6 +34,10 @@ export interface MountGpuShowcaseOptions {
   packageName?: string;
   title?: string;
   subtitle?: string;
+  createState?: () => unknown;
+  updateState?: (state: unknown, scene: Record<string, unknown>, dt: number) => unknown;
+  describeState?: (state: unknown, scene: Record<string, unknown>) => Record<string, unknown> | null;
+  destroyState?: (state: unknown) => void;
 }
 
 export interface MountGpuShowcaseResult {

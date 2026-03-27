@@ -10,5 +10,5 @@ await mountGpuShowcase({
   packageName: "@plasius/gpu-shared",
   title: "Shared GPU Harbor Runtime",
   subtitle:
-    "Browser-safe shared showcase ownership for the Plasius gpu-* family, with GLTF ships, collisions, cloth, fluid, lighting, performance, and telemetry.",
+    "Browser-safe moonlit showcase ownership for the Plasius gpu-* family, with GLTF ships, lantern-lit collisions, cloth, fluid, lighting, performance, and telemetry.",
 });

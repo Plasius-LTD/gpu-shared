@@ -35,9 +35,17 @@ import { resolveShowcaseAssetUrl } from "./asset-url.js";
 import { loadGltfModel } from "./gltf-loader.js";
 
 const STYLE_ID = "plasius-shared-3d-showcase-style";
+const ROOT_CLASS = "plasius-showcase-root";
 const DEFAULT_TITLE = "Flag by the Sea";
 const DEFAULT_SUBTITLE =
   "Shared 3D validation scene using GLTF ships, cloth, fluid continuity, adaptive performance, and telemetry.";
+const SHIP_SCALE = 1.1;
+const HARBOR_BOUNDS = Object.freeze({
+  minX: -11.2,
+  maxX: 11.2,
+  minZ: 1.8,
+  maxZ: 17.2,
+});
 const CAMERA_PRESETS = Object.freeze({
   integrated: Object.freeze({ yaw: -0.55, pitch: 0.34, distance: 27, target: [0, 2.2, 0] }),
   lighting: Object.freeze({ yaw: -0.28, pitch: 0.28, distance: 23, target: [0, 2.8, 0] }),
@@ -50,10 +58,10 @@ const CAMERA_PRESETS = Object.freeze({
 export const showcaseFocusModes = Object.freeze(Object.keys(CAMERA_PRESETS));
 
 const SCENE_NOTES = Object.freeze([
-  "Ships are loaded from a GLTF asset and carry physics metadata from node extras.",
-  "Near-field lighting uses the ray-traced-primary shadow and reflection path before stepping down by distance band.",
-  "Cloth and fluid continuity stay coherent across near, mid, far, and horizon bands.",
-  "Performance pressure reduces visual detail before authoritative collision motion is touched.",
+  "Ships are loaded from a GLTF asset and carry mass, damping, restitution, and hull extents from node extras.",
+  "Moonlight sets the cold ambient read while deck lanterns and harbor torches provide warm local contrast.",
+  "Cloth and fluid continuity stay coherent across near, mid, far, and horizon bands even in the darker night palette.",
+  "Performance pressure reduces visual detail before mass-weighted authoritative collision motion is touched.",
 ]);
 
 const UNIT_BOX_MESH = Object.freeze({
@@ -77,6 +85,18 @@ const UNIT_BOX_MESH = Object.freeze({
   ]),
 });
 
+const SHIP_LANTERNS = Object.freeze([
+  Object.freeze({ x: 0.94, y: 1.54, z: 2.52, glow: 1 }),
+  Object.freeze({ x: -0.9, y: 1.58, z: 2.44, glow: 0.92 }),
+  Object.freeze({ x: 0.62, y: 1.42, z: -2.18, glow: 0.88 }),
+  Object.freeze({ x: -0.58, y: 1.46, z: -2.04, glow: 0.84 }),
+]);
+
+const HARBOR_TORCHES = Object.freeze([
+  Object.freeze({ x: -5.2, y: 1.25, z: 1.36, glow: 1.1 }),
+  Object.freeze({ x: -8.6, y: 2.48, z: -0.72, glow: 1 }),
+  Object.freeze({ x: -10.4, y: 1.28, z: 0.82, glow: 0.92 }),
+]);
 function injectStyles() {
   if (document.getElementById(STYLE_ID)) {
     return;
@@ -85,27 +105,27 @@ function injectStyles() {
   const style = document.createElement("style");
   style.id = STYLE_ID;
   style.textContent = `
-    :root {
-      color-scheme: light;
-      --plasius-paper: #f4f7f8;
-      --plasius-ink: #152028;
-      --plasius-muted: #5c6f7b;
-      --plasius-accent: #8f5634;
-      --plasius-panel: rgba(255, 255, 255, 0.82);
-      --plasius-border: rgba(21, 32, 40, 0.12);
-      --plasius-shadow: 0 20px 48px rgba(15, 24, 31, 0.16);
-    }
-    * {
-      box-sizing: border-box;
-    }
-    body {
+    .${ROOT_CLASS} {
+      color-scheme: dark;
+      --plasius-paper: #081321;
+      --plasius-ink: #edf4ff;
+      --plasius-muted: #b6c5dd;
+      --plasius-accent: #f3b16a;
+      --plasius-panel: rgba(8, 19, 33, 0.72);
+      --plasius-border: rgba(159, 185, 223, 0.18);
+      --plasius-shadow: 0 24px 56px rgba(1, 6, 14, 0.44);
       margin: 0;
-      min-height: 100vh;
+      min-height: 100%;
       font-family: "Fraunces", "Iowan Old Style", serif;
       color: var(--plasius-ink);
       background:
-        radial-gradient(circle at top left, rgba(255, 247, 238, 0.92), transparent 34%),
-        linear-gradient(180deg, #f6f8fb 0%, #d2dee6 48%, #b6c4ce 100%);
+        radial-gradient(circle at 18% 12%, rgba(73, 101, 170, 0.28), transparent 30%),
+        radial-gradient(circle at 82% 18%, rgba(240, 188, 103, 0.08), transparent 18%),
+        linear-gradient(180deg, #04101d 0%, #0b1930 42%, #081321 100%);
+    }
+    .${ROOT_CLASS},
+    .${ROOT_CLASS} * {
+      box-sizing: border-box;
     }
     .plasius-demo {
       width: min(1560px, calc(100vw - 32px));
@@ -139,7 +159,7 @@ function injectStyles() {
       text-transform: uppercase;
       letter-spacing: 0.18em;
       font-size: 12px;
-      color: rgba(21, 32, 40, 0.56);
+      color: rgba(226, 236, 255, 0.58);
     }
     .plasius-demo h1,
     .plasius-demo h2,
@@ -157,7 +177,7 @@ function injectStyles() {
       margin: 0;
       padding: 8px 12px;
       border-radius: 999px;
-      background: rgba(143, 86, 52, 0.12);
+      background: rgba(243, 177, 106, 0.14);
       color: var(--plasius-accent);
       font-weight: 700;
     }
@@ -179,8 +199,8 @@ function injectStyles() {
       aspect-ratio: 16 / 9;
       display: block;
       border-radius: 20px;
-      border: 1px solid rgba(21, 32, 40, 0.08);
-      background: linear-gradient(180deg, #dce8ef 0%, #a9bfd0 42%, #0f5168 42%, #092433 100%);
+      border: 1px solid rgba(159, 185, 223, 0.12);
+      background: linear-gradient(180deg, #071220 0%, #132440 42%, #10344b 42%, #05111d 100%);
     }
     .plasius-demo__toolbar {
       position: absolute;
@@ -200,9 +220,9 @@ function injectStyles() {
     .plasius-demo button,
     .plasius-demo .plasius-toggle,
     .plasius-demo select {
-      border: 1px solid rgba(21, 32, 40, 0.12);
+      border: 1px solid rgba(159, 185, 223, 0.18);
       border-radius: 999px;
-      background: rgba(255, 255, 255, 0.84);
+      background: rgba(9, 20, 34, 0.84);
       color: var(--plasius-ink);
       padding: 10px 14px;
     }
@@ -241,8 +261,8 @@ function injectStyles() {
       bottom: 24px;
       padding: 10px 14px;
       border-radius: 16px;
-      background: rgba(255, 255, 255, 0.84);
-      border: 1px solid rgba(21, 32, 40, 0.1);
+      background: rgba(9, 20, 34, 0.82);
+      border: 1px solid rgba(159, 185, 223, 0.16);
       color: var(--plasius-muted);
       font-size: 12px;
       line-height: 1.45;
@@ -254,7 +274,7 @@ function injectStyles() {
     }
     .plasius-demo__footer {
       margin-top: 4px;
-      color: rgba(21, 32, 40, 0.66);
+      color: rgba(226, 236, 255, 0.68);
       font-size: 13px;
       line-height: 1.6;
     }
@@ -274,6 +294,16 @@ function clamp(value, min, max) {
 
 function mix(a, b, t) {
   return a + (b - a) * t;
+}
+
+function smoothstep(min, max, value) {
+  const t = clamp((value - min) / Math.max(0.0001, max - min), 0, 1);
+  return t * t * (3 - 2 * t);
+}
+
+function pseudoRandom(seed) {
+  const value = Math.sin(seed * 12.9898 + seed * seed * 0.0017) * 43758.5453;
+  return value - Math.floor(value);
 }
 
 function vec3(x = 0, y = 0, z = 0) {
@@ -316,6 +346,14 @@ function normalizeVec3(a) {
 function reflectVec3(vector, normal) {
   const unitNormal = normalizeVec3(normal);
   return subVec3(vector, scaleVec3(unitNormal, 2 * dotVec3(vector, unitNormal)));
+}
+
+function directionFromYaw(yaw) {
+  return normalizeVec3(vec3(Math.sin(yaw), 0, Math.cos(yaw)));
+}
+
+function perpendicularOnWater(direction) {
+  return vec3(-direction.z, 0, direction.x);
 }
 
 function rotateY(point, angle) {
@@ -522,7 +560,7 @@ function buildDemoDom(root, options) {
         <section class="plasius-panel plasius-demo__status">
           <p id="demoStatus" class="plasius-demo__status-badge">Booting 3D scene…</p>
           <p id="demoDetails" class="plasius-demo__status-text">
-            Preparing GLTF assets, cloth and fluid continuity plans, and adaptive quality metadata.
+            Preparing a moonlit harbor scene, GLTF hull data, cloth and fluid continuity plans, and adaptive quality metadata.
           </p>
         </section>
       </section>
@@ -550,9 +588,9 @@ function buildDemoDom(root, options) {
           </div>
           <div class="plasius-demo__legend">
             <strong>Scene</strong>
-            GLTF ships carry collision metadata.<br />
-            Flag cloth and ocean waves scale by distance band.<br />
-            Ray-traced shadow and reflection style is preserved near the camera.
+            GLTF ships carry hull mass and damping metadata.<br />
+            Lanterns and torches warm the moonlit harbor.<br />
+            Mass-aware collisions stay authoritative near the camera.
           </div>
         </section>
         <aside class="plasius-demo__sidebar">
@@ -635,6 +673,7 @@ function buildSceneSnapshot(state, shipModel) {
         })
       )
     ),
+    shipPhysics: shipModel?.physics ?? null,
     physics: Object.freeze({
       profile: state.physics.profile,
       plan: state.physics.plan,
@@ -686,28 +725,39 @@ function readVisualNumber(value, fallback) {
 function resolveVisualConfig(nearLighting, lightingSnapshot, customVisuals = {}) {
   const premiumShadows = nearLighting.primaryShadowSource === "ray-traced-primary";
   const defaults = {
-    skyTop: premiumShadows ? "#f0f7fb" : "#e8f1f7",
-    skyMid: premiumShadows ? "#c7d9e5" : "#b9ceda",
-    skyBottom: premiumShadows ? "#84a7bd" : "#7b9bb0",
-    seaTop: premiumShadows ? "#235064" : "#264c5f",
-    seaMid: premiumShadows ? "#153e53" : "#173d4f",
-    seaBottom: "#0b2433",
-    sunCore: "rgba(255, 244, 210, 0.9)",
+    skyTop: premiumShadows ? "#040c1a" : "#06101f",
+    skyMid: premiumShadows ? "#11203b" : "#152643",
+    skyBottom: premiumShadows ? "#2f4468" : "#364d73",
+    duskGlow: premiumShadows ? "rgba(116, 142, 201, 0.26)" : "rgba(104, 128, 188, 0.22)",
+    seaTop: premiumShadows ? "#102946" : "#153050",
+    seaMid: premiumShadows ? "#0a1d33" : "#0d2138",
+    seaBottom: "#04101d",
+    moonCore: "rgba(241, 246, 255, 0.98)",
+    moonHalo: "rgba(167, 191, 255, 0.24)",
+    moonReflection: "rgba(192, 214, 255, 0.22)",
+    starColor: "rgba(232, 239, 255, 0.82)",
+    ambientMist: "rgba(41, 63, 97, 0.16)",
     reflectionStrength: lightingSnapshot.currentLevel.config.reflectionStrength,
     shadowAccent: lightingSnapshot.currentLevel.config.shadowStrength,
-    waveAmplitude: 1,
-    waveDirection: { x: 0.86, z: 0.34 },
-    wavePhaseSpeed: 1,
-    wakeStrength: 0.24,
-    wakeLength: 15,
-    collisionRippleStrength: 0.34,
-    waterNear: { r: 0.12, g: 0.36, b: 0.46 },
-    waterFar: { r: 0.28, g: 0.56, b: 0.68 },
-    harborWall: { r: 0.48, g: 0.4, b: 0.32 },
-    harborDeck: { r: 0.5, g: 0.34, b: 0.22 },
-    harborTower: { r: 0.34, g: 0.32, b: 0.36 },
-    flagColor: { r: 0.76, g: 0.24, b: 0.18 },
-    flagMotion: 1,
+    waveAmplitude: 0.94,
+    waveDirection: { x: 0.88, z: 0.28 },
+    wavePhaseSpeed: 0.88,
+    wakeStrength: 0.31,
+    wakeLength: 18,
+    collisionRippleStrength: 0.42,
+    waterNear: { r: 0.08, g: 0.23, b: 0.33 },
+    waterFar: { r: 0.18, g: 0.35, b: 0.49 },
+    harborWall: { r: 0.26, g: 0.24, b: 0.28 },
+    harborDeck: { r: 0.33, g: 0.22, b: 0.16 },
+    harborTower: { r: 0.23, g: 0.24, b: 0.29 },
+    flagColor: { r: 0.66, g: 0.16, b: 0.13 },
+    flagMotion: 0.92,
+    lanternCore: { r: 0.98, g: 0.8, b: 0.48 },
+    lanternGlow: { r: 1, g: 0.56, b: 0.2 },
+    lanternReflectionStrength: 0.42,
+    torchCore: { r: 0.99, g: 0.72, b: 0.36 },
+    torchGlow: { r: 0.98, g: 0.38, b: 0.15 },
+    collisionFlash: "rgba(255, 212, 168, 0.16)",
   };
 
   return {
@@ -719,8 +769,26 @@ function resolveVisualConfig(nearLighting, lightingSnapshot, customVisuals = {})
     seaMid: typeof customVisuals.seaMid === "string" ? customVisuals.seaMid : defaults.seaMid,
     seaBottom:
       typeof customVisuals.seaBottom === "string" ? customVisuals.seaBottom : defaults.seaBottom,
-    sunCore:
-      typeof customVisuals.sunCore === "string" ? customVisuals.sunCore : defaults.sunCore,
+    duskGlow:
+      typeof customVisuals.duskGlow === "string" ? customVisuals.duskGlow : defaults.duskGlow,
+    moonCore:
+      typeof customVisuals.moonCore === "string"
+        ? customVisuals.moonCore
+        : typeof customVisuals.sunCore === "string"
+          ? customVisuals.sunCore
+          : defaults.moonCore,
+    moonHalo:
+      typeof customVisuals.moonHalo === "string" ? customVisuals.moonHalo : defaults.moonHalo,
+    moonReflection:
+      typeof customVisuals.moonReflection === "string"
+        ? customVisuals.moonReflection
+        : defaults.moonReflection,
+    starColor:
+      typeof customVisuals.starColor === "string" ? customVisuals.starColor : defaults.starColor,
+    ambientMist:
+      typeof customVisuals.ambientMist === "string"
+        ? customVisuals.ambientMist
+        : defaults.ambientMist,
     reflectionStrength: readVisualNumber(
       customVisuals.reflectionStrength,
       defaults.reflectionStrength
@@ -747,6 +815,18 @@ function resolveVisualConfig(nearLighting, lightingSnapshot, customVisuals = {})
     harborTower: normalizeColorOverride(customVisuals.harborTower, defaults.harborTower),
     flagColor: normalizeColorOverride(customVisuals.flagColor, defaults.flagColor),
     flagMotion: readVisualNumber(customVisuals.flagMotion, defaults.flagMotion),
+    lanternCore: normalizeColorOverride(customVisuals.lanternCore, defaults.lanternCore),
+    lanternGlow: normalizeColorOverride(customVisuals.lanternGlow, defaults.lanternGlow),
+    lanternReflectionStrength: readVisualNumber(
+      customVisuals.lanternReflectionStrength,
+      defaults.lanternReflectionStrength
+    ),
+    torchCore: normalizeColorOverride(customVisuals.torchCore, defaults.torchCore),
+    torchGlow: normalizeColorOverride(customVisuals.torchGlow, defaults.torchGlow),
+    collisionFlash:
+      typeof customVisuals.collisionFlash === "string"
+        ? customVisuals.collisionFlash
+        : defaults.collisionFlash,
   };
 }
 
@@ -1052,18 +1132,34 @@ function createSceneState(options) {
       {
         id: "northwind",
         position: vec3(-5.2, 0, 7.2),
-        velocity: vec3(2.1, 0, -1.6),
-        rotationY: 0.42,
-        angularVelocity: 0.18,
+        velocity: vec3(2.35, 0, -1.08),
+        rotationY: 0.58,
+        angularVelocity: 0.09,
         tint: { r: 0.62, g: 0.39, b: 0.23 },
+        massScale: 1.42,
+        cruiseSpeed: 2.25,
+        throttleResponse: 0.46,
+        rudderResponse: 0.54,
+        wanderPhase: 0.35,
+        lanterns: SHIP_LANTERNS,
+        lanternStrength: 1.06,
+        collisionRadiusScale: 1.04,
       },
       {
         id: "tidecaller",
         position: vec3(4.8, 0, 4.4),
-        velocity: vec3(-1.85, 0, 1.25),
-        rotationY: -2.62,
-        angularVelocity: -0.14,
+        velocity: vec3(-2.15, 0, 1.74),
+        rotationY: -2.48,
+        angularVelocity: -0.2,
         tint: { r: 0.48, g: 0.28, b: 0.19 },
+        massScale: 0.84,
+        cruiseSpeed: 2.68,
+        throttleResponse: 0.7,
+        rudderResponse: 0.78,
+        wanderPhase: 1.6,
+        lanterns: SHIP_LANTERNS,
+        lanternStrength: 1.18,
+        collisionRadiusScale: 0.94,
       },
     ],
     sprays: [],
@@ -1087,13 +1183,29 @@ function setListContent(element, values) {
 }
 
 function drawSkyAndShore(ctx, canvas, state, nearLighting, reflectionStrength, shadowStrength, visuals) {
-  const premiumShadows = nearLighting.primaryShadowSource === "ray-traced-primary";
   const sky = ctx.createLinearGradient(0, 0, 0, canvas.height * 0.5);
   sky.addColorStop(0, visuals.skyTop);
-  sky.addColorStop(0.6, visuals.skyMid);
+  sky.addColorStop(0.54, visuals.skyMid);
   sky.addColorStop(1, visuals.skyBottom);
   ctx.fillStyle = sky;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  for (let index = 0; index < 70; index += 1) {
+    const x = pseudoRandom(index + 13) * canvas.width;
+    const y = pseudoRandom(index * 7 + 5) * canvas.height * 0.42;
+    const twinkle = 0.45 + Math.sin(state.time * 1.4 + index * 0.73) * 0.25;
+    const radius = 0.6 + pseudoRandom(index * 11 + 2) * 1.9;
+    ctx.fillStyle = visuals.starColor.replace(/[\d.]+\)$/u, `${clamp(twinkle, 0.16, 0.92)})`);
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const horizonGlow = ctx.createLinearGradient(0, canvas.height * 0.22, 0, canvas.height * 0.62);
+  horizonGlow.addColorStop(0, "rgba(0, 0, 0, 0)");
+  horizonGlow.addColorStop(1, visuals.duskGlow);
+  ctx.fillStyle = horizonGlow;
+  ctx.fillRect(0, canvas.height * 0.2, canvas.width, canvas.height * 0.45);
 
   const shoreline = ctx.createLinearGradient(0, canvas.height * 0.45, 0, canvas.height);
   shoreline.addColorStop(0, visuals.seaTop);
@@ -1102,30 +1214,48 @@ function drawSkyAndShore(ctx, canvas, state, nearLighting, reflectionStrength, s
   ctx.fillStyle = shoreline;
   ctx.fillRect(0, canvas.height * 0.45, canvas.width, canvas.height * 0.55);
 
-  const sunX = mix(canvas.width * 0.16, canvas.width * 0.84, (Math.sin(state.time * 0.12) + 1) * 0.5);
-  const sunY = canvas.height * 0.14 + Math.cos(state.time * 0.12) * 22;
-  const sun = ctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 90);
-  sun.addColorStop(0, visuals.sunCore);
-  sun.addColorStop(1, "rgba(255, 244, 210, 0)");
-  ctx.fillStyle = sun;
+  const moonX = canvas.width * 0.76 + Math.sin(state.time * 0.045) * 18;
+  const moonY = canvas.height * 0.17 + Math.cos(state.time * 0.05) * 10;
+  const moon = ctx.createRadialGradient(moonX, moonY, 14, moonX, moonY, 126);
+  moon.addColorStop(0, visuals.moonCore);
+  moon.addColorStop(0.46, visuals.moonHalo);
+  moon.addColorStop(1, "rgba(167, 191, 255, 0)");
+  ctx.fillStyle = moon;
   ctx.beginPath();
-  ctx.arc(sunX, sunY, 90, 0, Math.PI * 2);
+  ctx.arc(moonX, moonY, 94, 0, Math.PI * 2);
   ctx.fill();
 
-  const track = ctx.createLinearGradient(sunX, canvas.height * 0.46, sunX, canvas.height * 0.96);
-  track.addColorStop(0, `rgba(255, 243, 214, ${0.08 + reflectionStrength * 0.18})`);
-  track.addColorStop(0.42, `rgba(224, 242, 255, ${0.04 + reflectionStrength * 0.2})`);
-  track.addColorStop(1, "rgba(224, 242, 255, 0)");
+  const moonCore = ctx.createRadialGradient(moonX, moonY, 4, moonX, moonY, 28);
+  moonCore.addColorStop(0, "rgba(255, 255, 255, 0.98)");
+  moonCore.addColorStop(1, visuals.moonCore);
+  ctx.fillStyle = moonCore;
+  ctx.beginPath();
+  ctx.arc(moonX, moonY, 24, 0, Math.PI * 2);
+  ctx.fill();
+
+  const track = ctx.createLinearGradient(moonX, canvas.height * 0.44, moonX, canvas.height * 0.98);
+  track.addColorStop(0, visuals.moonReflection.replace(/[\d.]+\)$/u, `${0.08 + reflectionStrength * 0.12})`));
+  track.addColorStop(0.42, visuals.moonReflection.replace(/[\d.]+\)$/u, `${0.04 + reflectionStrength * 0.18})`));
+  track.addColorStop(1, "rgba(192, 214, 255, 0)");
   ctx.save();
   ctx.globalCompositeOperation = "screen";
   ctx.fillStyle = track;
   ctx.beginPath();
-  ctx.ellipse(sunX, canvas.height * 0.72, 46 + shadowStrength * 60, canvas.height * 0.26, 0, 0, Math.PI * 2);
+  ctx.ellipse(moonX, canvas.height * 0.75, 38 + shadowStrength * 42, canvas.height * 0.24, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 
+  const mist = ctx.createLinearGradient(0, canvas.height * 0.5, 0, canvas.height);
+  mist.addColorStop(0, "rgba(0, 0, 0, 0)");
+  mist.addColorStop(1, visuals.ambientMist);
+  ctx.fillStyle = mist;
+  ctx.fillRect(0, canvas.height * 0.45, canvas.width, canvas.height * 0.55);
+
   if (state.collisionFlash > 0.01) {
-    ctx.fillStyle = `rgba(255, 243, 228, ${state.collisionFlash * 0.14})`;
+    ctx.fillStyle = visuals.collisionFlash.replace(
+      /[\d.]+\)$/u,
+      `${clamp(state.collisionFlash * 0.22, 0, 0.26)})`
+    );
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
 }
@@ -1235,7 +1365,7 @@ function pushHarborGeometry(camera, viewport, triangles, visuals) {
 }
 
 function renderShipRigging(ctx, ship, camera, viewport) {
-  const transform = { position: ship.position, rotationY: ship.rotationY, scale: 1.1 };
+  const transform = { position: ship.position, rotationY: ship.rotationY, scale: SHIP_SCALE };
   const mastBase = transformPoint(vec3(0, 0.38, -0.4), transform);
   const mastTop = transformPoint(vec3(0, 3.8, -0.2), transform);
   const aftBase = transformPoint(vec3(-0.25, 0.32, -1.9), transform);
@@ -1350,6 +1480,43 @@ function renderWaterHighlights(ctx, waterBands, camera, viewport) {
   }
 }
 
+function readPhysicsNumber(physics, key, fallback) {
+  const value = physics?.[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function getShipMass(ship, shipModel) {
+  const baseMass = readPhysicsNumber(shipModel.physics, "mass", 3200);
+  return baseMass * readVisualNumber(ship.massScale, 1);
+}
+
+function getShipHalfExtents(ship, shipModel) {
+  const physicsHalfExtents = Array.isArray(shipModel.physics.halfExtents)
+    ? shipModel.physics.halfExtents
+    : [1.35, 0.95, 3.9];
+  const scale = SHIP_SCALE * readVisualNumber(ship.collisionRadiusScale, 1);
+  return {
+    x: physicsHalfExtents[0] * scale,
+    y: physicsHalfExtents[1] * scale,
+    z: physicsHalfExtents[2] * scale,
+  };
+}
+
+function getShipCollisionRadius(ship, shipModel) {
+  const halfExtents = getShipHalfExtents(ship, shipModel);
+  return Math.max(halfExtents.x * 1.08, halfExtents.z * 0.62);
+}
+
+function getShipInverseMass(ship, shipModel) {
+  return 1 / Math.max(1, getShipMass(ship, shipModel));
+}
+
+function getShipInverseInertia(ship, shipModel) {
+  const radius = getShipCollisionRadius(ship, shipModel);
+  const inertia = getShipMass(ship, shipModel) * radius * radius * 0.72;
+  return 1 / Math.max(1, inertia);
+}
+
 function spawnSpray(state, point, intensity) {
   const count = state.fluidDetail.getSnapshot().currentLevel.config.splashCount;
   for (let index = 0; index < count; index += 1) {
@@ -1363,58 +1530,226 @@ function spawnSpray(state, point, intensity) {
   }
 }
 
-function updateShips(state, dt, shipModel) {
+function resolveShipRoute(ship, state, radius) {
+  if (typeof ship.routeDirection !== "number") {
+    ship.routeDirection = ship.velocity.x >= 0 ? 1 : -1;
+  }
+
+  if (ship.position.x > HARBOR_BOUNDS.maxX - radius * 1.1) {
+    ship.routeDirection = -1;
+  } else if (ship.position.x < HARBOR_BOUNDS.minX + radius * 1.1) {
+    ship.routeDirection = 1;
+  }
+
+  const wander = Math.sin(state.time * 0.22 + readVisualNumber(ship.wanderPhase, 0));
+  const crossCurrent = Math.cos(state.time * 0.31 + readVisualNumber(ship.wanderPhase, 0));
+  const laneCenter =
+    ship.id === "northwind"
+      ? 10.2 + wander * 2.1 + crossCurrent * 0.6
+      : 7 + wander * 3.3 - crossCurrent * 1.1;
+  const targetX =
+    ship.routeDirection > 0
+      ? HARBOR_BOUNDS.maxX - radius * 1.7
+      : HARBOR_BOUNDS.minX + radius * 1.7;
+  return vec3(targetX, 0, clamp(laneCenter, HARBOR_BOUNDS.minZ + 1.8, HARBOR_BOUNDS.maxZ - 1.8));
+}
+
+function updateShipMotion(state, ship, dt, shipModel) {
   const physics = shipModel.physics;
-  const halfExtents = physics.halfExtents ?? [1.35, 0.95, 3.9];
-  let collided = false;
-  state.contactCount = 0;
-  for (const ship of state.ships) {
-    ship.position = addVec3(ship.position, scaleVec3(ship.velocity, dt));
-    ship.rotationY += ship.angularVelocity * dt;
-    ship.velocity = scaleVec3(ship.velocity, 1 - (physics.linearDamping ?? 0.04) * dt);
-    ship.angularVelocity *= 1 - (physics.angularDamping ?? 0.08) * dt;
-    ship.position.y =
-      sampleWave(state, ship.position.x, ship.position.z, state.time) * 0.22 +
-      (physics.waterline ?? 0.42);
-    if (Math.abs(ship.position.x) > 10) {
-      ship.velocity.x *= -1;
-      ship.angularVelocity *= -1;
+  const massScale = Math.max(0.55, readVisualNumber(ship.massScale, 1));
+  const radius = getShipCollisionRadius(ship, shipModel);
+  const waterline = readPhysicsNumber(physics, "waterline", 0.42);
+  const linearDamping = readPhysicsNumber(physics, "linearDamping", 0.04);
+  const angularDamping = readPhysicsNumber(physics, "angularDamping", 0.08);
+  const throttleResponse = readVisualNumber(ship.throttleResponse, 0.58);
+  const rudderResponse = readVisualNumber(ship.rudderResponse, 0.62);
+  const cruiseSpeed = readVisualNumber(ship.cruiseSpeed, 2.4);
+
+  ship.collisionCooldown = Math.max(0, readVisualNumber(ship.collisionCooldown, 0) - dt);
+
+  const forward = directionFromYaw(ship.rotationY);
+  const lateral = perpendicularOnWater(forward);
+  const routeTarget = resolveShipRoute(ship, state, radius);
+  const desiredHeading = Math.atan2(routeTarget.x - ship.position.x, routeTarget.z - ship.position.z);
+  const headingError = Math.atan2(
+    Math.sin(desiredHeading - ship.rotationY),
+    Math.cos(desiredHeading - ship.rotationY)
+  );
+  ship.angularVelocity +=
+    headingError * rudderResponse * dt * (1.18 / Math.sqrt(massScale)) +
+    Math.sin(state.time * 0.9 + readVisualNumber(ship.wanderPhase, 0)) * dt * 0.04;
+
+  const waveDirection = resolveWaveDirection(state);
+  const forwardSpeed = dotVec3(ship.velocity, forward);
+  const lateralSpeed = dotVec3(ship.velocity, lateral);
+  const thrust = (cruiseSpeed - forwardSpeed) * throttleResponse;
+  const currentDrift = sampleWave(state, ship.position.x, ship.position.z, state.time) * 0.016;
+  const acceleration = addVec3(
+    scaleVec3(forward, thrust),
+    addVec3(
+      scaleVec3(lateral, -lateralSpeed * (1.28 + rudderResponse * 0.4)),
+      scaleVec3(waveDirection, currentDrift / Math.sqrt(massScale))
+    )
+  );
+
+  ship.velocity = addVec3(ship.velocity, scaleVec3(acceleration, dt));
+  ship.velocity = scaleVec3(
+    ship.velocity,
+    Math.max(0, 1 - (linearDamping / Math.pow(massScale, 0.22)) * dt)
+  );
+  ship.angularVelocity *= Math.max(
+    0,
+    1 - (angularDamping / Math.pow(massScale, 0.15)) * dt
+  );
+  ship.rotationY += ship.angularVelocity * dt;
+  ship.position = addVec3(ship.position, scaleVec3(ship.velocity, dt));
+  ship.position.y =
+    sampleWave(state, ship.position.x, ship.position.z, state.time) * 0.24 + waterline;
+}
+
+function resolveBoundaryCollision(ship, state, shipModel) {
+  const restitution = readPhysicsNumber(shipModel.physics, "restitution", 0.22) * 0.56;
+  const radius = getShipCollisionRadius(ship, shipModel);
+  const boundaries = [
+    { axis: "x", min: HARBOR_BOUNDS.minX + radius, max: HARBOR_BOUNDS.maxX - radius, normalMin: vec3(1, 0, 0), normalMax: vec3(-1, 0, 0) },
+    { axis: "z", min: HARBOR_BOUNDS.minZ + radius, max: HARBOR_BOUNDS.maxZ - radius, normalMin: vec3(0, 0, 1), normalMax: vec3(0, 0, -1) },
+  ];
+
+  for (const boundary of boundaries) {
+    if (ship.position[boundary.axis] < boundary.min) {
+      ship.position[boundary.axis] = boundary.min;
+      const normal = boundary.normalMin;
+      const speedIntoWall = dotVec3(ship.velocity, normal);
+      if (speedIntoWall < 0) {
+        ship.velocity = subVec3(
+          ship.velocity,
+          scaleVec3(normal, (1 + restitution) * speedIntoWall)
+        );
+        const tangent = vec3(-normal.z, 0, normal.x);
+        const tangentSpeed = dotVec3(ship.velocity, tangent);
+        ship.velocity = subVec3(ship.velocity, scaleVec3(tangent, tangentSpeed * 0.12));
+        ship.angularVelocity += tangentSpeed * 0.004;
+      }
+    } else if (ship.position[boundary.axis] > boundary.max) {
+      ship.position[boundary.axis] = boundary.max;
+      const normal = boundary.normalMax;
+      const speedIntoWall = dotVec3(ship.velocity, normal);
+      if (speedIntoWall < 0) {
+        ship.velocity = subVec3(
+          ship.velocity,
+          scaleVec3(normal, (1 + restitution) * speedIntoWall)
+        );
+        const tangent = vec3(-normal.z, 0, normal.x);
+        const tangentSpeed = dotVec3(ship.velocity, tangent);
+        ship.velocity = subVec3(ship.velocity, scaleVec3(tangent, tangentSpeed * 0.12));
+        ship.angularVelocity += tangentSpeed * 0.004;
+      }
     }
-    if (ship.position.z < 2 || ship.position.z > 16) {
-      ship.velocity.z *= -1;
-      ship.angularVelocity *= -1;
+  }
+}
+
+function resolveShipCollision(state, a, b, shipModel) {
+  const delta = subVec3(b.position, a.position);
+  const radiusA = getShipCollisionRadius(a, shipModel);
+  const radiusB = getShipCollisionRadius(b, shipModel);
+  const distance = Math.hypot(delta.x, delta.z);
+  const minDistance = radiusA + radiusB;
+  if (distance >= minDistance) {
+    return false;
+  }
+
+  const normal =
+    distance > 0.0001
+      ? normalizeVec3(vec3(delta.x / distance, 0, delta.z / distance))
+      : normalizeVec3(vec3(Math.cos(state.time * 5.2), 0, Math.sin(state.time * 4.8)));
+  const tangent = vec3(-normal.z, 0, normal.x);
+  const penetration = minDistance - distance;
+  const invMassA = getShipInverseMass(a, shipModel);
+  const invMassB = getShipInverseMass(b, shipModel);
+  const invMassSum = invMassA + invMassB;
+  const correction = scaleVec3(normal, (penetration / Math.max(0.0001, invMassSum)) * 0.72);
+  a.position = subVec3(a.position, scaleVec3(correction, invMassA));
+  b.position = addVec3(b.position, scaleVec3(correction, invMassB));
+
+  const relativeVelocity = subVec3(b.velocity, a.velocity);
+  const velocityAlongNormal = dotVec3(relativeVelocity, normal);
+  const restitution = readPhysicsNumber(shipModel.physics, "restitution", 0.22) * 0.88;
+  if (velocityAlongNormal < 0) {
+    const impulseMagnitude =
+      (-(1 + restitution) * velocityAlongNormal) / Math.max(0.0001, invMassSum);
+    const impulse = scaleVec3(normal, impulseMagnitude);
+    a.velocity = subVec3(a.velocity, scaleVec3(impulse, invMassA));
+    b.velocity = addVec3(b.velocity, scaleVec3(impulse, invMassB));
+
+    const tangentSpeed = dotVec3(relativeVelocity, tangent);
+    const frictionMagnitude = clamp(
+      (-tangentSpeed / Math.max(0.0001, invMassSum)),
+      -impulseMagnitude * 0.16,
+      impulseMagnitude * 0.16
+    );
+    const frictionImpulse = scaleVec3(tangent, frictionMagnitude);
+    a.velocity = subVec3(a.velocity, scaleVec3(frictionImpulse, invMassA));
+    b.velocity = addVec3(b.velocity, scaleVec3(frictionImpulse, invMassB));
+
+    a.angularVelocity -=
+      tangentSpeed * radiusA * getShipInverseInertia(a, shipModel) * 0.2 +
+      impulseMagnitude * 0.00024;
+    b.angularVelocity +=
+      tangentSpeed * radiusB * getShipInverseInertia(b, shipModel) * 0.2 +
+      impulseMagnitude * 0.00024;
+
+    const impactSpeed = Math.abs(velocityAlongNormal);
+    if (
+      impactSpeed > 0.18 &&
+      Math.max(readVisualNumber(a.collisionCooldown, 0), readVisualNumber(b.collisionCooldown, 0)) <= 0
+    ) {
+      const contactPoint = vec3(
+        (a.position.x + b.position.x) * 0.5,
+        (a.position.y + b.position.y) * 0.5 + 0.14,
+        (a.position.z + b.position.z) * 0.5
+      );
+      spawnSpray(state, contactPoint, impactSpeed * 2.4 + penetration * 8);
+      state.waveImpulses.push({
+        x: contactPoint.x,
+        z: contactPoint.z,
+        strength: clamp(0.24 + impactSpeed * 0.46 + penetration * 0.9, 0.2, 1.7),
+        radius: 0.9 + penetration * 1.4,
+        life: 1,
+      });
+      state.collisionCount += 1;
+      state.collisionFlash = Math.max(
+        state.collisionFlash,
+        clamp(impactSpeed * 0.55 + penetration * 1.8, 0.16, 1)
+      );
+      a.collisionCooldown = 0.2;
+      b.collisionCooldown = 0.2;
     }
   }
 
-  const [a, b] = state.ships;
-  const dx = b.position.x - a.position.x;
-  const dz = b.position.z - a.position.z;
-  const overlapX = Math.abs(dx) < halfExtents[0] * 1.7;
-  const overlapZ = Math.abs(dz) < halfExtents[2] * 0.8;
-  if (overlapX && overlapZ) {
-    const restitution = physics.restitution ?? 0.22;
-    const swapX = a.velocity.x;
-    const swapZ = a.velocity.z;
-    a.velocity.x = -b.velocity.x * (0.86 + restitution);
-    a.velocity.z = -b.velocity.z * (0.82 + restitution);
-    b.velocity.x = -swapX * (0.86 + restitution);
-    b.velocity.z = -swapZ * (0.82 + restitution);
-    a.angularVelocity += 0.55;
-    b.angularVelocity -= 0.55;
-    const contactPoint = vec3((a.position.x + b.position.x) * 0.5, (a.position.y + b.position.y) * 0.5 + 0.1, (a.position.z + b.position.z) * 0.5);
-    spawnSpray(state, contactPoint, Math.abs(dx) + Math.abs(dz));
-    state.waveImpulses.push({
-      x: contactPoint.x,
-      z: contactPoint.z,
-      strength: Math.min(1.4, 0.2 + (Math.abs(dx) + Math.abs(dz)) * 0.18),
-      radius: 0.8,
-      life: 1,
-    });
-    state.collisionCount += 1;
-    state.contactCount = 1;
-    collided = true;
+  state.contactCount += 1;
+  return true;
+}
+
+function updateShips(state, dt, shipModel) {
+  let collided = false;
+  state.contactCount = 0;
+
+  for (const ship of state.ships) {
+    updateShipMotion(state, ship, dt, shipModel);
+    resolveBoundaryCollision(ship, state, shipModel);
   }
-  state.collisionFlash = collided ? 1 : Math.max(0, state.collisionFlash - dt * 1.8);
+
+  for (let index = 0; index < state.ships.length; index += 1) {
+    for (let otherIndex = index + 1; otherIndex < state.ships.length; otherIndex += 1) {
+      collided =
+        resolveShipCollision(state, state.ships[index], state.ships[otherIndex], shipModel) ||
+        collided;
+    }
+  }
+
+  state.collisionFlash = collided
+    ? Math.max(0.12, state.collisionFlash)
+    : Math.max(0, state.collisionFlash - dt * 1.3);
 }
 
 function updateWaveImpulses(state, dt) {
@@ -1537,7 +1872,7 @@ function renderFlagPole(ctx, camera, viewport) {
 function renderShipShadow(ctx, shipModel, ship, state, camera, viewport, lightDir, shadowStrength) {
   const bounds = shipModel.bounds;
   const keelY = (shipModel.physics.waterline ?? 0.42) - 0.28;
-  const transform = { position: ship.position, rotationY: ship.rotationY, scale: 1.1 };
+  const transform = { position: ship.position, rotationY: ship.rotationY, scale: SHIP_SCALE };
   const hullCorners = [
     vec3(bounds.min[0], keelY, bounds.min[2]),
     vec3(bounds.max[0], keelY, bounds.min[2]),
@@ -1567,6 +1902,113 @@ function renderFlagShadow(ctx, cloth, camera, viewport, lightDir, shadowStrength
   });
 }
 
+function renderGlowLight(
+  ctx,
+  point,
+  camera,
+  viewport,
+  coreColor,
+  glowColor,
+  glowScale,
+  reflectionStrength = 0,
+  state = null
+) {
+  const projected = projectPoint(point, camera, viewport);
+  if (!projected) {
+    return;
+  }
+
+  const radius = clamp((1 / projected.depth) * 420 * glowScale, 4, 34);
+  const halo = ctx.createRadialGradient(projected.x, projected.y, radius * 0.12, projected.x, projected.y, radius);
+  halo.addColorStop(0, colorToRgba(coreColor, 0.98));
+  halo.addColorStop(0.5, colorToRgba(glowColor, 0.42));
+  halo.addColorStop(1, colorToRgba(glowColor, 0));
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.fillStyle = halo;
+  ctx.beginPath();
+  ctx.arc(projected.x, projected.y, radius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.fillStyle = colorToRgba(coreColor, 0.98);
+  ctx.beginPath();
+  ctx.arc(projected.x, projected.y, Math.max(1.2, radius * 0.16), 0, Math.PI * 2);
+  ctx.fill();
+
+  if (state && reflectionStrength > 0) {
+    const waterline = sampleWave(state, point.x, point.z, state.time) * 0.22;
+    const reflectedPoint = vec3(point.x, waterline - (point.y - waterline) * 0.58, point.z + 0.08);
+    const reflected = projectPoint(reflectedPoint, camera, viewport);
+    if (reflected) {
+      const reflectionRadius = radius * 0.72;
+      const glow = ctx.createRadialGradient(
+        reflected.x,
+        reflected.y,
+        reflectionRadius * 0.1,
+        reflected.x,
+        reflected.y,
+        reflectionRadius
+      );
+      glow.addColorStop(0, colorToRgba(coreColor, reflectionStrength * 0.34));
+      glow.addColorStop(1, colorToRgba(glowColor, 0));
+      ctx.save();
+      ctx.globalCompositeOperation = "screen";
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.ellipse(
+        reflected.x,
+        reflected.y,
+        reflectionRadius * 0.34,
+        reflectionRadius,
+        0,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+}
+
+function renderShipLanterns(ctx, ship, state, camera, viewport, visuals) {
+  const lanterns = Array.isArray(ship.lanterns) ? ship.lanterns : SHIP_LANTERNS;
+  const strength = readVisualNumber(ship.lanternStrength, 1);
+  for (const lantern of lanterns) {
+    const position = transformPoint(
+      vec3(lantern.x, lantern.y, lantern.z),
+      { position: ship.position, rotationY: ship.rotationY, scale: SHIP_SCALE }
+    );
+    renderGlowLight(
+      ctx,
+      position,
+      camera,
+      viewport,
+      visuals.lanternCore,
+      visuals.lanternGlow,
+      lantern.glow * strength,
+      visuals.lanternReflectionStrength,
+      state
+    );
+  }
+}
+
+function renderHarborTorches(ctx, state, camera, viewport, visuals) {
+  for (const torch of HARBOR_TORCHES) {
+    renderGlowLight(
+      ctx,
+      vec3(torch.x, torch.y, torch.z),
+      camera,
+      viewport,
+      visuals.torchCore,
+      visuals.torchGlow,
+      torch.glow,
+      visuals.lanternReflectionStrength * 0.55,
+      state
+    );
+  }
+}
+
 function renderScene(ctx, canvas, state, shipModel, dom) {
   const viewport = { width: canvas.width, height: canvas.height };
   const camera = buildCamera(state, canvas);
@@ -1576,7 +2018,7 @@ function renderScene(ctx, canvas, state, shipModel, dom) {
     importance: state.focus === "lighting" ? "critical" : "high",
   });
   const nearLighting = lightingPlan.bands.find((entry) => entry.band === "near") ?? lightingPlan.bands[0];
-  const lightDir = normalizeVec3(vec3(-0.45, 0.85, -0.24));
+  const lightDir = normalizeVec3(vec3(-0.22, 0.94, -0.31));
   const lightingSnapshot = state.lightingDetail.getSnapshot();
   const visuals = resolveVisualConfig(
     nearLighting,
@@ -1653,7 +2095,7 @@ function renderScene(ctx, canvas, state, shipModel, dom) {
   for (const ship of state.ships) {
     buildTrianglesFromMesh(
       shipModel,
-      { position: ship.position, rotationY: ship.rotationY, scale: 1.1 },
+      { position: ship.position, rotationY: ship.rotationY, scale: SHIP_SCALE },
       ship.tint,
       camera,
       viewport,
@@ -1669,10 +2111,12 @@ function renderScene(ctx, canvas, state, shipModel, dom) {
 
   drawTriangles(ctx, triangles, lightDir, reflectionStrength, camera, shadowStrength);
   renderWaterHighlights(ctx, water.bandMeshes, camera, viewport);
+  renderHarborTorches(ctx, state, camera, viewport, visuals);
   renderFlagPole(ctx, camera, viewport);
   renderClothAccent(ctx, cloth, camera, viewport);
   for (const ship of state.ships) {
     renderShipRigging(ctx, ship, camera, viewport);
+    renderShipLanterns(ctx, ship, state, camera, viewport, visuals);
   }
   renderSprays(ctx, state.sprays, camera, viewport);
 
@@ -1686,8 +2130,10 @@ function renderScene(ctx, canvas, state, shipModel, dom) {
   const sceneMetrics = [
     `focus: ${state.focus}`,
     `ships: ${state.ships.length} active GLTF hulls`,
+    `moonlight: cold overhead key + ${HARBOR_TORCHES.length + state.ships.length * SHIP_LANTERNS.length} warm deck and harbor lights`,
     `physics snapshot: ${state.physics.snapshot.stage} (${state.physics.snapshot.stability})`,
-    `physics contacts: ${state.physics.snapshot.contactCount ?? 0}`,
+    `physics contacts: ${state.contactCount}`,
+    `mass split: ${state.ships.map((ship) => `${ship.id} ${(getShipMass(ship, shipModel) / 1000).toFixed(1)}t`).join(" · ")}`,
     `cloth band: ${cloth.band} -> ${cloth.representation.output}`,
     `fluid near band: ${water.bandMeshes[0].representation.output}`,
     `lighting profile: ${lightingPlan.profile} (${lightingDistanceBands.length} bands)`,
@@ -1712,8 +2158,8 @@ function renderScene(ctx, canvas, state, shipModel, dom) {
     state.focus === "physics"
       ? [
           "Stable world snapshots are taken after the authoritative rigid-body commit and before visual follow-up work.",
-          "The ships collide on GLTF-derived hull volumes while cloth and fluid remain downstream visual consumers.",
-          "Near-field lighting keeps the ray-traced-primary shadow impression so the collision read stays crisp.",
+          "The ships collide with mass-weighted impulses and positional correction, so the heavier hull keeps more of its line.",
+          "Moonlight keeps the overall read legible while lanterns and torches make collision moments easy to track against the water.",
         ]
       : SCENE_NOTES;
   const custom = state.demoDescription ?? null;
@@ -1740,8 +2186,8 @@ function renderScene(ctx, canvas, state, shipModel, dom) {
     typeof custom?.details === "string"
       ? custom.details
       : state.focus === "physics"
-        ? `Stable world snapshots are emitted from ${state.physics.plan.snapshotStageId} after the authoritative solver; GLTF ships collide on ${shipModel.physics.shape ?? "box"} volumes while visual follow-up remains downstream.`
-        : `GLTF ships are colliding with ${shipModel.physics.shape ?? "box"} physics volumes; cloth and fluid remain continuous while the governor pressure is ${state.lastDecision.pressureLevel}.`;
+        ? `Stable world snapshots are emitted from ${state.physics.plan.snapshotStageId} after the authoritative solver; the heavier hull now carries momentum through mass-aware collision impulses while cloth and fluid remain downstream.`
+        : `Moonlit GLTF ships collide on ${shipModel.physics.shape ?? "box"} physics volumes; lantern reflections, cloth, and fluid remain continuous while the governor pressure is ${state.lastDecision.pressureLevel}.`;
 }
 
 function updateSceneState(state, dt, shipModel) {
@@ -1763,6 +2209,8 @@ function syncTextState(state, shipModel) {
       z: Number(ship.position.z.toFixed(2)),
       vx: Number(ship.velocity.x.toFixed(2)),
       vz: Number(ship.velocity.z.toFixed(2)),
+      massKg: Math.round(getShipMass(ship, shipModel)),
+      lanterns: Array.isArray(ship.lanterns) ? ship.lanterns.length : 0,
     })),
     shipPhysics: shipModel.physics,
     sprays: state.sprays.length,
@@ -1791,6 +2239,7 @@ function syncTextState(state, shipModel) {
 export async function mountGpuShowcase(options = {}) {
   injectStyles();
   const root = options.root ?? document.body;
+  root.classList.add(ROOT_CLASS);
   const previousMarkup = root.innerHTML;
   const previousRenderGameToText = window.render_game_to_text;
   const previousAdvanceTime = window.advanceTime;
@@ -1813,14 +2262,15 @@ export async function mountGpuShowcase(options = {}) {
   syncTextState(state, shipModel);
 
   const ctx = dom.canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("2D canvas context is required for the shared showcase.");
+  }
+  let animationFrameId = 0;
   let destroyed = false;
-  let frameHandle = null;
-
   const renderFrame = (nowMs) => {
     if (destroyed) {
       return;
     }
-
     if (!state.paused) {
       if (state.lastTimeMs == null) {
         state.lastTimeMs = nowMs;
@@ -1838,7 +2288,7 @@ export async function mountGpuShowcase(options = {}) {
     state.demoDescription = resolveSceneDescription(state, options, shipModel).description;
     renderScene(ctx, dom.canvas, state, shipModel, dom);
     syncTextState(state, shipModel);
-    frameHandle = requestAnimationFrame(renderFrame);
+    animationFrameId = requestAnimationFrame(renderFrame);
   };
 
   const handlePauseClick = () => {
@@ -1860,37 +2310,43 @@ export async function mountGpuShowcase(options = {}) {
   dom.stressToggle.addEventListener("change", handleStressChange);
   dom.focusMode.addEventListener("change", handleFocusChange);
 
-  frameHandle = requestAnimationFrame(renderFrame);
+  animationFrameId = requestAnimationFrame(renderFrame);
+  const destroy = () => {
+    if (destroyed) {
+      return;
+    }
+    destroyed = true;
+    if (animationFrameId) {
+      cancelAnimationFrame(animationFrameId);
+    }
+    dom.pauseButton.removeEventListener("click", handlePauseClick);
+    dom.stressToggle.removeEventListener("change", handleStressChange);
+    dom.focusMode.removeEventListener("change", handleFocusChange);
+    try {
+      if (typeof options.destroyState === "function") {
+        options.destroyState(state.packageState);
+      }
+    } finally {
+      state.packageState = undefined;
+    }
+    root.classList.remove(ROOT_CLASS);
+    root.innerHTML = previousMarkup;
+    if (typeof previousRenderGameToText === "function") {
+      window.render_game_to_text = previousRenderGameToText;
+    } else {
+      delete window.render_game_to_text;
+    }
+    if (typeof previousAdvanceTime === "function") {
+      window.advanceTime = previousAdvanceTime;
+    } else {
+      delete window.advanceTime;
+    }
+  };
   return {
     state,
     shipModel,
     canvas: dom.canvas,
-    destroy() {
-      if (destroyed) {
-        return;
-      }
-
-      destroyed = true;
-      if (frameHandle != null) {
-        cancelAnimationFrame(frameHandle);
-      }
-      dom.pauseButton.removeEventListener("click", handlePauseClick);
-      dom.stressToggle.removeEventListener("change", handleStressChange);
-      dom.focusMode.removeEventListener("change", handleFocusChange);
-      root.innerHTML = previousMarkup;
-
-      if (typeof previousRenderGameToText === "function") {
-        window.render_game_to_text = previousRenderGameToText;
-      } else {
-        delete window.render_game_to_text;
-      }
-
-      if (typeof previousAdvanceTime === "function") {
-        window.advanceTime = previousAdvanceTime;
-      } else {
-        delete window.advanceTime;
-      }
-    },
+    destroy,
   };
 }
 
@@ -1905,7 +2361,7 @@ function updatePhysicsSnapshot(state, shipModel) {
     animationInputRevision: state.frame,
     bodyCount: state.ships.length + 2,
     dynamicBodyCount: state.ships.length,
-    contactCount: state.collisionFlash > 0.02 ? 1 : 0,
+    contactCount: state.contactCount,
     metadata: {
       collisionCount: state.collisionCount,
       contactCount: state.contactCount,
