@@ -11,6 +11,20 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [0.1.6] - 2026-04-02
+
+- **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
   - Shared asset and glTF buffer loading now resolve reliably in browser consumers
     when the initial request URL is relative, using the fetched response URL as
     the stable base for nested asset requests.
@@ -104,3 +118,4 @@ All notable changes to this project will be documented in this file.
 [0.1.2]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v0.1.2
 [0.1.3]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v0.1.3
 [0.1.4]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v0.1.4
+[0.1.6]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v0.1.6
