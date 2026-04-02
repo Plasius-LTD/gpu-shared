@@ -2239,7 +2239,7 @@ function syncTextState(state, shipModel) {
 export async function mountGpuShowcase(options = {}) {
   injectStyles();
   const root = options.root ?? document.body;
-  root.classList.add(ROOT_CLASS);
+  root.classList?.add?.(ROOT_CLASS);
   const previousMarkup = root.innerHTML;
   const previousRenderGameToText = window.render_game_to_text;
   const previousAdvanceTime = window.advanceTime;
@@ -2329,7 +2329,7 @@ export async function mountGpuShowcase(options = {}) {
     } finally {
       state.packageState = undefined;
     }
-    root.classList.remove(ROOT_CLASS);
+    root.classList?.remove?.(ROOT_CLASS);
     root.innerHTML = previousMarkup;
     if (typeof previousRenderGameToText === "function") {
       window.render_game_to_text = previousRenderGameToText;
