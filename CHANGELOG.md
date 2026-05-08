@@ -11,7 +11,9 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Fixed**
-  - (placeholder)
+  - Rebuilt the bundled showcase runtime against the bundle-safe
+    `@plasius/gpu-lighting` module URL implementation so hosted GPU demos do
+    not construct lighting technique URLs from generated `data:` module bases.
 
 - **Security**
   - (placeholder)
