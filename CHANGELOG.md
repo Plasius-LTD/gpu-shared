@@ -11,6 +11,20 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [0.1.7] - 2026-05-08
+
+- **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
   - Rebuilt the bundled showcase runtime against the bundle-safe
     `@plasius/gpu-lighting` module URL implementation so hosted GPU demos do
     not construct lighting technique URLs from generated `data:` module bases.
@@ -121,3 +135,4 @@ All notable changes to this project will be documented in this file.
 [0.1.3]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v0.1.3
 [0.1.4]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v0.1.4
 [0.1.6]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v0.1.6
+[0.1.7]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v0.1.7
