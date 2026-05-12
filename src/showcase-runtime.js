@@ -1,7 +1,6 @@
 import {
   clothGarmentKinds,
   clothProfileNames,
-  createClothContinuityEnvelope,
   createClothRepresentationPlan,
   selectClothRepresentationBand,
 } from "@plasius/gpu-cloth";
@@ -97,6 +96,12 @@ const HARBOR_TORCHES = Object.freeze([
   Object.freeze({ x: -8.6, y: 2.48, z: -0.72, glow: 1 }),
   Object.freeze({ x: -10.4, y: 1.28, z: 0.82, glow: 0.92 }),
 ]);
+const FLAG_LAYOUT = Object.freeze({
+  origin: Object.freeze({ x: -3.5, y: 5.9, z: 2.4 }),
+  width: 4.8,
+  height: 2.7,
+  mastOffsetX: 1.8,
+});
 function injectStyles() {
   if (document.getElementById(STYLE_ID)) {
     return;
@@ -722,6 +727,282 @@ function readVisualNumber(value, fallback) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
+function resolveClothPresentation(state, meshDetail) {
+  const clothPlan = createClothRepresentationPlan({
+    garmentId: "shore-flag",
+    kind: state.focus === "cloth" ? "flag" : clothGarmentKinds[0],
+    profile: state.focus === "cloth" ? "cinematic" : clothProfileNames[0],
+    supportsRayTracing: true,
+    nearFieldMaxMeters: 18,
+    midFieldMaxMeters: 55,
+    farFieldMaxMeters: 180,
+  });
+  const preset = CAMERA_PRESETS[state.focus] ?? CAMERA_PRESETS.integrated;
+  const fallbackEye = state.camera.eye
+    ? state.camera.eye
+    : addVec3(
+        state.camera.target,
+        vec3(
+          Math.sin(state.camera.yaw ?? preset.yaw) * Math.cos(state.camera.pitch ?? preset.pitch) * (state.camera.distance ?? preset.distance),
+          Math.sin(state.camera.pitch ?? preset.pitch) * (state.camera.distance ?? preset.distance),
+          Math.cos(state.camera.yaw ?? preset.yaw) * Math.cos(state.camera.pitch ?? preset.pitch) * (state.camera.distance ?? preset.distance)
+        )
+      );
+  const cameraDistance = lengthVec3(subVec3(state.camera.target, fallbackEye));
+  const band = selectClothRepresentationBand(cameraDistance, clothPlan.thresholds);
+  const representation =
+    clothPlan.representations.find((entry) => entry.band === band) ?? clothPlan.representations[0];
+  return {
+    clothPlan,
+    band,
+    continuity: representation.continuity,
+    representation,
+  };
+}
+
+function getFlagRestPosition(rows, cols, row, column) {
+  const u = cols <= 1 ? 0 : column / (cols - 1);
+  const v = rows <= 1 ? 0 : row / (rows - 1);
+  return vec3(
+    FLAG_LAYOUT.origin.x + u * FLAG_LAYOUT.mastOffsetX,
+    FLAG_LAYOUT.origin.y - FLAG_LAYOUT.height * v - u * u * 0.08,
+    FLAG_LAYOUT.origin.z + FLAG_LAYOUT.width * u
+  );
+}
+
+function buildClothConstraints(rows, cols, restPositions) {
+  const constraints = [];
+  const indexFor = (row, column) => row * cols + column;
+  const pushConstraint = (a, b, stiffness) => {
+    constraints.push(
+      Object.freeze({
+        a,
+        b,
+        restLength: lengthVec3(subVec3(restPositions[a], restPositions[b])),
+        stiffness,
+      })
+    );
+  };
+
+  for (let row = 0; row < rows; row += 1) {
+    for (let column = 0; column < cols; column += 1) {
+      const index = indexFor(row, column);
+      if (column + 1 < cols) {
+        pushConstraint(index, indexFor(row, column + 1), 0.92);
+      }
+      if (row + 1 < rows) {
+        pushConstraint(index, indexFor(row + 1, column), 0.9);
+      }
+      if (column + 1 < cols && row + 1 < rows) {
+        pushConstraint(index, indexFor(row + 1, column + 1), 0.66);
+      }
+      if (column - 1 >= 0 && row + 1 < rows) {
+        pushConstraint(index, indexFor(row + 1, column - 1), 0.66);
+      }
+      if (column + 2 < cols) {
+        pushConstraint(index, indexFor(row, column + 2), 0.22);
+      }
+      if (row + 2 < rows) {
+        pushConstraint(index, indexFor(row + 2, column), 0.18);
+      }
+    }
+  }
+
+  return Object.freeze(constraints);
+}
+
+function createShowcaseClothSimulationState(options = {}) {
+  const rows = Math.max(4, options.rows ?? 11);
+  const cols = Math.max(4, options.cols ?? 16);
+  const continuity = options.continuity ?? {
+    broadMotionFloor: 0.72,
+    wrinkleFloor: 0.56,
+  };
+  const representation = options.representation ?? {
+    mesh: {
+      solverIterations: 6,
+      wrinkleLayers: 2,
+    },
+  };
+  const restPositions = [];
+  const positions = [];
+  const previousPositions = [];
+  const uvs = [];
+  const phaseOffsets = [];
+  const pinned = [];
+
+  for (let row = 0; row < rows; row += 1) {
+    for (let column = 0; column < cols; column += 1) {
+      const index = row * cols + column;
+      const u = cols <= 1 ? 0 : column / (cols - 1);
+      const v = rows <= 1 ? 0 : row / (rows - 1);
+      const rest = getFlagRestPosition(rows, cols, row, column);
+      const preload = vec3(
+        u * 0.04,
+        Math.sin(v * Math.PI) * 0.02 * continuity.wrinkleFloor,
+        -u * 0.12
+      );
+      const pinnedPoint = column === 0;
+      restPositions.push(rest);
+      positions.push(pinnedPoint ? vec3(rest.x, rest.y, rest.z) : addVec3(rest, preload));
+      previousPositions.push(
+        pinnedPoint
+          ? vec3(rest.x, rest.y, rest.z)
+          : addVec3(rest, scaleVec3(preload, 0.35))
+      );
+      uvs.push(Object.freeze({ u, v }));
+      phaseOffsets.push(pseudoRandom(index + 17) * Math.PI * 2);
+      pinned.push(pinnedPoint);
+    }
+  }
+
+  return {
+    rows,
+    cols,
+    continuity,
+    representation,
+    restPositions,
+    positions,
+    previousPositions,
+    constraints: buildClothConstraints(rows, cols, restPositions),
+    indices: Object.freeze(
+      Array.from({ length: (rows - 1) * (cols - 1) * 6 }, (_, listIndex) => listIndex)
+        .map((_, listIndex, source) => {
+          if (listIndex >= source.length) {
+            return 0;
+          }
+          const quadIndex = Math.floor(listIndex / 6);
+          const quadColumn = quadIndex % (cols - 1);
+          const quadRow = Math.floor(quadIndex / (cols - 1));
+          const base = quadRow * cols + quadColumn;
+          return [base, base + 1, base + cols + 1, base, base + cols + 1, base + cols][listIndex % 6];
+        })
+    ),
+    uvs,
+    phaseOffsets,
+    pinned,
+  };
+}
+
+function resetPinnedClothPoints(clothState) {
+  for (let index = 0; index < clothState.positions.length; index += 1) {
+    if (!clothState.pinned[index]) {
+      continue;
+    }
+    const anchor = clothState.restPositions[index];
+    clothState.positions[index] = vec3(anchor.x, anchor.y, anchor.z);
+    clothState.previousPositions[index] = vec3(anchor.x, anchor.y, anchor.z);
+  }
+}
+
+function satisfyClothConstraint(clothState, constraint) {
+  const a = clothState.positions[constraint.a];
+  const b = clothState.positions[constraint.b];
+  const delta = subVec3(b, a);
+  const distance = lengthVec3(delta);
+  if (distance <= 0.0001) {
+    return;
+  }
+
+  const correctionScale =
+    ((distance - constraint.restLength) / distance) * 0.5 * constraint.stiffness;
+  const correction = scaleVec3(delta, correctionScale);
+  if (!clothState.pinned[constraint.a]) {
+    clothState.positions[constraint.a] = addVec3(a, correction);
+  }
+  if (!clothState.pinned[constraint.b]) {
+    clothState.positions[constraint.b] = subVec3(b, correction);
+  }
+}
+
+function advanceShowcaseClothSimulationState(clothState, options = {}) {
+  const dt = clamp(options.dt ?? 1 / 60, 1 / 240, 1 / 18);
+  const time = readVisualNumber(options.time, 0);
+  const flagMotion = readVisualNumber(options.flagMotion, 0.92);
+  const waveInfluence = readVisualNumber(options.waveInfluence, 0);
+  const wrinkleLayers = Math.max(1, clothState.representation.mesh?.wrinkleLayers ?? 2);
+  const solverIterations = clamp(
+    Math.round(clothState.representation.mesh?.solverIterations ?? 6),
+    2,
+    10
+  );
+
+  for (let index = 0; index < clothState.positions.length; index += 1) {
+    if (clothState.pinned[index]) {
+      continue;
+    }
+
+    const current = clothState.positions[index];
+    const previous = clothState.previousPositions[index];
+    const { u, v } = clothState.uvs[index];
+    const phase = clothState.phaseOffsets[index];
+    const broadMotion = clothState.continuity.broadMotionFloor;
+    const wrinkleMotion = clothState.continuity.wrinkleFloor;
+    const gustPhase = time * 2.1 + phase + u * 4.4 + v * 2.3;
+    const wrinklePhase = time * 5.3 + phase * 0.72 + u * 9.6 + v * 7.1;
+    const windDirection = normalizeVec3(
+      vec3(
+        0.18 + Math.sin(gustPhase) * (0.12 + broadMotion * 0.09),
+        Math.cos(time * 1.4 + phase + v * 4.8) * 0.06 * wrinkleMotion,
+        1 + Math.sin(gustPhase * 0.74) * 0.18
+      )
+    );
+    const windStrength =
+      (1.6 + broadMotion * 1.25 + wrinkleLayers * 0.12) *
+      flagMotion *
+      (0.44 + u * 1.14);
+    const wrinkleForce = vec3(
+      Math.sin(wrinklePhase) * 0.22 * wrinkleMotion * flagMotion,
+      Math.cos(wrinklePhase * 0.7) * 0.08 * wrinkleMotion,
+      Math.cos(wrinklePhase) * 0.14 * broadMotion * flagMotion
+    );
+    const acceleration = addVec3(
+      vec3(0, -0.48 - u * 0.08, 0),
+      addVec3(
+        scaleVec3(windDirection, windStrength),
+        addVec3(
+          wrinkleForce,
+          vec3(waveInfluence * (0.04 + u * 0.08), 0, waveInfluence * 0.16)
+        )
+      )
+    );
+    const inertia = scaleVec3(subVec3(current, previous), 0.987);
+    const next = addVec3(addVec3(current, inertia), scaleVec3(acceleration, dt * dt));
+    clothState.previousPositions[index] = vec3(current.x, current.y, current.z);
+    clothState.positions[index] = next;
+  }
+
+  resetPinnedClothPoints(clothState);
+  for (let iteration = 0; iteration < solverIterations; iteration += 1) {
+    for (const constraint of clothState.constraints) {
+      satisfyClothConstraint(clothState, constraint);
+    }
+    resetPinnedClothPoints(clothState);
+  }
+
+  return clothState;
+}
+
+function ensureShowcaseClothState(state, meshDetail, clothPresentation) {
+  if (
+    !state.clothState ||
+    state.clothState.rows !== meshDetail.rows ||
+    state.clothState.cols !== meshDetail.cols
+  ) {
+    state.clothState = createShowcaseClothSimulationState({
+      rows: meshDetail.rows,
+      cols: meshDetail.cols,
+      continuity: clothPresentation.continuity,
+      representation: clothPresentation.representation,
+    });
+  } else {
+    state.clothState.continuity = clothPresentation.continuity;
+    state.clothState.representation = clothPresentation.representation;
+  }
+
+  return state.clothState;
+}
+
 function resolveVisualConfig(nearLighting, lightingSnapshot, customVisuals = {}) {
   const premiumShadows = nearLighting.primaryShadowSource === "ray-traced-primary";
   const defaults = {
@@ -831,74 +1112,18 @@ function resolveVisualConfig(nearLighting, lightingSnapshot, customVisuals = {})
 }
 
 function buildClothSurface(model, state, meshDetail, visuals) {
-  const clothPlan = createClothRepresentationPlan({
-    garmentId: "shore-flag",
-    kind: state.focus === "cloth" ? "flag" : clothGarmentKinds[0],
-    profile: state.focus === "cloth" ? "cinematic" : clothProfileNames[0],
-    supportsRayTracing: true,
-    nearFieldMaxMeters: 18,
-    midFieldMaxMeters: 55,
-    farFieldMaxMeters: 180,
-  });
-  const cameraDistance = lengthVec3(subVec3(state.camera.target, state.camera.eye ?? vec3(...CAMERA_PRESETS[state.focus].target)));
-  const band = selectClothRepresentationBand(cameraDistance, clothPlan.thresholds);
-  const representation =
-    clothPlan.representations.find((entry) => entry.band === band) ?? clothPlan.representations[0];
-  const continuity = createClothContinuityEnvelope({ garmentId: "shore-flag" });
-
-  const cols = meshDetail.cols;
-  const rows = meshDetail.rows;
-  const origin = vec3(-3.5, 5.9, 2.4);
-  const width = 4.8;
-  const height = 2.7;
-  const positions = [];
-  const indices = [];
-  const time = state.time;
-
-  for (let row = 0; row < rows; row += 1) {
-    for (let column = 0; column < cols; column += 1) {
-      const u = column / (cols - 1);
-      const v = row / (rows - 1);
-      const gust =
-        Math.sin(time * 1.9 + v * 3.2 + u * 2.1) *
-        continuity.broadMotionFloor *
-        visuals.flagMotion;
-      const wrinkle =
-        Math.sin(time * 4.4 + u * 9.2 + v * 5.6) *
-        continuity.wrinkleFloor *
-        0.22 *
-        Math.max(0.55, visuals.flagMotion);
-      const x = origin.x + u * 1.8 + gust * 0.55 * (u * 0.9);
-      const y = origin.y - height * v + wrinkle * 0.2;
-      const z = origin.z + width * u + gust * 0.72 * (u * 0.85);
-      const flap =
-        Math.cos(time * 2.7 + u * 7.4 + v * 3.8) *
-        continuity.broadMotionFloor *
-        0.28 *
-        visuals.flagMotion;
-      positions.push(vec3(x + flap, y, z));
-    }
-  }
-
-  for (let row = 0; row < rows - 1; row += 1) {
-    for (let column = 0; column < cols - 1; column += 1) {
-      const a = row * cols + column;
-      const b = a + 1;
-      const c = a + cols + 1;
-      const d = a + cols;
-      indices.push(a, b, c, a, c, d);
-    }
-  }
+  const clothPresentation = resolveClothPresentation(state, meshDetail);
+  const clothState = ensureShowcaseClothState(state, meshDetail, clothPresentation);
 
   return {
-    clothPlan,
-    band,
-    representation,
-    continuity,
+    clothPlan: clothPresentation.clothPlan,
+    band: clothPresentation.band,
+    representation: clothPresentation.representation,
+    continuity: clothPresentation.continuity,
     color: visuals.flagColor,
-    positions,
-    indices,
-    grid: { rows, cols },
+    positions: clothState.positions.map((point) => vec3(point.x, point.y, point.z)),
+    indices: clothState.indices,
+    grid: { rows: clothState.rows, cols: clothState.cols },
   };
 }
 
@@ -988,6 +1213,64 @@ function sampleWave(state, x, z, time) {
     sampleShipWake(state, x, z, time) +
     sampleWaveImpulses(state, x, z, time)
   );
+}
+
+function buildWaterMotionEffects(state) {
+  const wakeTrails = [];
+  const rippleRings = state.waveImpulses.map((impulse) => {
+    const radius = impulse.radius + (1 - impulse.life) * 4.8;
+    return Object.freeze({
+      center: vec3(
+        impulse.x,
+        sampleWave(state, impulse.x, impulse.z, state.time) * 0.24 + 0.06,
+        impulse.z
+      ),
+      radius,
+      opacity: clamp(impulse.life * 0.28, 0.08, 0.3),
+    });
+  });
+
+  for (const ship of state.ships) {
+    const speed = Math.hypot(ship.velocity.x, ship.velocity.z);
+    if (speed <= 0.18) {
+      continue;
+    }
+
+    const direction = normalizeVec3(vec3(ship.velocity.x, 0, ship.velocity.z));
+    const behind = scaleVec3(direction, -1);
+    const lateral = vec3(-direction.z, 0, direction.x);
+    const points = [];
+    for (let sampleIndex = 0; sampleIndex < 6; sampleIndex += 1) {
+      const along = 1 + sampleIndex * 1.45;
+      const lateralOffset =
+        Math.sin(state.time * 1.2 + sampleIndex * 0.8 + readVisualNumber(ship.wanderPhase, 0)) * 0.12;
+      const worldPoint = addVec3(
+        ship.position,
+        addVec3(scaleVec3(behind, along), scaleVec3(lateral, lateralOffset))
+      );
+      points.push(
+        Object.freeze({
+          center: vec3(
+            worldPoint.x,
+            sampleWave(state, worldPoint.x, worldPoint.z, state.time) * 0.24 + 0.04,
+            worldPoint.z
+          ),
+          width: 0.34 + sampleIndex * 0.13,
+        })
+      );
+    }
+    wakeTrails.push(
+      Object.freeze({
+        opacity: clamp(0.18 + speed * 0.09, 0.22, 0.46),
+        points: Object.freeze(points),
+      })
+    );
+  }
+
+  return Object.freeze({
+    wakeTrails: Object.freeze(wakeTrails),
+    rippleRings: Object.freeze(rippleRings),
+  });
 }
 
 function buildWaterBands(state, fluidDetail, visuals) {
@@ -1168,6 +1451,7 @@ function createSceneState(options) {
     contactCount: 0,
     collisionCount: 0,
     collisionFlash: 0,
+    clothState: null,
     physics: {
       profile: physicsProfile,
       plan: physicsPlan,
@@ -1902,27 +2186,78 @@ function renderFlagShadow(ctx, cloth, camera, viewport, lightDir, shadowStrength
   });
 }
 
-function renderGlowLight(
-  ctx,
-  point,
-  camera,
-  viewport,
-  coreColor,
-  glowColor,
-  glowScale,
-  reflectionStrength = 0,
-  state = null
-) {
-  const projected = projectPoint(point, camera, viewport);
+function collectSceneLightSources(state, visuals) {
+  const directLights = [];
+  const reflectionLights = [];
+  const pushLight = (point, glowScale, reflectionStrength, coreColor, glowColor) => {
+    directLights.push(
+      Object.freeze({
+        pass: "direct-glow",
+        point,
+        coreColor,
+        glowColor,
+        glowScale,
+      })
+    );
+    if (reflectionStrength > 0) {
+      reflectionLights.push(
+        Object.freeze({
+          pass: "water-reflection",
+          point,
+          coreColor,
+          glowColor,
+          glowScale,
+          reflectionStrength,
+        })
+      );
+    }
+  };
+
+  for (const torch of HARBOR_TORCHES) {
+    pushLight(
+      vec3(torch.x, torch.y, torch.z),
+      torch.glow,
+      visuals.lanternReflectionStrength * 0.55,
+      visuals.torchCore,
+      visuals.torchGlow
+    );
+  }
+
+  for (const ship of state.ships) {
+    const lanterns = Array.isArray(ship.lanterns) ? ship.lanterns : SHIP_LANTERNS;
+    const strength = readVisualNumber(ship.lanternStrength, 1);
+    for (const lantern of lanterns) {
+      const point = transformPoint(
+        vec3(lantern.x, lantern.y, lantern.z),
+        { position: ship.position, rotationY: ship.rotationY, scale: SHIP_SCALE }
+      );
+      pushLight(
+        point,
+        lantern.glow * strength,
+        visuals.lanternReflectionStrength,
+        visuals.lanternCore,
+        visuals.lanternGlow
+      );
+    }
+  }
+
+  return Object.freeze({
+    directLights: Object.freeze(directLights),
+    reflectionLights: Object.freeze(reflectionLights),
+  });
+}
+
+function renderDirectLightGlow(ctx, source, camera, viewport) {
+  const projected = projectPoint(source.point, camera, viewport);
   if (!projected) {
     return;
   }
 
-  const radius = clamp((1 / projected.depth) * 420 * glowScale, 4, 34);
+  const radius = clamp((1 / projected.depth) * 420 * source.glowScale, 4, 34);
   const halo = ctx.createRadialGradient(projected.x, projected.y, radius * 0.12, projected.x, projected.y, radius);
-  halo.addColorStop(0, colorToRgba(coreColor, 0.98));
-  halo.addColorStop(0.5, colorToRgba(glowColor, 0.42));
-  halo.addColorStop(1, colorToRgba(glowColor, 0));
+  halo.addColorStop(0, colorToRgba(source.coreColor, 0.98));
+  halo.addColorStop(0.5, colorToRgba(source.glowColor, 0.42));
+  halo.addColorStop(1, colorToRgba(source.glowColor, 0));
   ctx.save();
   ctx.globalCompositeOperation = "screen";
   ctx.fillStyle = halo;
@@ -1931,82 +2266,134 @@ function renderGlowLight(
   ctx.fill();
   ctx.restore();
 
-  ctx.fillStyle = colorToRgba(coreColor, 0.98);
+  ctx.fillStyle = colorToRgba(source.coreColor, 0.98);
   ctx.beginPath();
   ctx.arc(projected.x, projected.y, Math.max(1.2, radius * 0.16), 0, Math.PI * 2);
   ctx.fill();
+}
 
-  if (state && reflectionStrength > 0) {
-    const waterline = sampleWave(state, point.x, point.z, state.time) * 0.22;
-    const reflectedPoint = vec3(point.x, waterline - (point.y - waterline) * 0.58, point.z + 0.08);
-    const reflected = projectPoint(reflectedPoint, camera, viewport);
-    if (reflected) {
-      const reflectionRadius = radius * 0.72;
-      const glow = ctx.createRadialGradient(
-        reflected.x,
-        reflected.y,
-        reflectionRadius * 0.1,
-        reflected.x,
-        reflected.y,
-        reflectionRadius
-      );
-      glow.addColorStop(0, colorToRgba(coreColor, reflectionStrength * 0.34));
-      glow.addColorStop(1, colorToRgba(glowColor, 0));
-      ctx.save();
-      ctx.globalCompositeOperation = "screen";
-      ctx.fillStyle = glow;
+function renderWaterLightReflection(ctx, source, state, camera, viewport) {
+  const projected = projectPoint(source.point, camera, viewport);
+  if (!projected) {
+    return;
+  }
+
+  const radius = clamp((1 / projected.depth) * 420 * source.glowScale, 4, 34);
+  const waterline = sampleWave(state, source.point.x, source.point.z, state.time) * 0.22;
+  const reflectedPoint = vec3(
+    source.point.x,
+    waterline - (source.point.y - waterline) * 0.58,
+    source.point.z + 0.08
+  );
+  const reflected = projectPoint(reflectedPoint, camera, viewport);
+  if (!reflected) {
+    return;
+  }
+
+  const reflectionRadius = radius * 0.72;
+  const glow = ctx.createRadialGradient(
+    reflected.x,
+    reflected.y,
+    reflectionRadius * 0.1,
+    reflected.x,
+    reflected.y,
+    reflectionRadius
+  );
+  glow.addColorStop(0, colorToRgba(source.coreColor, source.reflectionStrength * 0.34));
+  glow.addColorStop(1, colorToRgba(source.glowColor, 0));
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.ellipse(
+    reflected.x,
+    reflected.y,
+    reflectionRadius * 0.34,
+    reflectionRadius,
+    0,
+    0,
+    Math.PI * 2
+  );
+  ctx.fill();
+  ctx.restore();
+}
+
+function renderWaterMotionEffects(ctx, effects, camera, viewport) {
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+
+  for (const wake of effects.wakeTrails) {
+    const projected = wake.points
+      .map((point) => ({
+        projected: projectPoint(point.center, camera, viewport),
+        width: point.width,
+      }))
+      .filter((entry) => entry.projected);
+    if (projected.length < 2) {
+      continue;
+    }
+
+    const averageDepth =
+      projected.reduce((total, entry) => total + entry.projected.depth, 0) / projected.length;
+    const averageWidth =
+      projected.reduce((total, entry) => total + entry.width, 0) / projected.length;
+    const baseWidth = clamp((averageWidth / Math.max(0.25, averageDepth)) * 180, 1.6, 5.4);
+    ctx.strokeStyle = `rgba(146, 194, 236, ${wake.opacity * 0.52})`;
+    ctx.lineWidth = baseWidth * 1.9;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(projected[0].projected.x, projected[0].projected.y);
+    for (let index = 1; index < projected.length; index += 1) {
+      ctx.lineTo(projected[index].projected.x, projected[index].projected.y);
+    }
+    ctx.stroke();
+
+    ctx.strokeStyle = `rgba(234, 247, 255, ${wake.opacity})`;
+    ctx.lineWidth = baseWidth;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+    ctx.beginPath();
+    ctx.moveTo(projected[0].projected.x, projected[0].projected.y);
+    for (let index = 1; index < projected.length; index += 1) {
+      ctx.lineTo(projected[index].projected.x, projected[index].projected.y);
+    }
+    ctx.stroke();
+
+    for (const entry of projected.slice(1, 5)) {
+      ctx.fillStyle = `rgba(239, 248, 255, ${wake.opacity * 0.76})`;
       ctx.beginPath();
       ctx.ellipse(
-        reflected.x,
-        reflected.y,
-        reflectionRadius * 0.34,
-        reflectionRadius,
+        entry.projected.x,
+        entry.projected.y,
+        baseWidth * 0.72,
+        baseWidth * 0.44,
         0,
         0,
         Math.PI * 2
       );
       ctx.fill();
-      ctx.restore();
     }
   }
-}
 
-function renderShipLanterns(ctx, ship, state, camera, viewport, visuals) {
-  const lanterns = Array.isArray(ship.lanterns) ? ship.lanterns : SHIP_LANTERNS;
-  const strength = readVisualNumber(ship.lanternStrength, 1);
-  for (const lantern of lanterns) {
-    const position = transformPoint(
-      vec3(lantern.x, lantern.y, lantern.z),
-      { position: ship.position, rotationY: ship.rotationY, scale: SHIP_SCALE }
-    );
-    renderGlowLight(
-      ctx,
-      position,
-      camera,
-      viewport,
-      visuals.lanternCore,
-      visuals.lanternGlow,
-      lantern.glow * strength,
-      visuals.lanternReflectionStrength,
-      state
-    );
-  }
-}
+  for (const ring of effects.rippleRings) {
+    const center = projectPoint(ring.center, camera, viewport);
+    const xAxis = projectPoint(addVec3(ring.center, vec3(ring.radius, 0, 0)), camera, viewport);
+    const zAxis = projectPoint(addVec3(ring.center, vec3(0, 0, ring.radius)), camera, viewport);
+    if (!center || !xAxis || !zAxis) {
+      continue;
+    }
 
-function renderHarborTorches(ctx, state, camera, viewport, visuals) {
-  for (const torch of HARBOR_TORCHES) {
-    renderGlowLight(
-      ctx,
-      vec3(torch.x, torch.y, torch.z),
-      camera,
-      viewport,
-      visuals.torchCore,
-      visuals.torchGlow,
-      torch.glow,
-      visuals.lanternReflectionStrength * 0.55,
-      state
-    );
+    const radiusX = Math.hypot(xAxis.x - center.x, xAxis.y - center.y);
+    const radiusY = Math.hypot(zAxis.x - center.x, zAxis.y - center.y);
+    ctx.strokeStyle = `rgba(216, 235, 255, ${ring.opacity})`;
+    ctx.lineWidth = clamp((radiusX + radiusY) * 0.02, 1, 3.1);
+    ctx.beginPath();
+    ctx.ellipse(center.x, center.y, radiusX, radiusY, 0, 0, Math.PI * 2);
+    ctx.stroke();
   }
+
+  ctx.restore();
 }
 
 function renderScene(ctx, canvas, state, shipModel, dom) {
@@ -2038,8 +2425,8 @@ function renderScene(ctx, canvas, state, shipModel, dom) {
     visuals
   );
 
-  const triangles = [];
-  pushHarborGeometry(camera, viewport, triangles, visuals);
+  const waterTriangles = [];
+  const sceneTriangles = [];
   const water = buildWaterBands(
     state,
     state.fluidDetail.getSnapshot().currentLevel.config,
@@ -2056,7 +2443,7 @@ function renderScene(ctx, canvas, state, shipModel, dom) {
       if (projected.some((value) => value === null)) {
         continue;
       }
-      triangles.push({
+      waterTriangles.push({
         points: projected,
         depth: (projected[0].depth + projected[1].depth + projected[2].depth) / 3,
         worldCenter: scaleVec3(addVec3(addVec3(a, b), c), 1 / 3),
@@ -2067,6 +2454,10 @@ function renderScene(ctx, canvas, state, shipModel, dom) {
     }
   }
 
+  const waterMotionEffects = buildWaterMotionEffects(state);
+  const lightSources = collectSceneLightSources(state, visuals);
+
+  pushHarborGeometry(camera, viewport, sceneTriangles, visuals);
   const cloth = buildClothSurface(
     state,
     state,
@@ -2082,7 +2473,7 @@ function renderScene(ctx, canvas, state, shipModel, dom) {
     if (projected.some((value) => value === null)) {
       continue;
     }
-    triangles.push({
+    sceneTriangles.push({
       points: projected,
       depth: (projected[0].depth + projected[1].depth + projected[2].depth) / 3,
       worldCenter: scaleVec3(addVec3(addVec3(a, b), c), 1 / 3),
@@ -2099,24 +2490,29 @@ function renderScene(ctx, canvas, state, shipModel, dom) {
       ship.tint,
       camera,
       viewport,
-      triangles,
+      sceneTriangles,
       nearLighting.rtParticipation.directShadows === "premium" ? 0.08 : 0.02
     );
   }
 
+  drawTriangles(ctx, waterTriangles, lightDir, reflectionStrength, camera, shadowStrength);
   for (const ship of state.ships) {
     renderShipShadow(ctx, shipModel, ship, state, camera, viewport, lightDir, shadowStrength);
   }
   renderFlagShadow(ctx, cloth, camera, viewport, lightDir, shadowStrength);
-
-  drawTriangles(ctx, triangles, lightDir, reflectionStrength, camera, shadowStrength);
+  for (const source of lightSources.reflectionLights) {
+    renderWaterLightReflection(ctx, source, state, camera, viewport);
+  }
+  renderWaterMotionEffects(ctx, waterMotionEffects, camera, viewport);
   renderWaterHighlights(ctx, water.bandMeshes, camera, viewport);
-  renderHarborTorches(ctx, state, camera, viewport, visuals);
+  drawTriangles(ctx, sceneTriangles, lightDir, reflectionStrength, camera, shadowStrength);
   renderFlagPole(ctx, camera, viewport);
   renderClothAccent(ctx, cloth, camera, viewport);
+  for (const source of lightSources.directLights) {
+    renderDirectLightGlow(ctx, source, camera, viewport);
+  }
   for (const ship of state.ships) {
     renderShipRigging(ctx, ship, camera, viewport);
-    renderShipLanterns(ctx, ship, state, camera, viewport, visuals);
   }
   renderSprays(ctx, state.sprays, camera, viewport);
 
@@ -2194,6 +2590,21 @@ function updateSceneState(state, dt, shipModel) {
   updateShips(state, dt, shipModel);
   updateWaveImpulses(state, dt);
   updateSpray(state, dt);
+  const clothPresentation = resolveClothPresentation(
+    state,
+    state.clothDetail.getSnapshot().currentLevel.config
+  );
+  const clothState = ensureShowcaseClothState(
+    state,
+    state.clothDetail.getSnapshot().currentLevel.config,
+    clothPresentation
+  );
+  advanceShowcaseClothSimulationState(clothState, {
+    dt,
+    time: state.time,
+    flagMotion: readVisualNumber(state.demoVisuals?.flagMotion, 0.92),
+    waveInfluence: sampleWave(state, FLAG_LAYOUT.origin.x + FLAG_LAYOUT.width * 0.55, FLAG_LAYOUT.origin.z + FLAG_LAYOUT.width * 0.48, state.time),
+  });
   updatePhysicsSnapshot(state, shipModel);
 }
 
@@ -2370,3 +2781,10 @@ function updatePhysicsSnapshot(state, shipModel) {
     },
   });
 }
+
+export {
+  advanceShowcaseClothSimulationState as __testOnlyAdvanceShowcaseClothSimulationState,
+  buildWaterMotionEffects as __testOnlyBuildWaterMotionEffects,
+  collectSceneLightSources as __testOnlyCollectSceneLightSources,
+  createShowcaseClothSimulationState as __testOnlyCreateShowcaseClothSimulationState,
+};
