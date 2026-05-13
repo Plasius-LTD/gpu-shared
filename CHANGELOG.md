@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [0.1.8] - 2026-05-13
+
+- **Added**
   - Deterministic showcase-runtime regression tests for the cloth simulation,
     visible water-motion overlays, and separated reflection light sources.
 
@@ -143,3 +157,4 @@ All notable changes to this project will be documented in this file.
 [0.1.4]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v0.1.4
 [0.1.6]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v0.1.6
 [0.1.7]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v0.1.7
+[0.1.8]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v0.1.8
