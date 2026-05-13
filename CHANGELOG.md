@@ -11,6 +11,20 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [0.1.11] - 2026-05-13
+
+- **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
   - Restored shared harbor water-surface motion by reading the banded
     `@plasius/gpu-fluid` continuity envelope correctly, keeping near-band
     heights finite and visibly animated in the default GPU Demo camera.
@@ -190,3 +204,4 @@ All notable changes to this project will be documented in this file.
 [0.1.8]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v0.1.8
 [0.1.9]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v0.1.9
 [0.1.10]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v0.1.10
+[0.1.11]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v0.1.11
