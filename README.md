@@ -28,6 +28,8 @@ npm install @plasius/gpu-shared
   planning from `@plasius/gpu-physics/browser`.
 - Keeps package demos aligned on the same family-owned scene contract instead of
   carrying duplicated runtime copies.
+- Preserves one shared fix point for cloth motion, visible water continuity, and
+  occluded harbor-light reflections across GPU demo consumers.
 
 ## Usage
 
@@ -85,6 +87,10 @@ Then open `http://localhost:8000/gpu-shared/demo/`.
 
 This package demo mounts the integrated harbor showcase so the shared runtime
 can be validated independently of `gpu-demo-viewer`.
+
+The integrated scene now includes a persistent flag cloth state, visible ship
+wakes and collision ripples, and water reflections that are occluded by later
+ship geometry instead of being painted through hulls.
 
 ## Current Boundary
 

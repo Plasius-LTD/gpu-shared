@@ -5,13 +5,20 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - **Added**
-  - (placeholder)
+  - Deterministic showcase-runtime regression tests for the cloth simulation,
+    visible water-motion overlays, and separated reflection light sources.
 
 - **Changed**
-  - (placeholder)
+  - The integrated harbor runtime now advances the flag as a persistent
+    constraint-driven cloth state instead of re-creating a stateless sinusoid
+    mesh every frame.
+  - Water reflections are rendered as a dedicated water-layer pass so later
+    ship geometry can occlude them naturally.
 
 - **Fixed**
-  - (placeholder)
+  - Shared GPU Demo water now has visible wake and ripple overlays at demo
+    scale, the flag reads as cloth instead of a static ribbon, and lantern
+    reflections no longer draw through hull geometry.
 
 - **Security**
   - (placeholder)
