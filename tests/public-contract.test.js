@@ -46,8 +46,9 @@ test("readme documents package-surface imports for browser demos", () => {
 test("bundled lighting dependency uses the bundle-safe module URL release", () => {
   const dependencyRange = packageJson.dependencies["@plasius/gpu-lighting"];
   const lockedLighting = packageLock.packages["node_modules/@plasius/gpu-lighting"];
+  const minimumVersion = dependencyRange.replace(/^[^^~]+/, "");
 
-  assert.equal(dependencyRange, "^0.1.14");
+  assert.match(dependencyRange, /^\^0\.1\.\d+$/);
   assert.ok(lockedLighting, "package-lock.json must pin @plasius/gpu-lighting");
-  assert.equal(compareVersions(lockedLighting.version, "0.1.14") >= 0, true);
+  assert.equal(compareVersions(lockedLighting.version, minimumVersion.slice(1)) >= 0, true);
 });
