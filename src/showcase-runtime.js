@@ -1215,6 +1215,14 @@ function sampleWave(state, x, z, time) {
   );
 }
 
+function resolveFluidBandContinuity(continuity, band) {
+  if (continuity?.bands && continuity.bands[band]) {
+    return continuity.bands[band];
+  }
+
+  return continuity ?? { amplitudeFloor: 1, frequencyFloor: 1 };
+}
+
 function buildWaterMotionEffects(state) {
   const wakeTrails = [];
   const rippleRings = state.waveImpulses.map((impulse) => {
@@ -1297,6 +1305,7 @@ function buildWaterBands(state, fluidDetail, visuals) {
       fluidPlan.representations.find((entry) => entry.band === bandSpec.band) ??
       fluidPlan.representations[0];
     const continuity = createFluidContinuityEnvelope({ fluidBodyId: "harbor" });
+    const bandContinuity = resolveFluidBandContinuity(continuity, bandSpec.band);
     const bandResolution =
       bandSpec.band === "near"
         ? fluidDetail.nearResolution
@@ -1320,7 +1329,7 @@ function buildWaterBands(state, fluidDetail, visuals) {
         const y =
           bandSpec.y +
           sampleWave(state, x, z, state.time) *
-            continuity.amplitudeFloor *
+            bandContinuity.amplitudeFloor *
             (bandSpec.band === "near" ? 0.9 : bandSpec.band === "mid" ? 0.55 : 0.3);
         positions.push(vec3(x, y, z));
       }
@@ -1338,7 +1347,7 @@ function buildWaterBands(state, fluidDetail, visuals) {
     bandMeshes.push({
       band: bandSpec.band,
       representation,
-      continuity,
+      continuity: bandContinuity,
       rows,
       cols,
       positions,
@@ -2784,6 +2793,7 @@ function updatePhysicsSnapshot(state, shipModel) {
 
 export {
   advanceShowcaseClothSimulationState as __testOnlyAdvanceShowcaseClothSimulationState,
+  buildWaterBands as __testOnlyBuildWaterBands,
   buildWaterMotionEffects as __testOnlyBuildWaterMotionEffects,
   collectSceneLightSources as __testOnlyCollectSceneLightSources,
   createShowcaseClothSimulationState as __testOnlyCreateShowcaseClothSimulationState,

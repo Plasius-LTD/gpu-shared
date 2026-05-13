@@ -11,7 +11,9 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Fixed**
-  - (placeholder)
+  - Restored shared harbor water-surface motion by reading the banded
+    `@plasius/gpu-fluid` continuity envelope correctly, keeping near-band
+    heights finite and visibly animated in the default GPU Demo camera.
 
 - **Security**
   - (placeholder)
