@@ -90,7 +90,10 @@ can be validated independently of `gpu-demo-viewer`.
 
 The integrated scene now includes a persistent flag cloth state, visible ship
 wakes and collision ripples, and water reflections that are occluded by later
-ship geometry instead of being painted through hulls.
+ship geometry instead of being painted through hulls. The harbor surface reads
+the banded `@plasius/gpu-fluid` continuity envelope directly, so the default
+camera keeps finite, visibly animated near-band water motion instead of
+flattening or dropping the shared water mesh.
 
 ## Current Boundary
 

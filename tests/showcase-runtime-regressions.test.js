@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   __testOnlyAdvanceShowcaseClothSimulationState,
+  __testOnlyBuildWaterBands,
   __testOnlyBuildWaterMotionEffects,
   __testOnlyCollectSceneLightSources,
   __testOnlyCreateShowcaseClothSimulationState,
@@ -11,6 +12,54 @@ import {
 function distanceBetween(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
 }
+
+function createWaterTestState(time) {
+  return {
+    focus: "integrated",
+    time,
+    demoVisuals: {
+      waveAmplitude: 0.94,
+      waveDirection: { x: 0.88, z: 0.28 },
+      wavePhaseSpeed: 0.88,
+      wakeStrength: 0.31,
+      wakeLength: 18,
+      collisionRippleStrength: 0.42,
+    },
+    ships: [
+      {
+        id: "northwind",
+        position: { x: -5.2, y: 0, z: 7.2 },
+        velocity: { x: 2.35, y: 0, z: -1.08 },
+        wanderPhase: 0.35,
+      },
+      {
+        id: "tidecaller",
+        position: { x: 4.8, y: 0, z: 4.4 },
+        velocity: { x: -2.15, y: 0, z: 1.74 },
+        wanderPhase: 1.6,
+      },
+    ],
+    waveImpulses: [
+      {
+        x: -0.6,
+        z: 7.1,
+        strength: 1.05,
+        radius: 1.1,
+        life: 0.72,
+      },
+    ],
+  };
+}
+
+const WATER_TEST_VISUALS = Object.freeze({
+  waterNear: { r: 0.08, g: 0.23, b: 0.33 },
+  waterFar: { r: 0.18, g: 0.35, b: 0.49 },
+});
+
+const WATER_TEST_DETAIL = Object.freeze({
+  nearResolution: 24,
+  midResolution: 12,
+});
 
 test("cloth simulation keeps the pole edge pinned while the free edge moves", () => {
   const cloth = __testOnlyCreateShowcaseClothSimulationState({
@@ -94,6 +143,48 @@ test("water motion effects expose wakes for moving ships and expanding ripple ri
   assert.ok(effects.wakeTrails[0].points.length >= 5);
   assert.ok(effects.rippleRings[0].radius > state.waveImpulses[0].radius);
   assert.equal(Number.isFinite(effects.wakeTrails[0].points[0].center.y), true);
+});
+
+test("water bands keep finite heights and show material near-band motion between frames", () => {
+  const before = __testOnlyBuildWaterBands(
+    createWaterTestState(0),
+    WATER_TEST_DETAIL,
+    WATER_TEST_VISUALS
+  );
+  const after = __testOnlyBuildWaterBands(
+    createWaterTestState(1 / 6),
+    WATER_TEST_DETAIL,
+    WATER_TEST_VISUALS
+  );
+  const nearBefore = before.bandMeshes.find((band) => band.band === "near");
+  const nearAfter = after.bandMeshes.find((band) => band.band === "near");
+
+  assert.ok(nearBefore);
+  assert.ok(nearAfter);
+  assert.ok(
+    nearBefore.positions.every((point) => Number.isFinite(point.y)),
+    "expected near-band heights to stay finite"
+  );
+  assert.ok(
+    nearAfter.positions.every((point) => Number.isFinite(point.y)),
+    "expected next-frame near-band heights to stay finite"
+  );
+
+  const deltas = nearBefore.positions.map((point, index) =>
+    Math.abs(nearAfter.positions[index].y - point.y)
+  );
+  const maxDisplacement = Math.max(...deltas);
+  const averageDisplacement =
+    deltas.reduce((total, value) => total + value, 0) / deltas.length;
+
+  assert.ok(
+    maxDisplacement > 0.05,
+    `expected visible near-band motion, saw max displacement ${maxDisplacement}`
+  );
+  assert.ok(
+    averageDisplacement > 0.01,
+    `expected broad near-band motion, saw average displacement ${averageDisplacement}`
+  );
 });
 
 test("scene lighting separates water reflections from direct glow sources", () => {
