@@ -11,7 +11,9 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Fixed**
-  - (placeholder)
+  - Deferred the built-in brigantine fallback payload behind the actual shared
+    asset failure path so normal `@plasius/gpu-shared` consumers no longer pay
+    the eager parse/bundle cost of the inline showcase asset.
 
 - **Security**
   - (placeholder)

@@ -9,5 +9,7 @@ used by the family showcase.
 
 - `resolveShowcaseAssetUrl(...)` resolves the shared brigantine asset from the
   package location.
-- `loadGltfModel(...)` loads the GLTF mesh and embedded physics metadata.
+- `loadGltfModel(...)` loads the GLTF mesh and embedded physics metadata, and
+  only activates the inline showcase fallback when the package-owned brigantine
+  asset cannot actually be loaded.
 - The asset is package-owned, versioned, and available in published artifacts.

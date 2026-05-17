@@ -502,6 +502,36 @@ test("resolveShowcaseAssetUrl resolves invalid relative bases against document.b
   }
 });
 
+test("loadGltfModel lazily activates the inline showcase fallback for the shared brigantine asset", async () => {
+  const originalFetch = globalThis.fetch;
+  const fetchCalls = [];
+
+  globalThis.fetch = async (input, init) => {
+    const href = input instanceof URL ? input.href : String(input);
+    fetchCalls.push(href);
+
+    if (href.endsWith("/assets/brigantine.gltf")) {
+      return {
+        ok: false,
+        status: 404,
+        statusText: "Not Found",
+      };
+    }
+
+    return originalFetch(input, init);
+  };
+
+  try {
+    const model = await loadGltfModel(resolveShowcaseAssetUrl("file:///tmp/dist/index.js"));
+    assert.equal(fetchCalls[0], "file:///tmp/assets/brigantine.gltf");
+    assert.match(fetchCalls[1], /^data:application\/json;base64,/);
+    assert.equal(model.name, "brigantine");
+    assert.equal(model.physics.waterline, 0.42);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
 test("loadGltfModel rejects failed asset and nested buffer fetches", async () => {
   const originalFetch = globalThis.fetch;
   const { document, bytes } = createTriangleGltfDocument({
