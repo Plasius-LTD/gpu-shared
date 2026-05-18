@@ -2,12 +2,20 @@
 
 ## Summary
 
-The shared package publishes a tested GLTF loader and a shared brigantine asset
-used by the family showcase.
+The shared package publishes a tested GLTF loader and a package-owned showcase
+asset catalog used by the family harbor scene.
 
 ## Contract
 
-- `resolveShowcaseAssetUrl(...)` resolves the shared brigantine asset from the
-  package location.
-- `loadGltfModel(...)` loads the GLTF mesh and embedded physics metadata.
-- The asset is package-owned, versioned, and available in published artifacts.
+- `resolveShowcaseAssetUrl(...)` resolves package-owned showcase assets from the
+  published package location, defaulting to the brigantine for backward
+  compatibility.
+- `loadGltfModel(...)` loads the GLTF mesh, embedded physics metadata,
+  per-primitive material data, and flattened aggregate fields.
+- The shared catalog currently includes:
+  - `brigantine.gltf`
+  - `cutter.gltf`
+  - `lighthouse.gltf`
+  - `harbor-dock.gltf`
+- The assets are package-owned, versioned, and available in published
+  artifacts.

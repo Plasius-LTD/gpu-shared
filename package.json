@@ -23,12 +23,16 @@
       "require": "./dist/index.cjs"
     },
     "./assets/brigantine.gltf": "./assets/brigantine.gltf",
+    "./assets/cutter.gltf": "./assets/cutter.gltf",
+    "./assets/lighthouse.gltf": "./assets/lighthouse.gltf",
+    "./assets/harbor-dock.gltf": "./assets/harbor-dock.gltf",
     "./package.json": "./package.json"
   },
   "scripts": {
     "build": "tsup",
     "demo": "python3 -m http.server --directory ..",
     "demo:example": "node demo/example.js",
+    "generate:assets": "node scripts/generate-showcase-assets.mjs",
     "typecheck": "node --check src/index.js && node --check src/showcase-runtime.js && node --check src/gltf-loader.js && node --check demo/main.js",
     "audit:eslint": "eslint . --max-warnings=0",
     "audit:deps": "npm ls --all --omit=optional --omit=peer > /dev/null 2>&1 || true",

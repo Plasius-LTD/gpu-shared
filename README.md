@@ -30,6 +30,9 @@ npm install @plasius/gpu-shared
   carrying duplicated runtime copies.
 - Preserves one shared fix point for cloth motion, visible water continuity, and
   occluded harbor-light reflections across GPU demo consumers.
+- Ships a package-owned showcase asset catalog with distinct brigantine,
+  cutter, lighthouse, and harbor-dock models instead of relying on one tiny
+  hull mesh plus placeholder box geometry.
 
 ## Usage
 
@@ -71,10 +74,13 @@ import {
 } from "@plasius/gpu-shared";
 
 const shipUrl = resolveShowcaseAssetUrl();
+const lighthouseUrl = resolveShowcaseAssetUrl("lighthouse");
 const shipModel = await loadGltfModel(shipUrl);
+const lighthouseModel = await loadGltfModel(lighthouseUrl);
 
 console.log(showcaseFocusModes);
 console.log(shipModel.physics);
+console.log(shipModel.primitives.length, lighthouseModel.primitives.length);
 ```
 
 ## Demo
@@ -95,6 +101,16 @@ the banded `@plasius/gpu-fluid` continuity envelope directly, so the default
 camera keeps finite, visibly animated near-band water motion instead of
 flattening or dropping the shared water mesh.
 
+The default showcase asset set now uses a multi-primitive brigantine, a
+distinct cutter profile, a modeled lighthouse, and a modeled dock/warehouse
+scene so the harbor reads closer to a believable coastal night view on high-end
+machines.
+
+For slide-deck screenshots or video capture, open the route with
+`?capture=1&renderScale=1`. Capture mode hides the validation chrome, fills the
+viewport with the scene canvas, and caps the backing buffer at 1080p by default
+so recording stays smooth on local machines.
+
 ## Current Boundary
 
 `@plasius/gpu-shared` owns the shared browser/demo orchestration surface. It
@@ -107,8 +123,12 @@ surface for these family demos.
 
 - `mountGpuShowcase(options)`
   - Returns `{ state, shipModel, canvas, destroy() }`
+  - `captureMode: true` enables fullscreen scene-only presentation for local
+    screenshots and video capture.
+  - `renderScale` overrides the canvas backing scale when a capture workflow
+    needs a specific quality/performance balance.
 - `loadGltfModel(url)`
-- `resolveShowcaseAssetUrl(baseUrl?)`
+- `resolveShowcaseAssetUrl(baseUrlOrAssetName?, assetName?)`
 - `showcaseFocusModes`
 
 ## Development
