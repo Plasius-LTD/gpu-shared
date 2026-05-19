@@ -1,3 +1,5 @@
+import { shouldUseInlineShowcaseFallback } from "./asset-url.js";
+
 function decodeDataUri(uri) {
   const match = /^data:.*?;base64,(.+)$/i.exec(uri);
   if (!match) {
@@ -370,8 +372,18 @@ export async function loadGltfModel(url) {
     throw new Error(`Failed to load glTF asset: ${response.status} ${response.statusText}`);
   }
 
-  const document = await response.json();
-  const baseUrl = resolveFetchBaseUrl(url, response.url);
+  return {
+    document: await response.json(),
+    baseUrl: resolveFetchBaseUrl(url, response.url),
+  };
+}
+
+async function loadInlineShowcaseDocument() {
+  const module = await import("./showcase-inline-assets.js");
+  return loadGltfDocument(module.createInlineShowcaseAssetUrl());
+}
+
+async function buildGltfModel(document, baseUrl) {
   const buffers = await Promise.all(
     (document.buffers ?? []).map(async (buffer) => {
       if (typeof buffer.uri !== "string") {
@@ -409,4 +421,26 @@ export async function loadGltfModel(url) {
     physics: scene.physics,
     primitives: Object.freeze(scene.primitives),
   });
+}
+
+function shouldRetryWithInlineShowcaseFallback(url, error) {
+  if (!shouldUseInlineShowcaseFallback(url)) {
+    return false;
+  }
+
+  return error instanceof TypeError || /^Failed to load glTF asset:/u.test(error.message);
+}
+
+export async function loadGltfModel(url) {
+  try {
+    const { document, baseUrl } = await loadGltfDocument(url);
+    return buildGltfModel(document, baseUrl);
+  } catch (error) {
+    if (!shouldRetryWithInlineShowcaseFallback(url, error)) {
+      throw error;
+    }
+
+    const { document, baseUrl } = await loadInlineShowcaseDocument();
+    return buildGltfModel(document, baseUrl);
+  }
 }

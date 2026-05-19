@@ -131,6 +131,11 @@ surface for these family demos.
 - `resolveShowcaseAssetUrl(baseUrlOrAssetName?, assetName?)`
 - `showcaseFocusModes`
 
+`resolveShowcaseAssetUrl()` keeps consumers on the package-owned brigantine
+asset URL. If a host cannot actually serve that asset, `loadGltfModel()`
+lazily activates the built-in inline fallback instead of eagerly parsing that
+payload in the top-level package entrypoint.
+
 ## Development
 
 ```bash

@@ -40,7 +40,7 @@ test("showcase asset resolution can target the richer shared asset catalog", () 
 
 test("showcase asset resolution falls back to an inline asset when the base URL is invalid", () => {
   const url = resolveShowcaseAssetUrl("");
-  assert.match(url.href, /^data:application\/json;base64,/);
+  assert.match(url.href, /\/assets\/brigantine\.gltf$/);
 });
 
 test("loadGltfModel can load the inline fallback asset URL", async () => {
