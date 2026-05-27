@@ -1,17 +1,60 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createI18n } from "@plasius/translations";
 
 import {
+  createGpuSharedTranslator,
+  gpuSharedEnGbTranslations,
+  gpuSharedTranslationKeys,
+  gpuSharedTranslations,
   loadGltfModel,
   mountGpuShowcase,
   resolveShowcaseAssetUrl,
   showcaseFocusModes,
+  translateGpuSharedText,
 } from "../src/index.js";
 
 test("public API exports the shared showcase entrypoints", () => {
   assert.equal(typeof mountGpuShowcase, "function");
   assert.equal(typeof loadGltfModel, "function");
   assert.equal(typeof resolveShowcaseAssetUrl, "function");
+  assert.equal(typeof translateGpuSharedText, "function");
+  assert.equal(typeof createGpuSharedTranslator, "function");
+});
+
+test("showcase translation keys resolve through bundled en-GB defaults", () => {
+  const keys = Object.values(gpuSharedTranslationKeys);
+  assert.equal(keys.length > 0, true);
+  assert.equal(keys.every((key) => Object.hasOwn(gpuSharedEnGbTranslations, key)), true);
+  assert.equal(
+    translateGpuSharedText(gpuSharedTranslationKeys.statusLive, { fps: "59.9" }),
+    "3D scene live - 59.9 FPS"
+  );
+  assert.equal(
+    createGpuSharedTranslator((key, args) =>
+      key === gpuSharedTranslationKeys.debugAdapterShowcase
+        ? `Localized ${args?.adapter ?? "showcase"}`
+        : undefined
+    )(gpuSharedTranslationKeys.debugAdapterShowcase, { adapter: "adapter" }),
+    "Localized adapter"
+  );
+});
+
+test("showcase dictionaries can be consumed by @plasius/translations", () => {
+  const i18n = createI18n({
+    language: "en-GB",
+    fallback: "en-GB",
+    translations: gpuSharedTranslations,
+  });
+
+  assert.equal(
+    i18n.t(gpuSharedTranslationKeys.debugMainColorBuffer),
+    "Main color buffer"
+  );
+  assert.equal(
+    i18n.t(gpuSharedTranslationKeys.statusLive, { fps: "60.0" }),
+    "3D scene live - 60.0 FPS"
+  );
 });
 
 test("showcase focus modes remain stable for family demos", () => {
