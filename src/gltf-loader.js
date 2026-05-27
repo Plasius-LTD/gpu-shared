@@ -366,7 +366,7 @@ function collectScenePrimitives(document, buffers) {
   };
 }
 
-export async function loadGltfModel(url) {
+async function loadGltfDocument(url) {
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`Failed to load glTF asset: ${response.status} ${response.statusText}`);
@@ -380,7 +380,7 @@ export async function loadGltfModel(url) {
 
 async function loadInlineShowcaseDocument() {
   const module = await import("./showcase-inline-assets.js");
-  return loadGltfDocument(module.createInlineShowcaseAssetUrl());
+  return loadGltfDocument(new URL(module.INLINE_SHOWCASE_ASSET_URLS.brigantine));
 }
 
 async function buildGltfModel(document, baseUrl) {

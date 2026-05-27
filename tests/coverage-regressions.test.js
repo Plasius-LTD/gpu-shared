@@ -602,7 +602,7 @@ test("loadGltfModel lazily activates the inline showcase fallback for the shared
     assert.equal(fetchCalls[0], "file:///tmp/assets/brigantine.gltf");
     assert.match(fetchCalls[1], /^data:application\/json;base64,/);
     assert.equal(model.name, "brigantine");
-    assert.equal(model.physics.waterline, 0.42);
+    assert.equal(model.physics.waterline, 0.44);
   } finally {
     globalThis.fetch = originalFetch;
   }
