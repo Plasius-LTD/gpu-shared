@@ -10,6 +10,28 @@ export interface GltfModelBounds {
   readonly max: readonly [number, number, number];
 }
 
+export interface GltfModelMaterial {
+  readonly name: string;
+  readonly color: GltfModelColor;
+  readonly roughness: number;
+  readonly metallic: number;
+  readonly emissive: Readonly<{
+    r: number;
+    g: number;
+    b: number;
+  }>;
+}
+
+export interface GltfModelPrimitive {
+  readonly name: string;
+  readonly positions: readonly number[];
+  readonly indices: readonly number[];
+  readonly normals: readonly number[] | null;
+  readonly colors: readonly number[] | null;
+  readonly material: GltfModelMaterial;
+  readonly bounds: GltfModelBounds;
+}
+
 export interface GltfModel {
   readonly name: string;
   readonly positions: readonly number[];
@@ -17,7 +39,14 @@ export interface GltfModel {
   readonly bounds: GltfModelBounds;
   readonly color: GltfModelColor;
   readonly physics: Readonly<Record<string, unknown>>;
+  readonly primitives: readonly GltfModelPrimitive[];
 }
+
+export type ShowcaseAssetName =
+  | "brigantine"
+  | "cutter"
+  | "lighthouse"
+  | "harbor-dock";
 
 export type ShowcaseFocusMode =
   | "integrated"
@@ -34,6 +63,8 @@ export interface MountGpuShowcaseOptions {
   packageName?: string;
   title?: string;
   subtitle?: string;
+  captureMode?: boolean;
+  renderScale?: number;
   createState?: () => unknown;
   updateState?: (state: unknown, scene: Record<string, unknown>, dt: number) => unknown;
   describeState?: (state: unknown, scene: Record<string, unknown>) => Record<string, unknown> | null;
@@ -49,7 +80,10 @@ export interface MountGpuShowcaseResult {
 
 export const showcaseFocusModes: readonly ShowcaseFocusMode[];
 
-export function resolveShowcaseAssetUrl(baseUrl?: string | URL): URL;
+export function resolveShowcaseAssetUrl(
+  baseUrlOrAssetName?: string | URL | ShowcaseAssetName,
+  assetName?: ShowcaseAssetName
+): URL;
 
 export function loadGltfModel(url: string | URL): Promise<GltfModel>;
 

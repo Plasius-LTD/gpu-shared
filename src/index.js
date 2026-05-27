@@ -27,5 +27,6 @@ export async function mountGpuShowcase(options = {}) {
 
   const publicOptions = { ...options };
   delete publicOptions.__runtimeLoader;
-  return module.mountGpuShowcase(publicOptions);
+  delete publicOptions.__featureFlags;
+  return module.mountGpuShowcase(publicOptions, options.__featureFlags);
 }

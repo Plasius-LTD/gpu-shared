@@ -36,11 +36,15 @@ test("package exports keep the public gpu-shared runtime surface stable", () => 
     require: "./dist/index.cjs",
   });
   assert.equal(packageJson.exports["./assets/brigantine.gltf"], "./assets/brigantine.gltf");
+  assert.equal(packageJson.exports["./assets/cutter.gltf"], "./assets/cutter.gltf");
+  assert.equal(packageJson.exports["./assets/lighthouse.gltf"], "./assets/lighthouse.gltf");
+  assert.equal(packageJson.exports["./assets/harbor-dock.gltf"], "./assets/harbor-dock.gltf");
 });
 
 test("readme documents package-surface imports for browser demos", () => {
   assert.match(readme, /import \{ mountGpuShowcase \} from "@plasius\/gpu-shared"/);
   assert.match(readme, /import map/i);
+  assert.match(readme, /resolveShowcaseAssetUrl\("lighthouse"\)/);
 });
 
 test("bundled lighting dependency uses the bundle-safe module URL release", () => {

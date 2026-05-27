@@ -5,15 +5,41 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - **Added**
-  - (placeholder)
+  - Deterministic showcase asset generation for a richer shared brigantine,
+    cutter, lighthouse, and harbor-dock catalog.
+  - Fullscreen capture mode for slide-deck screenshots and video recording,
+    including scene-only layout and bounded 1080p canvas scaling.
 
 - **Changed**
-  - (placeholder)
+  - Expanded the shared GLTF loader contract to preserve the legacy flattened
+    mesh fields while exposing transformed multi-primitive/material data for the
+    realistic showcase scene.
+  - The shared harbor runtime now renders distinct ship models and modeled
+    harbor structures instead of one tiny hull mesh plus placeholder boxes.
+  - Showcase lighting now adds local lantern response, a lighthouse beam pass,
+    and a subtle atmospheric grade for more realistic recorded frames.
 
 - **Fixed**
-  - Deferred the built-in brigantine fallback payload behind the actual shared
-    asset failure path so normal `@plasius/gpu-shared` consumers no longer pay
-    the eager parse/bundle cost of the inline showcase asset.
+  - The shared showcase now propagates the realistic-model feature flag into
+    scene state and initializes its DOM scaffold before canvas setup, allowing
+    the local realistic asset catalog to mount in browser demos.
+  - Generated cylindrical showcase geometry now emits outward-facing side
+    winding, so towers, posts, masts, and lanterns no longer carry inverted side
+    normals.
+  - Generated cylindrical showcase geometry now carries smooth radial side
+    normals, reducing the faceted placeholder look on lighthouse bands, masts,
+    posts, and lantern glass.
+  - The showcase renderer now culls with geometric face normals while shading
+    with smoothed asset normals, keeping curved surfaces stable at glancing
+    camera angles.
+  - The generated lighthouse, mast, lantern, and dock-post assets now use denser
+    radial geometry for cleaner silhouettes in recording shots.
+  - Showcase shading now applies subtle deterministic material grain and
+    lower-surface wear so wood, stone, painted hulls, and plaster read less like
+    flat placeholder fills.
+  - Low-lying ship triangles no longer pick up the water reflection term just
+    because they are near the shoreline plane, so hulls stop reading like
+    reflective water surfaces.
 
 - **Security**
   - (placeholder)

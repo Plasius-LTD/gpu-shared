@@ -32,12 +32,17 @@ import {
 
 import { resolveShowcaseAssetUrl } from "./asset-url.js";
 import { loadGltfModel } from "./gltf-loader.js";
+import { GPU_SHOWCASE_REALISTIC_MODELS_FEATURE } from "./feature-flags.js";
 
 const STYLE_ID = "plasius-shared-3d-showcase-style";
 const ROOT_CLASS = "plasius-showcase-root";
+const CAPTURE_CLASS = "plasius-showcase-root--capture";
 const DEFAULT_TITLE = "Flag by the Sea";
 const DEFAULT_SUBTITLE =
   "Shared 3D validation scene using GLTF ships, cloth, fluid continuity, adaptive performance, and telemetry.";
+const DEFAULT_CANVAS_WIDTH = 1280;
+const DEFAULT_CANVAS_HEIGHT = 720;
+const CAPTURE_CANVAS_PIXEL_BUDGET = 1920 * 1080;
 const SHIP_SCALE = 1.1;
 const HARBOR_BOUNDS = Object.freeze({
   minX: -11.2,
@@ -63,32 +68,56 @@ const SCENE_NOTES = Object.freeze([
   "Performance pressure reduces visual detail before mass-weighted authoritative collision motion is touched.",
 ]);
 
-const UNIT_BOX_MESH = Object.freeze({
-  positions: Object.freeze([
-    -0.5, -0.5, -0.5,
-     0.5, -0.5, -0.5,
-     0.5, 0.5, -0.5,
-    -0.5, 0.5, -0.5,
-    -0.5, -0.5, 0.5,
-     0.5, -0.5, 0.5,
-     0.5, 0.5, 0.5,
-    -0.5, 0.5, 0.5,
-  ]),
-  indices: Object.freeze([
-    0, 1, 2, 0, 2, 3,
-    5, 4, 7, 5, 7, 6,
-    4, 0, 3, 4, 3, 7,
-    1, 5, 6, 1, 6, 2,
-    3, 2, 6, 3, 6, 7,
-    4, 5, 1, 4, 1, 0,
-  ]),
-});
+const LEGACY_HARBOR_LAYOUT = Object.freeze([
+  Object.freeze({
+    position: Object.freeze({ x: -8.2, y: 1.1, z: -0.9 }),
+    rotationY: -0.16,
+    scale: 5.4,
+    color: { r: 0.32, g: 0.27, b: 0.23, a: 1 },
+    accent: 0.06,
+  }),
+  Object.freeze({
+    position: Object.freeze({ x: -5.7, y: 0.45, z: 1.4 }),
+    rotationY: -0.08,
+    scale: { x: 6.8, y: 0.3, z: 2.1 },
+    color: { r: 0.31, g: 0.31, b: 0.34, a: 1 },
+    accent: 0.04,
+  }),
+  Object.freeze({
+    position: Object.freeze({ x: -10.4, y: 0.28, z: 0.8 }),
+    rotationY: 0.22,
+    scale: { x: 1.2, y: 0.9, z: 1.2 },
+    color: { r: 0.31, g: 0.35, b: 0.39, a: 1 },
+    accent: 0.02,
+  }),
+]);
+
+const SHOWCASE_ENVIRONMENT_LAYOUT = Object.freeze([
+  Object.freeze({
+    assetKey: "harbor-dock",
+    position: Object.freeze({ x: -4.6, y: 0.16, z: 0.7 }),
+    rotationY: -0.08,
+    scale: 0.84,
+    accent: 0.04,
+  }),
+  Object.freeze({
+    assetKey: "lighthouse",
+    position: Object.freeze({ x: -9.8, y: 0, z: -0.58 }),
+    rotationY: 0.12,
+    scale: 0.56,
+    accent: 0.08,
+  }),
+]);
 
 const SHIP_LANTERNS = Object.freeze([
   Object.freeze({ x: 0.94, y: 1.54, z: 2.52, glow: 1 }),
   Object.freeze({ x: -0.9, y: 1.58, z: 2.44, glow: 0.92 }),
   Object.freeze({ x: 0.62, y: 1.42, z: -2.18, glow: 0.88 }),
   Object.freeze({ x: -0.58, y: 1.46, z: -2.04, glow: 0.84 }),
+]);
+const CUTTER_LANTERNS = Object.freeze([
+  Object.freeze({ x: 0.42, y: 1.04, z: 1.18, glow: 0.94 }),
+  Object.freeze({ x: -0.42, y: 1.04, z: 1.12, glow: 0.88 }),
 ]);
 
 const HARBOR_TORCHES = Object.freeze([
@@ -127,6 +156,11 @@ function injectStyles() {
         radial-gradient(circle at 18% 12%, rgba(73, 101, 170, 0.28), transparent 30%),
         radial-gradient(circle at 82% 18%, rgba(240, 188, 103, 0.08), transparent 18%),
         linear-gradient(180deg, #04101d 0%, #0b1930 42%, #081321 100%);
+    }
+    .${ROOT_CLASS}.${CAPTURE_CLASS} {
+      min-height: 100vh;
+      overflow: hidden;
+      background: #030710;
     }
     .${ROOT_CLASS},
     .${ROOT_CLASS} * {
@@ -206,6 +240,40 @@ function injectStyles() {
       border-radius: 20px;
       border: 1px solid rgba(159, 185, 223, 0.12);
       background: linear-gradient(180deg, #071220 0%, #132440 42%, #10344b 42%, #05111d 100%);
+    }
+    .${CAPTURE_CLASS} .plasius-demo {
+      width: 100vw;
+      height: 100vh;
+      padding: 0;
+      display: block;
+    }
+    .${CAPTURE_CLASS} .plasius-demo__hero,
+    .${CAPTURE_CLASS} .plasius-demo__toolbar,
+    .${CAPTURE_CLASS} .plasius-demo__legend,
+    .${CAPTURE_CLASS} .plasius-demo__sidebar,
+    .${CAPTURE_CLASS} .plasius-demo__footer {
+      display: none;
+    }
+    .${CAPTURE_CLASS} .plasius-demo__layout {
+      display: block;
+      height: 100%;
+    }
+    .${CAPTURE_CLASS} .plasius-demo__canvas-panel {
+      height: 100%;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+      backdrop-filter: none;
+    }
+    .${CAPTURE_CLASS} .plasius-demo__canvas {
+      width: 100%;
+      height: 100%;
+      aspect-ratio: auto;
+      border: 0;
+      border-radius: 0;
+      background: #030710;
     }
     .plasius-demo__toolbar {
       position: absolute;
@@ -381,6 +449,15 @@ function transformPoint(point, transform) {
   return addVec3(rotated, transform.position);
 }
 
+function transformDirection(direction, transform) {
+  const scale =
+    typeof transform.scale === "number"
+      ? { x: transform.scale, y: transform.scale, z: transform.scale }
+      : transform.scale;
+  const scaled = vec3(direction.x * scale.x, direction.y * scale.y, direction.z * scale.z);
+  return normalizeVec3(rotateY(scaled, transform.rotationY));
+}
+
 function projectPoint(point, camera, viewport) {
   const relative = subVec3(point, camera.eye);
   const viewX = dotVec3(relative, camera.right);
@@ -406,6 +483,92 @@ function colorToRgba(color, alpha = 1) {
   return `rgba(${r}, ${g}, ${b}, ${clamp(alpha, 0, 1)})`;
 }
 
+function mixColor(a, b, t) {
+  return {
+    r: mix(a.r, b.r, t),
+    g: mix(a.g, b.g, t),
+    b: mix(a.b, b.b, t),
+    a: mix(a.a ?? 1, b.a ?? 1, t),
+  };
+}
+
+function multiplyColor(a, b) {
+  return {
+    r: a.r * b.r,
+    g: a.g * b.g,
+    b: a.b * b.b,
+    a: (a.a ?? 1) * (b.a ?? 1),
+  };
+}
+
+function createLegacyMeshPrimitive(mesh) {
+  return Object.freeze({
+    name: mesh.name ?? "legacy-mesh",
+    positions: mesh.positions,
+    indices: mesh.indices,
+    normals: null,
+    colors: null,
+    material: Object.freeze({
+      name: "legacy-material",
+      color: mesh.color ?? { r: 0.56, g: 0.33, b: 0.22, a: 1 },
+      roughness: 0.88,
+      metallic: 0.08,
+      emissive: Object.freeze({ r: 0, g: 0, b: 0 }),
+    }),
+  });
+}
+
+function isFeatureEnabled(featureFlags, featureName, fallback = true) {
+  const directValue =
+    typeof featureFlags?.[featureName] === "boolean"
+      ? featureFlags[featureName]
+      : featureFlags?.flags?.[featureName];
+  if (typeof directValue === "boolean") {
+    return directValue;
+  }
+
+  const enabledValue =
+    typeof featureFlags?.enabled?.[featureName] === "boolean"
+      ? featureFlags.enabled[featureName]
+      : undefined;
+  if (typeof enabledValue === "boolean") {
+    return enabledValue;
+  }
+
+  return fallback;
+}
+
+function getMeshPrimitives(mesh) {
+  return Array.isArray(mesh?.primitives) && mesh.primitives.length > 0
+    ? mesh.primitives
+    : [createLegacyMeshPrimitive(mesh)];
+}
+
+function tintPrimitiveColor(material, colorOverride) {
+  if (!colorOverride) {
+    return material.color;
+  }
+
+  const name = String(material.name ?? "").toLowerCase();
+  if (name.includes("sail") || name.includes("glass") || name.includes("roof")) {
+    return material.color;
+  }
+
+  const tintAmount = name.includes("hull")
+    ? 0.54
+    : name.includes("trim")
+      ? 0.22
+      : name.includes("deck")
+        ? 0.12
+        : 0;
+
+  if (tintAmount <= 0) {
+    return material.color;
+  }
+
+  return mixColor(material.color, multiplyColor(material.color, colorOverride), tintAmount);
+}
+
 function projectShadowPoint(point, lightDir, planeY) {
   const shadowDir = scaleVec3(lightDir, -1);
   if (Math.abs(shadowDir.y) < 0.0001) {
@@ -427,6 +590,64 @@ function shadeColor(base, normal, lightDir, heightBias = 0, accent = 0) {
     r: clamp(base.r * brightness, 0, 1),
     g: clamp(base.g * brightness, 0, 1),
     b: clamp(base.b * (brightness + 0.03), 0, 1),
+  };
+}
+
+function getMaterialSeed(materialName) {
+  let seed = 0;
+  for (let index = 0; index < materialName.length; index += 1) {
+    seed += materialName.charCodeAt(index) * (index + 1);
+  }
+  return seed;
+}
+
+function getMaterialDetailStrength(material, surfaceType) {
+  const name = String(material?.name ?? "").toLowerCase();
+  if (surfaceType === "water" || name.includes("glass")) {
+    return 0.018;
+  }
+  if (name.includes("wood") || name.includes("timber") || name.includes("plank")) {
+    return 0.13;
+  }
+  if (name.includes("stone") || name.includes("concrete") || name.includes("plaster")) {
+    return 0.1;
+  }
+  if (name.includes("roof") || name.includes("crate")) {
+    return 0.09;
+  }
+  if (name.includes("paint")) {
+    return 0.045;
+  }
+  if (name.includes("metal")) {
+    return 0.035;
+  }
+  return 0.04;
+}
+
+function applyMaterialDetail(color, material, worldCenter, normal, surfaceType) {
+  const materialName = String(material?.name ?? surfaceType ?? "material");
+  const detailStrength = getMaterialDetailStrength(material, surfaceType);
+  const sample =
+    worldCenter.x * 3.17 +
+    worldCenter.y * 5.29 +
+    worldCenter.z * 7.83 +
+    getMaterialSeed(materialName) * 0.013;
+  const grain = (pseudoRandom(sample) - 0.5) * detailStrength;
+  const lowerSurface = smoothstep(7.5, -0.8, worldCenter.y);
+  const verticalSurface = 1 - clamp(Math.abs(normal.y), 0, 1);
+  const materialLowerWear =
+    /stone|concrete|plaster|paint|wood|timber|plank|crate/.test(materialName.toLowerCase())
+      ? lowerSurface * verticalSurface * 0.055
+      : 0;
+  const wetlineWear =
+    surfaceType === "ship" && worldCenter.y < 0.72
+      ? smoothstep(0.72, -0.1, worldCenter.y) * 0.05
+      : 0;
+
+  return {
+    r: clamp(color.r * (1 + grain) - materialLowerWear - wetlineWear, 0, 1),
+    g: clamp(color.g * (1 + grain * 0.82) - materialLowerWear * 0.9 - wetlineWear, 0, 1),
+    b: clamp(color.b * (1 + grain * 0.62) - materialLowerWear * 0.68 - wetlineWear * 0.75, 0, 1),
   };
 }
 
@@ -455,47 +676,151 @@ function buildCamera(state, canvas) {
   };
 }
 
-function buildTrianglesFromMesh(mesh, transform, baseColor, camera, viewport, triangles, accent = 0) {
-  for (let index = 0; index < mesh.indices.length; index += 3) {
-    const aIndex = mesh.indices[index] * 3;
-    const bIndex = mesh.indices[index + 1] * 3;
-    const cIndex = mesh.indices[index + 2] * 3;
+function buildTrianglesFromMesh(
+  mesh,
+  transform,
+  colorOverride,
+  camera,
+  viewport,
+  triangles,
+  options = {}
+) {
+  const primitives = getMeshPrimitives(mesh);
+  for (const primitive of primitives) {
+    const resolvedColor = tintPrimitiveColor(primitive.material, colorOverride);
+    for (let index = 0; index < primitive.indices.length; index += 3) {
+      const aIndex = primitive.indices[index] * 3;
+      const bIndex = primitive.indices[index + 1] * 3;
+      const cIndex = primitive.indices[index + 2] * 3;
 
-    const a = transformPoint(
-      vec3(mesh.positions[aIndex], mesh.positions[aIndex + 1], mesh.positions[aIndex + 2]),
-      transform
-    );
-    const b = transformPoint(
-      vec3(mesh.positions[bIndex], mesh.positions[bIndex + 1], mesh.positions[bIndex + 2]),
-      transform
-    );
-    const c = transformPoint(
-      vec3(mesh.positions[cIndex], mesh.positions[cIndex + 1], mesh.positions[cIndex + 2]),
-      transform
-    );
+      const a = transformPoint(
+        vec3(
+          primitive.positions[aIndex],
+          primitive.positions[aIndex + 1],
+          primitive.positions[aIndex + 2]
+        ),
+        transform
+      );
+      const b = transformPoint(
+        vec3(
+          primitive.positions[bIndex],
+          primitive.positions[bIndex + 1],
+          primitive.positions[bIndex + 2]
+        ),
+        transform
+      );
+      const c = transformPoint(
+        vec3(
+          primitive.positions[cIndex],
+          primitive.positions[cIndex + 1],
+          primitive.positions[cIndex + 2]
+        ),
+        transform
+      );
 
-    const ab = subVec3(b, a);
-    const ac = subVec3(c, a);
-    const normal = normalizeVec3(crossVec3(ab, ac));
-    const viewDir = normalizeVec3(subVec3(camera.eye, a));
-    if (dotVec3(normal, viewDir) <= 0) {
-      continue;
+      const ab = subVec3(b, a);
+      const ac = subVec3(c, a);
+      const faceNormal = normalizeVec3(crossVec3(ab, ac));
+      let normal = faceNormal;
+      if (Array.isArray(primitive.normals)) {
+        const aNormal = transformDirection(
+          vec3(
+            primitive.normals[aIndex],
+            primitive.normals[aIndex + 1],
+            primitive.normals[aIndex + 2]
+          ),
+          transform
+        );
+        const bNormal = transformDirection(
+          vec3(
+            primitive.normals[bIndex],
+            primitive.normals[bIndex + 1],
+            primitive.normals[bIndex + 2]
+          ),
+          transform
+        );
+        const cNormal = transformDirection(
+          vec3(
+            primitive.normals[cIndex],
+            primitive.normals[cIndex + 1],
+            primitive.normals[cIndex + 2]
+          ),
+          transform
+        );
+        normal = normalizeVec3(
+          scaleVec3(addVec3(addVec3(aNormal, bNormal), cNormal), 1 / 3)
+        );
+      }
+
+      const viewDir = normalizeVec3(subVec3(camera.eye, a));
+      if (dotVec3(faceNormal, viewDir) <= 0) {
+        continue;
+      }
+
+      const projected = [
+        projectPoint(a, camera, viewport),
+        projectPoint(b, camera, viewport),
+        projectPoint(c, camera, viewport),
+      ];
+      if (projected.some((value) => value === null)) {
+        continue;
+      }
+
+      triangles.push({
+        points: projected,
+        depth: (projected[0].depth + projected[1].depth + projected[2].depth) / 3,
+        worldCenter: scaleVec3(addVec3(addVec3(a, b), c), 1 / 3),
+        normal,
+        baseColor: resolvedColor,
+        accent: options.accent ?? 0,
+        material: primitive.material,
+        reflection: options.reflection ?? 0,
+        surfaceType: options.surfaceType ?? "solid",
+      });
     }
-
-    const projected = [projectPoint(a, camera, viewport), projectPoint(b, camera, viewport), projectPoint(c, camera, viewport)];
-    if (projected.some((value) => value === null)) {
-      continue;
-    }
-
-    triangles.push({
-      points: projected,
-      depth: (projected[0].depth + projected[1].depth + projected[2].depth) / 3,
-      worldCenter: scaleVec3(addVec3(addVec3(a, b), c), 1 / 3),
-      normal,
-      baseColor,
-      accent,
-    });
   }
+}
+
+async function loadShowcaseAssetCatalog() {
+  const [brigantine, cutter, lighthouse, harborDock] = await Promise.all([
+    loadGltfModel(resolveShowcaseAssetUrl("brigantine")),
+    loadGltfModel(resolveShowcaseAssetUrl("cutter")),
+    loadGltfModel(resolveShowcaseAssetUrl("lighthouse")),
+    loadGltfModel(resolveShowcaseAssetUrl("harbor-dock")),
+  ]);
+
+  return Object.freeze({
+    primaryShipKey: "brigantine",
+    ships: Object.freeze({
+      brigantine,
+      cutter,
+    }),
+    environment: Object.freeze({
+      lighthouse,
+      "harbor-dock": harborDock,
+    }),
+  });
+}
+
+function createLegacyShowcaseAssetCatalog() {
+  const brigantine = loadGltfModel(resolveShowcaseAssetUrl("brigantine"));
+  return Promise.resolve(brigantine).then((primary) =>
+    Object.freeze({
+      primaryShipKey: "brigantine",
+      ships: Object.freeze({
+        brigantine: primary,
+      }),
+      environment: Object.freeze({}),
+    })
+  );
+}
+
+function resolveShipModel(state, ship, fallbackModel = null) {
+  return (
+    state.assetCatalog?.ships?.[ship.modelKey ?? state.assetCatalog?.primaryShipKey ?? "brigantine"] ??
+    fallbackModel ??
+    state.shipModel
+  );
 }
 
 function createPerformanceGovernor() {
@@ -571,7 +896,7 @@ function buildDemoDom(root, options) {
       </section>
       <section class="plasius-demo__layout">
         <section class="plasius-panel plasius-demo__canvas-panel">
-          <canvas id="demoCanvas" class="plasius-demo__canvas" width="1280" height="720"></canvas>
+          <canvas id="demoCanvas" class="plasius-demo__canvas" width="${DEFAULT_CANVAS_WIDTH}" height="${DEFAULT_CANVAS_HEIGHT}"></canvas>
           <div class="plasius-demo__toolbar">
             <button id="pauseButton" type="button">Pause</button>
             <label class="plasius-toggle">
@@ -638,6 +963,12 @@ function buildDemoDom(root, options) {
 }
 
 function buildSceneSnapshot(state, shipModel) {
+  const shipPhysics = Object.freeze(
+    Object.fromEntries(
+      state.ships.map((ship) => [ship.id, resolveShipModel(state, ship, shipModel)?.physics ?? null])
+    )
+  );
+
   return Object.freeze({
     focus: state.focus,
     frame: state.frame,
@@ -659,6 +990,7 @@ function buildSceneSnapshot(state, shipModel) {
       state.ships.map((ship) =>
         Object.freeze({
           id: ship.id,
+          modelKey: ship.modelKey ?? "brigantine",
           position: Object.freeze({ ...ship.position }),
           velocity: Object.freeze({ ...ship.velocity }),
           rotationY: ship.rotationY,
@@ -679,12 +1011,13 @@ function buildSceneSnapshot(state, shipModel) {
       )
     ),
     shipPhysics: shipModel?.physics ?? null,
+    shipModels: shipPhysics,
     physics: Object.freeze({
       profile: state.physics.profile,
       plan: state.physics.plan,
       manifest: state.physics.manifest,
       snapshot: state.physics.snapshot,
-      shipPhysics: shipModel?.physics ?? null,
+      shipPhysics,
     }),
   });
 }
@@ -725,6 +1058,83 @@ function normalizeColorOverride(color, fallback) {
 
 function readVisualNumber(value, fallback) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function readPositiveNumber(value, fallback) {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+    ? value
+    : fallback;
+}
+
+function isTruthyCaptureValue(value) {
+  return value === "1" || value === "true" || value === "scene" || value === "video";
+}
+
+function resolveCaptureSettings(options) {
+  const explicitCaptureMode =
+    typeof options.captureMode === "boolean" ? options.captureMode : undefined;
+  let captureMode = explicitCaptureMode ?? false;
+  let renderScale = readPositiveNumber(options.renderScale, undefined);
+
+  try {
+    const params = new URLSearchParams(window.location.search);
+    if (explicitCaptureMode === undefined) {
+      captureMode =
+        isTruthyCaptureValue(params.get("capture")) ||
+        params.get("presentation") === "capture";
+    }
+    renderScale = readPositiveNumber(Number(params.get("renderScale")), renderScale);
+  } catch {
+    // Query-string capture controls are optional and only available in browsers.
+  }
+
+  return {
+    captureMode,
+    renderScale,
+  };
+}
+
+function getCanvasDisplaySize(canvas) {
+  const rect =
+    typeof canvas.getBoundingClientRect === "function"
+      ? canvas.getBoundingClientRect()
+      : null;
+  const width = Math.round(
+    readPositiveNumber(rect?.width, readPositiveNumber(canvas.clientWidth, canvas.width))
+  );
+  const height = Math.round(
+    readPositiveNumber(rect?.height, readPositiveNumber(canvas.clientHeight, canvas.height))
+  );
+
+  return {
+    width: Math.max(1, width || DEFAULT_CANVAS_WIDTH),
+    height: Math.max(1, height || DEFAULT_CANVAS_HEIGHT),
+  };
+}
+
+function resizeCanvasToDisplaySize(canvas, state) {
+  const { width, height } = getCanvasDisplaySize(canvas);
+  const deviceScale = readPositiveNumber(globalThis.devicePixelRatio, 1);
+  const requestedScale = readPositiveNumber(state.renderScale, deviceScale);
+  const maxScale = state.captureMode ? 2 : 1.5;
+  let scale = clamp(requestedScale, 1, maxScale);
+  const pixelBudget = state.captureMode
+    ? CAPTURE_CANVAS_PIXEL_BUDGET
+    : DEFAULT_CANVAS_WIDTH * DEFAULT_CANVAS_HEIGHT * 1.5;
+  const projectedPixels = width * height * scale * scale;
+
+  if (projectedPixels > pixelBudget) {
+    scale = Math.sqrt(pixelBudget / Math.max(1, width * height));
+  }
+
+  const targetWidth = Math.max(1, Math.round(width * scale));
+  const targetHeight = Math.max(1, Math.round(height * scale));
+  if (canvas.width !== targetWidth || canvas.height !== targetHeight) {
+    canvas.width = targetWidth;
+    canvas.height = targetHeight;
+  }
+
+  state.renderScale = scale;
 }
 
 function resolveClothPresentation(state, meshDetail) {
@@ -1409,6 +1819,9 @@ function createSceneState(options) {
     clothDetail,
     lightingDetail,
     debugSession,
+    showcaseRealisticModelsEnabled: options.realisticModelsEnabled !== false,
+    captureMode: options.captureMode === true,
+    renderScale: readPositiveNumber(options.renderScale, undefined),
     packageState: undefined,
     demoDescription: null,
     demoVisuals: null,
@@ -1423,6 +1836,7 @@ function createSceneState(options) {
     ships: [
       {
         id: "northwind",
+        modelKey: "brigantine",
         position: vec3(-5.2, 0, 7.2),
         velocity: vec3(2.35, 0, -1.08),
         rotationY: 0.58,
@@ -1433,17 +1847,18 @@ function createSceneState(options) {
         throttleResponse: 0.46,
         rudderResponse: 0.54,
         wanderPhase: 0.35,
-        lanterns: SHIP_LANTERNS,
+        lanterns: CUTTER_LANTERNS,
         lanternStrength: 1.06,
         collisionRadiusScale: 1.04,
       },
       {
         id: "tidecaller",
+        modelKey: "cutter",
         position: vec3(4.8, 0, 4.4),
         velocity: vec3(-2.15, 0, 1.74),
         rotationY: -2.48,
         angularVelocity: -0.2,
-        tint: { r: 0.48, g: 0.28, b: 0.19 },
+        tint: { r: 0.58, g: 0.24, b: 0.16 },
         massScale: 0.84,
         cruiseSpeed: 2.68,
         throttleResponse: 0.7,
@@ -1467,6 +1882,7 @@ function createSceneState(options) {
       manifest: physicsManifest,
       snapshot: null,
     },
+    assetCatalog: null,
     shipModel: null,
   };
 }
@@ -1553,10 +1969,51 @@ function drawSkyAndShore(ctx, canvas, state, nearLighting, reflectionStrength, s
   }
 }
 
-function drawTriangles(ctx, triangles, lightDir, reflectionStrength, camera, shadowStrength) {
+function resolveLocalLightContribution(triangle, lightSources) {
+  const contribution = { r: 0, g: 0, b: 0 };
+  if (!Array.isArray(lightSources) || triangle.surfaceType === "water") {
+    return contribution;
+  }
+
+  const normal = normalizeVec3(triangle.normal);
+  for (const source of lightSources.slice(0, 8)) {
+    const delta = subVec3(source.point, triangle.worldCenter);
+    const distance = lengthVec3(delta);
+    const attenuation =
+      (source.glowScale ?? 1) / Math.max(1, 0.68 + distance * distance * 0.2);
+    if (attenuation < 0.012) {
+      continue;
+    }
+
+    const lightDir = normalizeVec3(delta);
+    const facing = clamp(dotVec3(normal, lightDir), 0, 1);
+    const response = attenuation * (0.18 + facing * 0.82);
+    const glowColor = source.glowColor ?? source.coreColor ?? { r: 1, g: 0.72, b: 0.4 };
+    contribution.r += glowColor.r * response * 0.32;
+    contribution.g += glowColor.g * response * 0.26;
+    contribution.b += glowColor.b * response * 0.18;
+  }
+
+  return contribution;
+}
+
+function drawTriangles(
+  ctx,
+  triangles,
+  lightDir,
+  reflectionStrength,
+  camera,
+  shadowStrength,
+  localLights = []
+) {
   triangles.sort((left, right) => right.depth - left.depth);
   for (const triangle of triangles) {
     const surfaceNormal = normalizeVec3(triangle.normal);
+    const material = triangle.material ?? {
+      roughness: 0.88,
+      metallic: 0.08,
+      emissive: { r: 0, g: 0, b: 0 },
+    };
     const shaded = shadeColor(
       triangle.baseColor,
       surfaceNormal,
@@ -1564,19 +2021,42 @@ function drawTriangles(ctx, triangles, lightDir, reflectionStrength, camera, sha
       clamp((triangle.worldCenter.y + 3) / 10, 0, 1),
       triangle.accent
     );
-    const reflection = triangle.worldCenter.y < 0.8 ? reflectionStrength : 0;
+    const reflection = reflectionStrength * (triangle.reflection ?? 0);
     const viewDir = normalizeVec3(subVec3(camera.eye, triangle.worldCenter));
     const reflectedLight = reflectVec3(scaleVec3(lightDir, -1), surfaceNormal);
-    const gloss = triangle.worldCenter.y < 0.9 ? 1 : triangle.accent > 0.05 ? 0.55 : 0.3;
-    const specular = Math.pow(clamp(dotVec3(reflectedLight, viewDir), 0, 1), triangle.worldCenter.y < 0.9 ? 18 : 12) * gloss;
-    const occlusion = triangle.worldCenter.y < 0.9 ? shadowStrength * 0.035 : 0;
-    const fill = colorToRgba(
+    const gloss = mix(0.78, 0.14, clamp(material.roughness ?? 0.88, 0, 1)) + (material.metallic ?? 0) * 0.18;
+    const specularPower = mix(26, 7, clamp(material.roughness ?? 0.88, 0, 1));
+    const specular =
+      Math.pow(clamp(dotVec3(reflectedLight, viewDir), 0, 1), specularPower) * gloss;
+    const emissive = material.emissive ?? { r: 0, g: 0, b: 0 };
+    const localLight = resolveLocalLightContribution(triangle, localLights);
+    const occlusion = triangle.surfaceType === "water" ? shadowStrength * 0.018 : shadowStrength * 0.04;
+    const detailed = applyMaterialDetail(
       {
-        r: clamp(shaded.r + reflection * 0.08 + specular * 0.14 - occlusion, 0, 1),
-        g: clamp(shaded.g + reflection * 0.08 + specular * 0.15 - occlusion, 0, 1),
-        b: clamp(shaded.b + reflection * 0.16 + specular * 0.2 - occlusion * 0.5, 0, 1),
+        r: clamp(
+          shaded.r + reflection * 0.08 + specular * 0.16 + emissive.r * 0.42 + localLight.r - occlusion,
+          0,
+          1
+        ),
+        g: clamp(
+          shaded.g + reflection * 0.08 + specular * 0.16 + emissive.g * 0.42 + localLight.g - occlusion,
+          0,
+          1
+        ),
+        b: clamp(
+          shaded.b + reflection * 0.16 + specular * 0.22 + emissive.b * 0.46 + localLight.b - occlusion * 0.5,
+          0,
+          1
+        ),
       },
-      0.98
+      material,
+      triangle.worldCenter,
+      surfaceNormal,
+      triangle.surfaceType
+    );
+    const fill = colorToRgba(
+      detailed,
+      triangle.baseColor.a ?? 0.98
     );
     ctx.fillStyle = fill;
     ctx.beginPath();
@@ -1615,78 +2095,111 @@ function renderProjectedShadow(ctx, worldPoints, camera, viewport, lightDir, opt
   ctx.restore();
 }
 
-function pushHarborGeometry(camera, viewport, triangles, visuals) {
-  const harborObjects = [
-    {
-      position: vec3(-8.2, 1.1, -0.9),
-      rotationY: -0.16,
-      scale: { x: 5.4, y: 2.4, z: 4.2 },
-      color: visuals.harborWall,
-      accent: 0.06,
-    },
-    {
-      position: vec3(-5.7, 0.45, 1.4),
-      rotationY: -0.08,
-      scale: { x: 6.8, y: 0.3, z: 2.1 },
-      color: visuals.harborDeck,
-      accent: 0.04,
-    },
-    {
-      position: vec3(-10.4, 0.28, 0.8),
-      rotationY: 0.22,
-      scale: { x: 1.2, y: 0.9, z: 1.2 },
-      color: visuals.harborTower,
-      accent: 0.02,
-    },
-  ];
+function pushHarborGeometry(camera, viewport, triangles, state) {
+  if (!state.showcaseRealisticModelsEnabled) {
+    for (const object of LEGACY_HARBOR_LAYOUT) {
+      buildTrianglesFromMesh(
+        { positions: [object], indices: [0], normals: null, colors: null, material: createLegacyMeshPrimitive({})?.material, bounds: null, name: "legacy-structure" },
+        {
+          position: object.position,
+          rotationY: object.rotationY,
+          scale: object.scale,
+        },
+        object.color,
+        camera,
+        viewport,
+        triangles,
+        {
+          accent: object.accent,
+          reflection: 0,
+          surfaceType: "structure",
+        }
+      );
+    }
 
-  for (const object of harborObjects) {
+    return;
+  }
+
+  for (const placement of SHOWCASE_ENVIRONMENT_LAYOUT) {
+    const mesh = state.assetCatalog?.environment?.[placement.assetKey] ?? null;
+    if (!mesh) {
+      continue;
+    }
+
     buildTrianglesFromMesh(
-      UNIT_BOX_MESH,
+      mesh,
       {
-        position: object.position,
-        rotationY: object.rotationY,
-        scale: object.scale,
+        position: vec3(placement.position.x, placement.position.y, placement.position.z),
+        rotationY: placement.rotationY,
+        scale: placement.scale,
       },
-      object.color,
+      null,
       camera,
       viewport,
       triangles,
-      object.accent
+      {
+        accent: placement.accent,
+        reflection: 0,
+        surfaceType: "structure",
+      }
     );
   }
 }
 
 function renderShipRigging(ctx, ship, camera, viewport) {
   const transform = { position: ship.position, rotationY: ship.rotationY, scale: SHIP_SCALE };
-  const mastBase = transformPoint(vec3(0, 0.38, -0.4), transform);
-  const mastTop = transformPoint(vec3(0, 3.8, -0.2), transform);
-  const aftBase = transformPoint(vec3(-0.25, 0.32, -1.9), transform);
-  const aftTop = transformPoint(vec3(-0.15, 2.7, -1.75), transform);
-  const sailA = transformPoint(vec3(0.08, 3.2, -0.2), transform);
-  const sailB = transformPoint(vec3(0.12, 1.2, -0.5), transform);
-  const sailC = transformPoint(vec3(2.25, 2.25, 0.15), transform);
-  const projected = [mastBase, mastTop, aftBase, aftTop, sailA, sailB, sailC].map((point) =>
-    projectPoint(point, camera, viewport)
-  );
+  const layout =
+    ship.modelKey === "cutter"
+      ? {
+          lineColor: "rgba(85, 89, 97, 0.92)",
+          sailColor: "rgba(218, 232, 244, 0.28)",
+          points: [
+            vec3(0, 0.88, -0.32),
+            vec3(0, 2.4, -0.28),
+            vec3(0.1, 1.92, -0.3),
+            vec3(1.18, 1.72, -0.18),
+            vec3(1.04, 1.08, -0.12),
+          ],
+          mastPairs: [[0, 1], [2, 3]],
+          sailTriangle: [2, 3, 4],
+        }
+      : {
+          lineColor: "rgba(73, 54, 45, 0.94)",
+          sailColor: "rgba(238, 232, 214, 0.88)",
+          points: [
+            vec3(0, 0.38, -0.4),
+            vec3(0, 3.8, -0.2),
+            vec3(-0.25, 0.32, -1.9),
+            vec3(-0.15, 2.7, -1.75),
+            vec3(0.08, 3.2, -0.2),
+            vec3(0.12, 1.2, -0.5),
+            vec3(2.25, 2.25, 0.15),
+          ],
+          mastPairs: [[0, 1], [2, 3]],
+          sailTriangle: [4, 5, 6],
+        };
+  const projected = layout.points
+    .map((point) => transformPoint(point, transform))
+    .map((point) => projectPoint(point, camera, viewport));
   if (projected.some((value) => value === null)) {
     return;
   }
 
-  ctx.strokeStyle = "rgba(73, 54, 45, 0.94)";
-  ctx.lineWidth = 3.5;
+  ctx.strokeStyle = layout.lineColor;
+  ctx.lineWidth = ship.modelKey === "cutter" ? 2.2 : 3.5;
   ctx.beginPath();
-  ctx.moveTo(projected[0].x, projected[0].y);
-  ctx.lineTo(projected[1].x, projected[1].y);
-  ctx.moveTo(projected[2].x, projected[2].y);
-  ctx.lineTo(projected[3].x, projected[3].y);
+  for (const [from, to] of layout.mastPairs) {
+    ctx.moveTo(projected[from].x, projected[from].y);
+    ctx.lineTo(projected[to].x, projected[to].y);
+  }
   ctx.stroke();
 
-  ctx.fillStyle = "rgba(238, 232, 214, 0.88)";
+  const [a, b, c] = layout.sailTriangle;
+  ctx.fillStyle = layout.sailColor;
   ctx.beginPath();
-  ctx.moveTo(projected[4].x, projected[4].y);
-  ctx.lineTo(projected[5].x, projected[5].y);
-  ctx.lineTo(projected[6].x, projected[6].y);
+  ctx.moveTo(projected[a].x, projected[a].y);
+  ctx.lineTo(projected[b].x, projected[b].y);
+  ctx.lineTo(projected[c].x, projected[c].y);
   ctx.closePath();
   ctx.fill();
 }
@@ -1941,10 +2454,10 @@ function resolveBoundaryCollision(ship, state, shipModel) {
   }
 }
 
-function resolveShipCollision(state, a, b, shipModel) {
+function resolveShipCollision(state, a, b, shipModelA, shipModelB) {
   const delta = subVec3(b.position, a.position);
-  const radiusA = getShipCollisionRadius(a, shipModel);
-  const radiusB = getShipCollisionRadius(b, shipModel);
+  const radiusA = getShipCollisionRadius(a, shipModelA);
+  const radiusB = getShipCollisionRadius(b, shipModelB);
   const distance = Math.hypot(delta.x, delta.z);
   const minDistance = radiusA + radiusB;
   if (distance >= minDistance) {
@@ -1957,8 +2470,8 @@ function resolveShipCollision(state, a, b, shipModel) {
       : normalizeVec3(vec3(Math.cos(state.time * 5.2), 0, Math.sin(state.time * 4.8)));
   const tangent = vec3(-normal.z, 0, normal.x);
   const penetration = minDistance - distance;
-  const invMassA = getShipInverseMass(a, shipModel);
-  const invMassB = getShipInverseMass(b, shipModel);
+  const invMassA = getShipInverseMass(a, shipModelA);
+  const invMassB = getShipInverseMass(b, shipModelB);
   const invMassSum = invMassA + invMassB;
   const correction = scaleVec3(normal, (penetration / Math.max(0.0001, invMassSum)) * 0.72);
   a.position = subVec3(a.position, scaleVec3(correction, invMassA));
@@ -1966,7 +2479,11 @@ function resolveShipCollision(state, a, b, shipModel) {
 
   const relativeVelocity = subVec3(b.velocity, a.velocity);
   const velocityAlongNormal = dotVec3(relativeVelocity, normal);
-  const restitution = readPhysicsNumber(shipModel.physics, "restitution", 0.22) * 0.88;
+  const restitution =
+    ((readPhysicsNumber(shipModelA.physics, "restitution", 0.22) +
+      readPhysicsNumber(shipModelB.physics, "restitution", 0.22)) /
+      2) *
+    0.88;
   if (velocityAlongNormal < 0) {
     const impulseMagnitude =
       (-(1 + restitution) * velocityAlongNormal) / Math.max(0.0001, invMassSum);
@@ -1985,10 +2502,10 @@ function resolveShipCollision(state, a, b, shipModel) {
     b.velocity = addVec3(b.velocity, scaleVec3(frictionImpulse, invMassB));
 
     a.angularVelocity -=
-      tangentSpeed * radiusA * getShipInverseInertia(a, shipModel) * 0.2 +
+      tangentSpeed * radiusA * getShipInverseInertia(a, shipModelA) * 0.2 +
       impulseMagnitude * 0.00024;
     b.angularVelocity +=
-      tangentSpeed * radiusB * getShipInverseInertia(b, shipModel) * 0.2 +
+      tangentSpeed * radiusB * getShipInverseInertia(b, shipModelB) * 0.2 +
       impulseMagnitude * 0.00024;
 
     const impactSpeed = Math.abs(velocityAlongNormal);
@@ -2028,14 +2545,19 @@ function updateShips(state, dt, shipModel) {
   state.contactCount = 0;
 
   for (const ship of state.ships) {
-    updateShipMotion(state, ship, dt, shipModel);
-    resolveBoundaryCollision(ship, state, shipModel);
+    const activeShipModel = resolveShipModel(state, ship, shipModel);
+    updateShipMotion(state, ship, dt, activeShipModel);
+    resolveBoundaryCollision(ship, state, activeShipModel);
   }
 
   for (let index = 0; index < state.ships.length; index += 1) {
     for (let otherIndex = index + 1; otherIndex < state.ships.length; otherIndex += 1) {
+      const shipA = state.ships[index];
+      const shipB = state.ships[otherIndex];
+      const shipModelA = resolveShipModel(state, shipA, shipModel);
+      const shipModelB = resolveShipModel(state, shipB, shipModel);
       collided =
-        resolveShipCollision(state, state.ships[index], state.ships[otherIndex], shipModel) ||
+        resolveShipCollision(state, shipA, shipB, shipModelA, shipModelB) ||
         collided;
     }
   }
@@ -2327,6 +2849,108 @@ function renderWaterLightReflection(ctx, source, state, camera, viewport) {
   ctx.restore();
 }
 
+function renderLighthouseBeam(ctx, state, camera, viewport, visuals) {
+  const lighthousePlacement = SHOWCASE_ENVIRONMENT_LAYOUT.find(
+    (placement) => placement.assetKey === "lighthouse"
+  );
+  if (!lighthousePlacement || !state.showcaseRealisticModelsEnabled) {
+    return;
+  }
+
+  const source = transformPoint(
+    vec3(0, 11.34, 0),
+    {
+      position: vec3(
+        lighthousePlacement.position.x,
+        lighthousePlacement.position.y,
+        lighthousePlacement.position.z
+      ),
+      rotationY: lighthousePlacement.rotationY,
+      scale: lighthousePlacement.scale,
+    }
+  );
+  const sweep = state.time * 0.22 + 0.8;
+  const direction = normalizeVec3(vec3(Math.sin(sweep), -0.07, Math.cos(sweep)));
+  const spread = perpendicularOnWater(direction);
+  const farCenter = addVec3(source, scaleVec3(direction, 34));
+  const left = addVec3(farCenter, scaleVec3(spread, 7.4));
+  const right = addVec3(farCenter, scaleVec3(spread, -7.4));
+  const projectedSource = projectPoint(source, camera, viewport);
+  const projectedLeft = projectPoint(left, camera, viewport);
+  const projectedRight = projectPoint(right, camera, viewport);
+  if (!projectedSource || !projectedLeft || !projectedRight) {
+    return;
+  }
+
+  const pulse = 0.72 + Math.sin(state.time * 1.7) * 0.08;
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.fillStyle = colorToRgba(visuals.torchCore, 0.055 * pulse);
+  ctx.beginPath();
+  ctx.moveTo(projectedSource.x, projectedSource.y);
+  ctx.lineTo(projectedLeft.x, projectedLeft.y);
+  ctx.lineTo(projectedRight.x, projectedRight.y);
+  ctx.closePath();
+  ctx.fill();
+
+  const beamLength = Math.hypot(
+    projectedLeft.x - projectedSource.x,
+    projectedLeft.y - projectedSource.y
+  );
+  const core = ctx.createRadialGradient(
+    projectedSource.x,
+    projectedSource.y,
+    2,
+    projectedSource.x,
+    projectedSource.y,
+    clamp(beamLength * 0.22, 18, 80)
+  );
+  core.addColorStop(0, colorToRgba(visuals.torchCore, 0.58));
+  core.addColorStop(0.5, colorToRgba(visuals.torchGlow, 0.18));
+  core.addColorStop(1, colorToRgba(visuals.torchGlow, 0));
+  ctx.fillStyle = core;
+  ctx.beginPath();
+  ctx.arc(projectedSource.x, projectedSource.y, clamp(beamLength * 0.18, 14, 64), 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function renderAtmosphericGrade(ctx, canvas, state, visuals) {
+  const vignette = ctx.createRadialGradient(
+    canvas.width * 0.5,
+    canvas.height * 0.48,
+    canvas.width * 0.2,
+    canvas.width * 0.5,
+    canvas.height * 0.5,
+    canvas.width * 0.72
+  );
+  vignette.addColorStop(0, "rgba(0, 0, 0, 0)");
+  vignette.addColorStop(0.68, "rgba(0, 0, 0, 0.08)");
+  vignette.addColorStop(1, "rgba(0, 0, 0, 0.32)");
+  ctx.fillStyle = vignette;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const seaHaze = ctx.createLinearGradient(0, canvas.height * 0.34, 0, canvas.height);
+  seaHaze.addColorStop(0, "rgba(0, 0, 0, 0)");
+  seaHaze.addColorStop(0.5, visuals.ambientMist);
+  seaHaze.addColorStop(1, "rgba(3, 8, 16, 0.18)");
+  ctx.fillStyle = seaHaze;
+  ctx.fillRect(0, canvas.height * 0.34, canvas.width, canvas.height * 0.66);
+
+  if (state.captureMode) {
+    ctx.save();
+    ctx.globalCompositeOperation = "screen";
+    for (let index = 0; index < 70; index += 1) {
+      const x = pseudoRandom(index * 19 + 3) * canvas.width;
+      const y = pseudoRandom(index * 23 + 7) * canvas.height;
+      const alpha = 0.008 + pseudoRandom(index * 31 + 11) * 0.012;
+      ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+      ctx.fillRect(x, y, 1.1, 1.1);
+    }
+    ctx.restore();
+  }
+}
+
 function renderWaterMotionEffects(ctx, effects, camera, viewport) {
   ctx.save();
   ctx.globalCompositeOperation = "screen";
@@ -2459,6 +3083,15 @@ function renderScene(ctx, canvas, state, shipModel, dom) {
         normal,
         baseColor: bandMesh.color,
         accent: bandAccent,
+        material: {
+          name: "water-surface",
+          color: bandMesh.color,
+          roughness: 0.2,
+          metallic: 0,
+          emissive: { r: 0, g: 0, b: 0 },
+        },
+        reflection: 1,
+        surfaceType: "water",
       });
     }
   }
@@ -2466,7 +3099,7 @@ function renderScene(ctx, canvas, state, shipModel, dom) {
   const waterMotionEffects = buildWaterMotionEffects(state);
   const lightSources = collectSceneLightSources(state, visuals);
 
-  pushHarborGeometry(camera, viewport, sceneTriangles, visuals);
+  pushHarborGeometry(camera, viewport, sceneTriangles, state);
   const cloth = buildClothSurface(
     state,
     state,
@@ -2489,24 +3122,47 @@ function renderScene(ctx, canvas, state, shipModel, dom) {
       normal,
       baseColor: cloth.color,
       accent: cloth.band === "near" ? 0.1 : 0.04,
+      material: {
+        name: "flag-cloth",
+        color: cloth.color,
+        roughness: 0.94,
+        metallic: 0,
+        emissive: { r: 0, g: 0, b: 0 },
+      },
+      reflection: 0,
+      surfaceType: "cloth",
     });
   }
 
   for (const ship of state.ships) {
+    const activeShipModel = resolveShipModel(state, ship, shipModel);
     buildTrianglesFromMesh(
-      shipModel,
+      activeShipModel,
       { position: ship.position, rotationY: ship.rotationY, scale: SHIP_SCALE },
       ship.tint,
       camera,
       viewport,
       sceneTriangles,
-      nearLighting.rtParticipation.directShadows === "premium" ? 0.08 : 0.02
+      {
+        accent: nearLighting.rtParticipation.directShadows === "premium" ? 0.08 : 0.02,
+        reflection: 0,
+        surfaceType: "ship",
+      }
     );
   }
 
   drawTriangles(ctx, waterTriangles, lightDir, reflectionStrength, camera, shadowStrength);
   for (const ship of state.ships) {
-    renderShipShadow(ctx, shipModel, ship, state, camera, viewport, lightDir, shadowStrength);
+    renderShipShadow(
+      ctx,
+      resolveShipModel(state, ship, shipModel),
+      ship,
+      state,
+      camera,
+      viewport,
+      lightDir,
+      shadowStrength
+    );
   }
   renderFlagShadow(ctx, cloth, camera, viewport, lightDir, shadowStrength);
   for (const source of lightSources.reflectionLights) {
@@ -2514,9 +3170,18 @@ function renderScene(ctx, canvas, state, shipModel, dom) {
   }
   renderWaterMotionEffects(ctx, waterMotionEffects, camera, viewport);
   renderWaterHighlights(ctx, water.bandMeshes, camera, viewport);
-  drawTriangles(ctx, sceneTriangles, lightDir, reflectionStrength, camera, shadowStrength);
+  drawTriangles(
+    ctx,
+    sceneTriangles,
+    lightDir,
+    reflectionStrength,
+    camera,
+    shadowStrength,
+    lightSources.directLights
+  );
   renderFlagPole(ctx, camera, viewport);
   renderClothAccent(ctx, cloth, camera, viewport);
+  renderLighthouseBeam(ctx, state, camera, viewport, visuals);
   for (const source of lightSources.directLights) {
     renderDirectLightGlow(ctx, source, camera, viewport);
   }
@@ -2524,6 +3189,7 @@ function renderScene(ctx, canvas, state, shipModel, dom) {
     renderShipRigging(ctx, ship, camera, viewport);
   }
   renderSprays(ctx, state.sprays, camera, viewport);
+  renderAtmosphericGrade(ctx, canvas, state, visuals);
 
   const debugSnapshot = state.debugSession.getSnapshot();
   const quality = {
@@ -2534,11 +3200,11 @@ function renderScene(ctx, canvas, state, shipModel, dom) {
 
   const sceneMetrics = [
     `focus: ${state.focus}`,
-    `ships: ${state.ships.length} active GLTF hulls`,
-    `moonlight: cold overhead key + ${HARBOR_TORCHES.length + state.ships.length * SHIP_LANTERNS.length} warm deck and harbor lights`,
+    `ships: ${state.ships.length} active GLTF hulls across ${new Set(state.ships.map((ship) => ship.modelKey)).size} model families`,
+    `moonlight: cold overhead key + ${HARBOR_TORCHES.length + state.ships.reduce((total, ship) => total + (Array.isArray(ship.lanterns) ? ship.lanterns.length : 0), 0)} warm deck and harbor lights`,
     `physics snapshot: ${state.physics.snapshot.stage} (${state.physics.snapshot.stability})`,
     `physics contacts: ${state.contactCount}`,
-    `mass split: ${state.ships.map((ship) => `${ship.id} ${(getShipMass(ship, shipModel) / 1000).toFixed(1)}t`).join(" · ")}`,
+    `mass split: ${state.ships.map((ship) => `${ship.id} ${(getShipMass(ship, resolveShipModel(state, ship, shipModel)) / 1000).toFixed(1)}t`).join(" · ")}`,
     `cloth band: ${cloth.band} -> ${cloth.representation.output}`,
     `fluid near band: ${water.bandMeshes[0].representation.output}`,
     `lighting profile: ${lightingPlan.profile} (${lightingDistanceBands.length} bands)`,
@@ -2566,7 +3232,7 @@ function renderScene(ctx, canvas, state, shipModel, dom) {
           "The ships collide with mass-weighted impulses and positional correction, so the heavier hull keeps more of its line.",
           "Moonlight keeps the overall read legible while lanterns and torches make collision moments easy to track against the water.",
         ]
-      : SCENE_NOTES;
+        : SCENE_NOTES;
   const custom = state.demoDescription ?? null;
 
   setListContent(
@@ -2592,7 +3258,9 @@ function renderScene(ctx, canvas, state, shipModel, dom) {
       ? custom.details
       : state.focus === "physics"
         ? `Stable world snapshots are emitted from ${state.physics.plan.snapshotStageId} after the authoritative solver; the heavier hull now carries momentum through mass-aware collision impulses while cloth and fluid remain downstream.`
-        : `Moonlit GLTF ships collide on ${shipModel.physics.shape ?? "box"} physics volumes; lantern reflections, cloth, and fluid remain continuous while the governor pressure is ${state.lastDecision.pressureLevel}.`;
+        : state.showcaseRealisticModelsEnabled
+          ? `Moonlit GLTF ships now mix a brigantine and a cutter against modeled harbor assets; cloth, fluid, and ship-local lighting stay continuous while the governor pressure is ${state.lastDecision.pressureLevel}.`
+          : `Moonlit GLTF ships use the legacy brigantine and placeholder harbor blocks while cloth, fluid, and ship-local lighting stay continuous while the governor pressure is ${state.lastDecision.pressureLevel}.`;
 }
 
 function updateSceneState(state, dt, shipModel) {
@@ -2624,15 +3292,18 @@ function syncTextState(state, shipModel) {
     stress: state.stress,
     ships: state.ships.map((ship) => ({
       id: ship.id,
+      modelKey: ship.modelKey ?? "brigantine",
       x: Number(ship.position.x.toFixed(2)),
       y: Number(ship.position.y.toFixed(2)),
       z: Number(ship.position.z.toFixed(2)),
       vx: Number(ship.velocity.x.toFixed(2)),
       vz: Number(ship.velocity.z.toFixed(2)),
-      massKg: Math.round(getShipMass(ship, shipModel)),
+      massKg: Math.round(getShipMass(ship, resolveShipModel(state, ship, shipModel))),
       lanterns: Array.isArray(ship.lanterns) ? ship.lanterns.length : 0,
     })),
-    shipPhysics: shipModel.physics,
+    shipPhysics: Object.fromEntries(
+      state.ships.map((ship) => [ship.id, resolveShipModel(state, ship, shipModel)?.physics ?? null])
+    ),
     sprays: state.sprays.length,
     waveImpulses: state.waveImpulses.length,
     pressure: state.lastDecision?.pressureLevel ?? "stable",
@@ -2656,10 +3327,14 @@ function syncTextState(state, shipModel) {
   };
 }
 
-export async function mountGpuShowcase(options = {}) {
+export async function mountGpuShowcase(options = {}, featureFlags = null) {
   injectStyles();
   const root = options.root ?? document.body;
   root.classList?.add?.(ROOT_CLASS);
+  const captureSettings = resolveCaptureSettings(options);
+  if (captureSettings.captureMode) {
+    root.classList?.add?.(CAPTURE_CLASS);
+  }
   const previousMarkup = root.innerHTML;
   const previousRenderGameToText = window.render_game_to_text;
   const previousAdvanceTime = window.advanceTime;
@@ -2670,9 +3345,18 @@ export async function mountGpuShowcase(options = {}) {
     subtitle: options.subtitle ?? DEFAULT_SUBTITLE,
   });
   dom.focusMode.value = focus;
+  const state = createSceneState({
+    focus,
+    realisticModelsEnabled: isFeatureEnabled(featureFlags, GPU_SHOWCASE_REALISTIC_MODELS_FEATURE, true),
+    captureMode: captureSettings.captureMode,
+    renderScale: captureSettings.renderScale,
+  });
+  const assetCatalog = await (state.showcaseRealisticModelsEnabled
+    ? loadShowcaseAssetCatalog()
+    : createLegacyShowcaseAssetCatalog());
+  const shipModel = assetCatalog.ships[assetCatalog.primaryShipKey];
 
-  const state = createSceneState({ focus });
-  const shipModel = await loadGltfModel(resolveShowcaseAssetUrl());
+  state.assetCatalog = assetCatalog;
   state.shipModel = shipModel;
   state.packageState =
     typeof options.createState === "function" ? options.createState() : undefined;
@@ -2685,6 +3369,8 @@ export async function mountGpuShowcase(options = {}) {
   if (!ctx) {
     throw new Error("2D canvas context is required for the shared showcase.");
   }
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
   let animationFrameId = 0;
   let destroyed = false;
   const renderFrame = (nowMs) => {
@@ -2706,6 +3392,7 @@ export async function mountGpuShowcase(options = {}) {
     }
 
     state.demoDescription = resolveSceneDescription(state, options, shipModel).description;
+    resizeCanvasToDisplaySize(dom.canvas, state);
     renderScene(ctx, dom.canvas, state, shipModel, dom);
     syncTextState(state, shipModel);
     animationFrameId = requestAnimationFrame(renderFrame);
@@ -2750,6 +3437,7 @@ export async function mountGpuShowcase(options = {}) {
       state.packageState = undefined;
     }
     root.classList?.remove?.(ROOT_CLASS);
+    root.classList?.remove?.(CAPTURE_CLASS);
     root.innerHTML = previousMarkup;
     if (typeof previousRenderGameToText === "function") {
       window.render_game_to_text = previousRenderGameToText;
@@ -2771,6 +3459,13 @@ export async function mountGpuShowcase(options = {}) {
 }
 
 function updatePhysicsSnapshot(state, shipModel) {
+  const rigidBodyShapes = Object.fromEntries(
+    state.ships.map((ship) => [
+      ship.id,
+      resolveShipModel(state, ship, shipModel)?.physics?.shape ?? "box",
+    ])
+  );
+
   state.physics.snapshot = createPhysicsWorldSnapshot({
     frameId: `showcase-${state.frame}`,
     tick: state.frame,
@@ -2787,6 +3482,7 @@ function updatePhysicsSnapshot(state, shipModel) {
       contactCount: state.contactCount,
       snapshotStageId: state.physics.plan.snapshotStageId,
       rigidBodyShape: shipModel.physics.shape ?? "box",
+      rigidBodyShapes,
     },
   });
 }

@@ -4,6 +4,7 @@
 package demos need in common:
 
 - shared GLTF asset loading
+- package-owned showcase assets for ships and harbor structures
 - the harbor/showcase scene shell
 - shared 3D validation layout and controls
 - family-owned integration between cloth, fluid, lighting, performance, debug,
