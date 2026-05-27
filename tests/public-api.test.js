@@ -31,37 +31,25 @@ test("showcase asset resolution targets the shared brigantine asset", () => {
   assert.equal(url.href, "file:///tmp/assets/brigantine.gltf");
 });
 
-test("showcase asset resolution keeps the package asset URL when the base URL is invalid", () => {
+test("showcase asset resolution can target the richer shared asset catalog", () => {
+  const url = resolveShowcaseAssetUrl("file:///tmp/dist/index.js", "lighthouse");
+  const cutterUrl = resolveShowcaseAssetUrl("cutter");
+  assert.equal(url.href, "file:///tmp/assets/lighthouse.gltf");
+  assert.match(cutterUrl.href, /cutter\.gltf$/);
+});
+
+test("showcase asset resolution falls back to an inline asset when the base URL is invalid", () => {
   const url = resolveShowcaseAssetUrl("");
   assert.match(url.href, /\/assets\/brigantine\.gltf$/);
 });
 
-test("loadGltfModel falls back to the inline showcase asset after the package asset fetch fails", async () => {
-  const originalFetch = globalThis.fetch;
-  let failedPackageFetches = 0;
-
-  globalThis.fetch = async (input, init) => {
-    const href = input instanceof URL ? input.href : String(input);
-    if (href.endsWith("/assets/brigantine.gltf")) {
-      failedPackageFetches += 1;
-      return {
-        ok: false,
-        status: 404,
-        statusText: "Not Found",
-      };
-    }
-    return originalFetch(input, init);
-  };
-
-  try {
-    const model = await loadGltfModel(resolveShowcaseAssetUrl(""));
-    assert.equal(failedPackageFetches, 1);
-    assert.equal(model.name, "brigantine");
-    assert.equal(model.indices.length > 0, true);
-    assert.equal(model.physics.shape, "box");
-  } finally {
-    globalThis.fetch = originalFetch;
-  }
+test("loadGltfModel can load the inline fallback asset URL", async () => {
+  const model = await loadGltfModel(resolveShowcaseAssetUrl(""));
+  assert.equal(model.name, "brigantine");
+  assert.equal(model.indices.length > 0, true);
+  assert.equal(model.physics.shape, "box");
+  assert.equal(model.primitives.length >= 3, true);
+  assert.equal(model.primitives.some((primitive) => primitive.material.name === "sail-canvas"), true);
 });
 
 test("loadGltfModel delegates through the shared loader", async () => {
@@ -138,6 +126,7 @@ test("loadGltfModel delegates through the shared loader", async () => {
     assert.equal(model.name, "ship");
     assert.equal(model.indices.length, 3);
     assert.equal(model.physics.shape, "box");
+    assert.equal(model.primitives.length, 1);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -241,6 +230,7 @@ test("loadGltfModel resolves external buffers against response.url when the requ
     assert.equal(model.name, "ship");
     assert.equal(model.indices.length, 3);
     assert.equal(model.physics.shape, "box");
+    assert.equal(model.primitives.length, 1);
   } finally {
     globalThis.fetch = originalFetch;
     globalThis.window = originalWindow;

@@ -84,7 +84,12 @@ function createCanvasContext() {
   };
 }
 
-function createSceneHarness({ canvasContext, search = "", href = "https://plasius.co.uk/gpu-demo" } = {}) {
+function createSceneHarness({
+  canvasContext,
+  displaySize = null,
+  search = "",
+  href = "https://plasius.co.uk/gpu-demo",
+} = {}) {
   const listenerRegistry = new Map();
   const removals = [];
   const classNames = new Set();
@@ -97,6 +102,14 @@ function createSceneHarness({ canvasContext, search = "", href = "https://plasiu
     "#demoCanvas": {
       width: 1280,
       height: 720,
+      clientWidth: displaySize?.width ?? 1280,
+      clientHeight: displaySize?.height ?? 720,
+      getBoundingClientRect() {
+        return {
+          width: displaySize?.width ?? this.width,
+          height: displaySize?.height ?? this.height,
+        };
+      },
       getContext() {
         return ctx;
       },
@@ -346,6 +359,14 @@ test("mountGpuShowcase renders live frames, package hooks, and physics telemetry
     assert.equal(harness.root.classList.contains("plasius-showcase-root"), true);
     assert.ok(harness.styleElements.has("plasius-shared-3d-showcase-style"));
     assert.equal(animationFrames.length, 1);
+    assert.deepEqual(Object.keys(showcase.state.assetCatalog.ships).sort(), [
+      "brigantine",
+      "cutter",
+    ]);
+    assert.deepEqual(Object.keys(showcase.state.assetCatalog.environment).sort(), [
+      "harbor-dock",
+      "lighthouse",
+    ]);
 
     animationFrames.shift().callback(16.4);
 
@@ -423,7 +444,7 @@ test("mountGpuShowcase renders live frames, package hooks, and physics telemetry
     harness.listenerRegistry.get("focusMode:change")();
     animationFrames.shift().callback(66.8);
     assert.match(harness.elements["#demoStatus"].textContent, /3D scene live/);
-    assert.match(harness.elements["#demoDetails"].textContent, /Moonlit GLTF ships collide/);
+    assert.match(harness.elements["#demoDetails"].textContent, /Moonlit GLTF ships now mix a brigantine and a cutter/);
 
     harness.elements["#focusMode"].value = "physics";
     harness.listenerRegistry.get("focusMode:change")();
@@ -451,6 +472,61 @@ test("mountGpuShowcase renders live frames, package hooks, and physics telemetry
     globalThis.fetch = originalFetch;
     globalThis.requestAnimationFrame = originalRequestAnimationFrame;
     globalThis.cancelAnimationFrame = originalCancelAnimationFrame;
+  }
+});
+
+test("mountGpuShowcase supports fullscreen capture mode with a bounded 1080p canvas", async () => {
+  const originalDocument = globalThis.document;
+  const originalWindow = globalThis.window;
+  const originalFetch = globalThis.fetch;
+  const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
+  const originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
+  const originalDevicePixelRatio = globalThis.devicePixelRatio;
+  const { document } = createTriangleGltfDocument();
+  const harness = createSceneHarness({
+    displaySize: { width: 1920, height: 1080 },
+    search: "?capture=1&renderScale=2",
+  });
+  const animationFrames = [];
+
+  globalThis.document = harness.documentStub;
+  globalThis.window = harness.windowStub;
+  globalThis.devicePixelRatio = 2;
+  globalThis.fetch = async () => ({
+    ok: true,
+    async json() {
+      return document;
+    },
+  });
+  globalThis.requestAnimationFrame = (callback) => {
+    animationFrames.push(callback);
+    return animationFrames.length;
+  };
+  globalThis.cancelAnimationFrame = () => undefined;
+
+  try {
+    const showcase = await mountGpuShowcase({ root: harness.root });
+
+    assert.equal(showcase.state.captureMode, true);
+    assert.equal(harness.root.classList.contains("plasius-showcase-root--capture"), true);
+    animationFrames.shift()(16.7);
+    assert.equal(harness.elements["#demoCanvas"].width, 1920);
+    assert.equal(harness.elements["#demoCanvas"].height, 1080);
+    assert.equal(showcase.state.renderScale, 1);
+
+    showcase.destroy();
+    assert.equal(harness.root.classList.contains("plasius-showcase-root--capture"), false);
+  } finally {
+    globalThis.document = originalDocument;
+    globalThis.window = originalWindow;
+    globalThis.fetch = originalFetch;
+    globalThis.requestAnimationFrame = originalRequestAnimationFrame;
+    globalThis.cancelAnimationFrame = originalCancelAnimationFrame;
+    if (typeof originalDevicePixelRatio === "undefined") {
+      delete globalThis.devicePixelRatio;
+    } else {
+      globalThis.devicePixelRatio = originalDevicePixelRatio;
+    }
   }
 });
 
@@ -526,7 +602,7 @@ test("loadGltfModel lazily activates the inline showcase fallback for the shared
     assert.equal(fetchCalls[0], "file:///tmp/assets/brigantine.gltf");
     assert.match(fetchCalls[1], /^data:application\/json;base64,/);
     assert.equal(model.name, "brigantine");
-    assert.equal(model.physics.waterline, 0.42);
+    assert.equal(model.physics.waterline, 0.44);
   } finally {
     globalThis.fetch = originalFetch;
   }
