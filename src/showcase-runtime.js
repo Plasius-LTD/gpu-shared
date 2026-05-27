@@ -33,13 +33,14 @@ import {
 import { resolveShowcaseAssetUrl } from "./asset-url.js";
 import { loadGltfModel } from "./gltf-loader.js";
 import { GPU_SHOWCASE_REALISTIC_MODELS_FEATURE } from "./feature-flags.js";
+import {
+  createGpuSharedTranslator,
+  gpuSharedTranslationKeys,
+} from "./i18n.js";
 
 const STYLE_ID = "plasius-shared-3d-showcase-style";
 const ROOT_CLASS = "plasius-showcase-root";
 const CAPTURE_CLASS = "plasius-showcase-root--capture";
-const DEFAULT_TITLE = "Flag by the Sea";
-const DEFAULT_SUBTITLE =
-  "Shared 3D validation scene using GLTF ships, cloth, fluid continuity, adaptive performance, and telemetry.";
 const DEFAULT_CANVAS_WIDTH = 1280;
 const DEFAULT_CANVAS_HEIGHT = 720;
 const CAPTURE_CANVAS_PIXEL_BUDGET = 1920 * 1080;
@@ -61,11 +62,27 @@ const CAMERA_PRESETS = Object.freeze({
 });
 export const showcaseFocusModes = Object.freeze(Object.keys(CAMERA_PRESETS));
 
-const SCENE_NOTES = Object.freeze([
-  "Ships are loaded from a GLTF asset and carry mass, damping, restitution, and hull extents from node extras.",
-  "Moonlight sets the cold ambient read while deck lanterns and harbor torches provide warm local contrast.",
-  "Cloth and fluid continuity stay coherent across near, mid, far, and horizon bands even in the darker night palette.",
-  "Performance pressure reduces visual detail before mass-weighted authoritative collision motion is touched.",
+const FOCUS_MODE_TRANSLATION_KEYS = Object.freeze({
+  integrated: gpuSharedTranslationKeys.focusIntegrated,
+  lighting: gpuSharedTranslationKeys.focusLighting,
+  cloth: gpuSharedTranslationKeys.focusCloth,
+  fluid: gpuSharedTranslationKeys.focusFluid,
+  physics: gpuSharedTranslationKeys.focusPhysics,
+  performance: gpuSharedTranslationKeys.focusPerformance,
+  debug: gpuSharedTranslationKeys.focusDebug,
+});
+
+const SCENE_NOTE_KEYS = Object.freeze([
+  gpuSharedTranslationKeys.noteAssetLoading,
+  gpuSharedTranslationKeys.noteMoonlight,
+  gpuSharedTranslationKeys.noteContinuity,
+  gpuSharedTranslationKeys.notePerformance,
+]);
+
+const PHYSICS_SCENE_NOTE_KEYS = Object.freeze([
+  gpuSharedTranslationKeys.notePhysicsSnapshots,
+  gpuSharedTranslationKeys.notePhysicsCollisions,
+  gpuSharedTranslationKeys.notePhysicsLighting,
 ]);
 
 const LEGACY_HARBOR_LAYOUT = Object.freeze([
@@ -879,6 +896,7 @@ function createPerformanceGovernor() {
 }
 
 function buildDemoDom(root, options) {
+  const t = options.translate;
   root.innerHTML = `
     <main class="plasius-demo">
       <section class="plasius-demo__hero">
@@ -888,9 +906,9 @@ function buildDemoDom(root, options) {
           <p class="plasius-demo__lead">${options.subtitle}</p>
         </section>
         <section class="plasius-panel plasius-demo__status">
-          <p id="demoStatus" class="plasius-demo__status-badge">Booting 3D scene…</p>
+          <p id="demoStatus" class="plasius-demo__status-badge">${t(gpuSharedTranslationKeys.statusBooting)}</p>
           <p id="demoDetails" class="plasius-demo__status-text">
-            Preparing a moonlit harbor scene, GLTF hull data, cloth and fluid continuity plans, and adaptive quality metadata.
+            ${t(gpuSharedTranslationKeys.detailsBooting)}
           </p>
         </section>
       </section>
@@ -898,46 +916,45 @@ function buildDemoDom(root, options) {
         <section class="plasius-panel plasius-demo__canvas-panel">
           <canvas id="demoCanvas" class="plasius-demo__canvas" width="${DEFAULT_CANVAS_WIDTH}" height="${DEFAULT_CANVAS_HEIGHT}"></canvas>
           <div class="plasius-demo__toolbar">
-            <button id="pauseButton" type="button">Pause</button>
+            <button id="pauseButton" type="button">${t(gpuSharedTranslationKeys.pause)}</button>
             <label class="plasius-toggle">
               <input id="stressToggle" type="checkbox" />
-              Stress mode
+              ${t(gpuSharedTranslationKeys.stressMode)}
             </label>
             <label class="plasius-toggle">
-              Focus
+              ${t(gpuSharedTranslationKeys.focus)}
               <select id="focusMode">
-                <option value="integrated">integrated</option>
-                <option value="lighting">lighting</option>
-                <option value="cloth">cloth</option>
-                <option value="fluid">fluid</option>
-                <option value="physics">physics</option>
-                <option value="performance">performance</option>
-                <option value="debug">debug</option>
+                ${showcaseFocusModes
+                  .map(
+                    (mode) =>
+                      `<option value="${mode}">${t(FOCUS_MODE_TRANSLATION_KEYS[mode])}</option>`
+                  )
+                  .join("")}
               </select>
             </label>
           </div>
           <div class="plasius-demo__legend">
-            <strong>Scene</strong>
-            GLTF ships carry hull mass and damping metadata.<br />
-            Lanterns and torches warm the moonlit harbor.<br />
-            Mass-aware collisions stay authoritative near the camera.
+            <strong>${t(gpuSharedTranslationKeys.legendTitle)}</strong>
+            ${t(gpuSharedTranslationKeys.legendShipMetadata)}<br />
+            ${t(gpuSharedTranslationKeys.legendLighting)}<br />
+            ${t(gpuSharedTranslationKeys.legendCollisions)}
           </div>
         </section>
         <aside class="plasius-demo__sidebar">
           <section class="plasius-panel plasius-demo__card">
-            <h2>Scene State</h2>
+            <h2>${t(gpuSharedTranslationKeys.sceneState)}</h2>
             <ul id="sceneMetrics" class="plasius-demo__metrics"></ul>
           </section>
           <section class="plasius-panel plasius-demo__card">
-            <h2>Quality + Budgets</h2>
+            <h2>${t(gpuSharedTranslationKeys.qualityBudgets)}</h2>
             <ul id="qualityMetrics" class="plasius-demo__metrics"></ul>
           </section>
           <section class="plasius-panel plasius-demo__card">
-            <h2>Debug Telemetry</h2>
+            <h2>${t(gpuSharedTranslationKeys.debugTelemetry)}</h2>
             <ul id="debugMetrics" class="plasius-demo__metrics"></ul>
           </section>
           <section class="plasius-panel plasius-demo__card">
-            <h2>Notes</h2>
+            <h2>${t(gpuSharedTranslationKeys.notes)}</h2>
             <ul id="sceneNotes" class="plasius-demo__metrics"></ul>
           </section>
         </aside>
@@ -1785,6 +1802,7 @@ function buildWaterBands(state, fluidDetail, visuals) {
 }
 
 function createSceneState(options) {
+  const translate = options.translate;
   const { governor, fluidDetail, clothDetail, lightingDetail } = createPerformanceGovernor();
   const physicsProfile = defaultPhysicsWorkerProfile;
   const physicsPlan = createPhysicsSimulationPlan(physicsProfile);
@@ -1792,7 +1810,7 @@ function createSceneState(options) {
   const debugSession = createGpuDebugSession({
     enabled: true,
     adapter: {
-      label: "3D showcase",
+      label: translate(gpuSharedTranslationKeys.debugAdapterShowcase),
       memoryCapacityHintBytes: 6 * 1024 * 1024 * 1024,
       coreCountHint: 12,
     },
@@ -1802,17 +1820,18 @@ function createSceneState(options) {
     owner: "renderer",
     category: "texture",
     sizeBytes: 1280 * 720 * 4,
-    label: "Main color buffer",
+    label: translate(gpuSharedTranslationKeys.debugMainColorBuffer),
   });
   debugSession.trackAllocation({
     id: "showcase.shadow-impression",
     owner: "lighting",
     category: "texture",
     sizeBytes: 12 * 1024 * 1024,
-    label: "Shadow impression atlas",
+    label: translate(gpuSharedTranslationKeys.debugShadowImpressionAtlas),
   });
 
   return {
+    translate,
     focus: options.focus,
     governor,
     fluidDetail,
@@ -3227,12 +3246,8 @@ function renderScene(ctx, canvas, state, shipModel, dom) {
   ];
   const sceneNotes =
     state.focus === "physics"
-      ? [
-          "Stable world snapshots are taken after the authoritative rigid-body commit and before visual follow-up work.",
-          "The ships collide with mass-weighted impulses and positional correction, so the heavier hull keeps more of its line.",
-          "Moonlight keeps the overall read legible while lanterns and torches make collision moments easy to track against the water.",
-        ]
-        : SCENE_NOTES;
+      ? PHYSICS_SCENE_NOTE_KEYS.map((key) => state.translate(key))
+      : SCENE_NOTE_KEYS.map((key) => state.translate(key));
   const custom = state.demoDescription ?? null;
 
   setListContent(
@@ -3252,15 +3267,23 @@ function renderScene(ctx, canvas, state, shipModel, dom) {
   dom.status.textContent =
     typeof custom?.status === "string"
       ? custom.status
-      : `3D scene live · ${state.lastDecision.metrics.fps.toFixed(1)} FPS`;
+      : state.translate(gpuSharedTranslationKeys.statusLive, {
+          fps: state.lastDecision.metrics.fps.toFixed(1),
+        });
   dom.details.textContent =
     typeof custom?.details === "string"
       ? custom.details
       : state.focus === "physics"
-        ? `Stable world snapshots are emitted from ${state.physics.plan.snapshotStageId} after the authoritative solver; the heavier hull now carries momentum through mass-aware collision impulses while cloth and fluid remain downstream.`
+        ? state.translate(gpuSharedTranslationKeys.detailsPhysics, {
+            snapshotStageId: state.physics.plan.snapshotStageId,
+          })
         : state.showcaseRealisticModelsEnabled
-          ? `Moonlit GLTF ships now mix a brigantine and a cutter against modeled harbor assets; cloth, fluid, and ship-local lighting stay continuous while the governor pressure is ${state.lastDecision.pressureLevel}.`
-          : `Moonlit GLTF ships use the legacy brigantine and placeholder harbor blocks while cloth, fluid, and ship-local lighting stay continuous while the governor pressure is ${state.lastDecision.pressureLevel}.`;
+          ? state.translate(gpuSharedTranslationKeys.detailsRealistic, {
+              pressureLevel: state.lastDecision.pressureLevel,
+            })
+          : state.translate(gpuSharedTranslationKeys.detailsLegacy, {
+              pressureLevel: state.lastDecision.pressureLevel,
+            });
 }
 
 function updateSceneState(state, dt, shipModel) {
@@ -3339,14 +3362,17 @@ export async function mountGpuShowcase(options = {}, featureFlags = null) {
   const previousRenderGameToText = window.render_game_to_text;
   const previousAdvanceTime = window.advanceTime;
   const focus = options.focus ?? new URLSearchParams(window.location.search).get("focus") ?? "integrated";
+  const translate = createGpuSharedTranslator(options.translate);
   const dom = buildDemoDom(root, {
     packageName: options.packageName ?? "@plasius/gpu-demo-viewer",
-    title: options.title ?? DEFAULT_TITLE,
-    subtitle: options.subtitle ?? DEFAULT_SUBTITLE,
+    title: options.title ?? translate(gpuSharedTranslationKeys.showcaseTitle),
+    subtitle: options.subtitle ?? translate(gpuSharedTranslationKeys.showcaseSubtitle),
+    translate,
   });
   dom.focusMode.value = focus;
   const state = createSceneState({
     focus,
+    translate,
     realisticModelsEnabled: isFeatureEnabled(featureFlags, GPU_SHOWCASE_REALISTIC_MODELS_FEATURE, true),
     captureMode: captureSettings.captureMode,
     renderScale: captureSettings.renderScale,
@@ -3400,7 +3426,9 @@ export async function mountGpuShowcase(options = {}, featureFlags = null) {
 
   const handlePauseClick = () => {
     state.paused = !state.paused;
-    dom.pauseButton.textContent = state.paused ? "Resume" : "Pause";
+    dom.pauseButton.textContent = state.paused
+      ? state.translate(gpuSharedTranslationKeys.resume)
+      : state.translate(gpuSharedTranslationKeys.pause);
   };
   const handleStressChange = () => {
     state.stress = dom.stressToggle.checked;

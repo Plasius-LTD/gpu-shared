@@ -57,12 +57,92 @@ export type ShowcaseFocusMode =
   | "performance"
   | "debug";
 
+export type GpuSharedTranslationValue =
+  | string
+  | number
+  | boolean
+  | null
+  | undefined;
+
+export type GpuSharedTranslationArgs = Readonly<
+  Record<string, GpuSharedTranslationValue>
+>;
+
+export interface GpuSharedTranslate {
+  (
+    key: GpuSharedTranslationKey,
+    args?: GpuSharedTranslationArgs
+  ): string | undefined;
+}
+
+export const gpuSharedTranslationKeys: Readonly<{
+  showcaseTitle: "gpuShared.showcase.title";
+  showcaseSubtitle: "gpuShared.showcase.subtitle";
+  statusBooting: "gpuShared.showcase.status.booting";
+  statusLive: "gpuShared.showcase.status.live";
+  detailsBooting: "gpuShared.showcase.details.booting";
+  detailsPhysics: "gpuShared.showcase.details.physics";
+  detailsRealistic: "gpuShared.showcase.details.realistic";
+  detailsLegacy: "gpuShared.showcase.details.legacy";
+  pause: "gpuShared.showcase.action.pause";
+  resume: "gpuShared.showcase.action.resume";
+  stressMode: "gpuShared.showcase.control.stressMode";
+  focus: "gpuShared.showcase.control.focus";
+  focusIntegrated: "gpuShared.showcase.focus.integrated";
+  focusLighting: "gpuShared.showcase.focus.lighting";
+  focusCloth: "gpuShared.showcase.focus.cloth";
+  focusFluid: "gpuShared.showcase.focus.fluid";
+  focusPhysics: "gpuShared.showcase.focus.physics";
+  focusPerformance: "gpuShared.showcase.focus.performance";
+  focusDebug: "gpuShared.showcase.focus.debug";
+  legendTitle: "gpuShared.showcase.legend.title";
+  legendShipMetadata: "gpuShared.showcase.legend.shipMetadata";
+  legendLighting: "gpuShared.showcase.legend.lighting";
+  legendCollisions: "gpuShared.showcase.legend.collisions";
+  sceneState: "gpuShared.showcase.section.sceneState";
+  qualityBudgets: "gpuShared.showcase.section.qualityBudgets";
+  debugTelemetry: "gpuShared.showcase.section.debugTelemetry";
+  notes: "gpuShared.showcase.section.notes";
+  noteAssetLoading: "gpuShared.showcase.note.assetLoading";
+  noteMoonlight: "gpuShared.showcase.note.moonlight";
+  noteContinuity: "gpuShared.showcase.note.continuity";
+  notePerformance: "gpuShared.showcase.note.performance";
+  notePhysicsSnapshots: "gpuShared.showcase.note.physicsSnapshots";
+  notePhysicsCollisions: "gpuShared.showcase.note.physicsCollisions";
+  notePhysicsLighting: "gpuShared.showcase.note.physicsLighting";
+  debugAdapterShowcase: "gpuShared.debug.adapter.showcase";
+  debugMainColorBuffer: "gpuShared.debug.allocation.mainColorBuffer";
+  debugShadowImpressionAtlas: "gpuShared.debug.allocation.shadowImpressionAtlas";
+}>;
+
+export type GpuSharedTranslationKey =
+  (typeof gpuSharedTranslationKeys)[keyof typeof gpuSharedTranslationKeys];
+
+export const gpuSharedEnGbTranslations: Readonly<
+  Record<GpuSharedTranslationKey, string>
+>;
+
+export const gpuSharedTranslations: Readonly<{
+  "en-GB": typeof gpuSharedEnGbTranslations;
+}>;
+
+export function translateGpuSharedText(
+  key: GpuSharedTranslationKey,
+  args?: GpuSharedTranslationArgs,
+  translate?: GpuSharedTranslate
+): string;
+
+export function createGpuSharedTranslator(
+  translate?: GpuSharedTranslate
+): (key: GpuSharedTranslationKey, args?: GpuSharedTranslationArgs) => string;
+
 export interface MountGpuShowcaseOptions {
   root?: HTMLElement;
   focus?: ShowcaseFocusMode | string;
   packageName?: string;
   title?: string;
   subtitle?: string;
+  translate?: GpuSharedTranslate;
   captureMode?: boolean;
   renderScale?: number;
   createState?: () => unknown;

@@ -9,8 +9,12 @@ All notable changes to this project will be documented in this file.
     cutter, lighthouse, and harbor-dock catalog.
   - Fullscreen capture mode for slide-deck screenshots and video recording,
     including scene-only layout and bounded 1080p canvas scaling.
+  - Bundled `en-GB` translation keys and dictionaries for shared showcase labels
+    that can be consumed through `@plasius/translations`.
 
 - **Changed**
+  - Routed showcase chrome and debug allocation labels through package-owned
+    translation keys with an optional consumer translator override.
   - Expanded the shared GLTF loader contract to preserve the legacy flattened
     mesh fields while exposing transformed multi-primitive/material data for the
     realistic showcase scene.

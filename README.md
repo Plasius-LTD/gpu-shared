@@ -50,6 +50,35 @@ const showcase = await mountGpuShowcase({
 showcase.destroy();
 ```
 
+### Showcase Translations
+
+The shared showcase owns its display keys and bundled `en-GB` defaults without
+making the browser runtime React-bound. Consumers that already use
+`@plasius/translations` can register the package dictionary and pass a
+translator into `mountGpuShowcase`:
+
+```js
+import { createI18n } from "@plasius/translations";
+import {
+  gpuSharedTranslationKeys,
+  gpuSharedTranslations,
+  mountGpuShowcase,
+} from "@plasius/gpu-shared";
+
+const i18n = createI18n({
+  language: "en-GB",
+  fallback: "en-GB",
+  translations: gpuSharedTranslations,
+});
+
+await mountGpuShowcase({
+  root: document.getElementById("app"),
+  translate: (key, args) => i18n.t(key, args),
+});
+
+console.log(i18n.t(gpuSharedTranslationKeys.debugMainColorBuffer));
+```
+
 For browser-only demos served without a bundler, keep the import surface on the
 published package name and resolve it with an import map rather than importing a
 viewer-private or workspace-private source file:
