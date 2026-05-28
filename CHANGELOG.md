@@ -24,6 +24,7 @@ All notable changes to this project will be documented in this file.
     and a subtle atmospheric grade for more realistic recorded frames.
 
 - **Fixed**
+  - Restored the package CD workflow so protected `main` releases are prepared by PR and published without direct branch pushes.
   - The shared showcase now propagates the realistic-model feature flag into
     scene state and initializes its DOM scaffold before canvas setup, allowing
     the local realistic asset catalog to mount in browser demos.
