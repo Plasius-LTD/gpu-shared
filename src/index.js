@@ -1,4 +1,11 @@
 export { resolveShowcaseAssetUrl } from "./asset-url.js";
+export {
+  createGpuSharedTranslator,
+  gpuSharedTranslationKeys,
+  gpuSharedTranslations,
+  translateGpuSharedText,
+} from "./i18n.js";
+export { gpuSharedEnGbTranslations } from "./translations/en-GB.js";
 
 export const showcaseFocusModes = Object.freeze([
   "integrated",
