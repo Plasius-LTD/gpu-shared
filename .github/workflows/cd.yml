@@ -19,14 +19,11 @@ on:
         type: string
 
 permissions:
-  actions: read
   contents: write
   id-token: write
   attestations: write
 
 env:
-  FALLBACK_RUNNER_LABEL: ubuntu-latest
-  SELF_HOSTED_RUNNER_LABELS: '["self-hosted","Linux","X64"]'
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 concurrency:
@@ -114,22 +111,6 @@ jobs:
           RELEASE_TAG="v${RELEASE_VERSION}"
           SHOULD_PUSH="false"
 
-          echo "New version: $NEW_VER"
-          git push --follow-tags
-
-          # Expose tag (vX.Y.Z) and version (X.Y.Z) for later steps
-          VER_NO_V=${NEW_VER#v}
-          echo "tag=$NEW_VER" >> "$GITHUB_OUTPUT"
-          echo "version=$VER_NO_V" >> "$GITHUB_OUTPUT"
-
-          NAME=$(node -p "require('./package.json').name")
-          echo "name=$NAME" >> "$GITHUB_OUTPUT"
-          if npm view "$NAME" version >/dev/null 2>&1; then
-            echo "flags=" >> "$GITHUB_OUTPUT"
-          else
-            echo "flags=--access public" >> "$GITHUB_OUTPUT"
-          fi
-          
           if ! git rev-parse "${RELEASE_TAG}" >/dev/null 2>&1; then
             git tag "${RELEASE_TAG}"
             SHOULD_PUSH="true"
@@ -139,15 +120,6 @@ jobs:
             echo "Version already exists on npm: ${PACKAGE_NAME}@${RELEASE_VERSION}" >&2
             exit 1
           fi
-
-      - name: Install deps (CI)
-        run: npm ci
-
-      - name: Test (coverage)
-        run: npm run test:coverage
-
-      - name: Install Codecov CLI
-        run: python3 -m pip install --upgrade codecov-cli
 
           echo "package_name=${PACKAGE_NAME}" >> "$GITHUB_OUTPUT"
           echo "package_access=${PACKAGE_ACCESS}" >> "$GITHUB_OUTPUT"
