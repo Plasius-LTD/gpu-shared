@@ -1,3 +1,5 @@
+import { resolveShowcaseAssetUrl, shouldUseInlineShowcaseFallback } from "./asset-url.js";
+
 function decodeDataUri(uri) {
   const match = /^data:.*?;base64,(.+)$/i.exec(uri);
   if (!match) {
@@ -80,13 +82,83 @@ function readAccessor(document, accessorIndex, buffers) {
   return values;
 }
 
-function getMaterialInfo(document, primitive) {
-  const material = document.materials?.[primitive.material] ?? null;
-  const factor =
-    material?.pbrMetallicRoughness?.baseColorFactor ?? [0.56, 0.33, 0.22, 1];
-  const emissive = material?.emissiveFactor ?? [0, 0, 0];
+function freezeNumericArray(values, fallback) {
+  const source = Array.isArray(values) ? values : fallback;
+  return Object.freeze([...source]);
+}
+
+function resolveRelativeAssetUri(uri, baseUrl) {
+  if (typeof uri !== "string" || uri.length === 0) {
+    return null;
+  }
+  if (uri.startsWith("data:")) {
+    return uri;
+  }
+  return new URL(uri, baseUrl).href;
+}
+
+function getTextureTransform(textureInfo) {
+  const transform = textureInfo?.extensions?.KHR_texture_transform ?? {};
+  return Object.freeze({
+    offset: freezeNumericArray(transform.offset, [0, 0]),
+    scale: freezeNumericArray(transform.scale, [1, 1]),
+    rotation:
+      typeof transform.rotation === "number" && Number.isFinite(transform.rotation)
+        ? transform.rotation
+        : 0,
+    texCoord:
+      typeof transform.texCoord === "number"
+        ? transform.texCoord
+        : typeof textureInfo?.texCoord === "number"
+          ? textureInfo.texCoord
+          : 0,
+  });
+}
+
+function getTextureInfo(document, textureInfo, baseUrl) {
+  if (!textureInfo || typeof textureInfo.index !== "number") {
+    return null;
+  }
+
+  const texture = document.textures?.[textureInfo.index];
+  const image =
+    typeof texture?.source === "number" ? document.images?.[texture.source] : null;
 
   return Object.freeze({
+    index: textureInfo.index,
+    name: texture?.name ?? image?.name ?? `texture-${textureInfo.index}`,
+    texCoord:
+      typeof textureInfo.texCoord === "number" ? textureInfo.texCoord : 0,
+    sampler: typeof texture?.sampler === "number" ? texture.sampler : null,
+    source: typeof texture?.source === "number" ? texture.source : null,
+    uri: resolveRelativeAssetUri(image?.uri, baseUrl),
+    mimeType: image?.mimeType ?? null,
+    bufferView: typeof image?.bufferView === "number" ? image.bufferView : null,
+    transform: getTextureTransform(textureInfo),
+    scale:
+      typeof textureInfo.scale === "number" && Number.isFinite(textureInfo.scale)
+        ? textureInfo.scale
+        : 1,
+    strength:
+      typeof textureInfo.strength === "number" && Number.isFinite(textureInfo.strength)
+        ? textureInfo.strength
+        : 1,
+  });
+}
+
+function getMaterialInfo(document, primitive, baseUrl) {
+  const material = document.materials?.[primitive.material] ?? null;
+  const factor =
+    material?.pbrMetallicRoughness?.baseColorFactor ??
+    (material ? [1, 1, 1, 1] : [0.56, 0.33, 0.22, 1]);
+  const emissive = material?.emissiveFactor ?? [0, 0, 0];
+  const pbr = material?.pbrMetallicRoughness ?? {};
+  const specular = material?.extensions?.KHR_materials_specular ?? {};
+  const transmission = material?.extensions?.KHR_materials_transmission ?? {};
+  const ior = material?.extensions?.KHR_materials_ior ?? {};
+
+  return Object.freeze({
+    index: typeof primitive.material === "number" ? primitive.material : null,
     name: material?.name ?? "default-material",
     color: Object.freeze({
       r: factor[0],
@@ -99,14 +171,44 @@ function getMaterialInfo(document, primitive) {
         ? material.pbrMetallicRoughness.roughnessFactor
         : 0.92,
     metallic:
-      typeof material?.pbrMetallicRoughness?.metallicFactor === "number"
-        ? material.pbrMetallicRoughness.metallicFactor
+      typeof pbr.metallicFactor === "number"
+        ? pbr.metallicFactor
         : 0.08,
+    baseColorFactor: freezeNumericArray(factor, [1, 1, 1, 1]),
     emissive: Object.freeze({
       r: emissive[0] ?? 0,
       g: emissive[1] ?? 0,
       b: emissive[2] ?? 0,
     }),
+    emissiveFactor: freezeNumericArray(emissive, [0, 0, 0]),
+    alphaMode: material?.alphaMode ?? "OPAQUE",
+    alphaCutoff:
+      typeof material?.alphaCutoff === "number" ? material.alphaCutoff : 0.5,
+    doubleSided: material?.doubleSided === true,
+    baseColorTexture: getTextureInfo(document, pbr.baseColorTexture, baseUrl),
+    metallicRoughnessTexture: getTextureInfo(
+      document,
+      pbr.metallicRoughnessTexture,
+      baseUrl
+    ),
+    normalTexture: getTextureInfo(document, material?.normalTexture, baseUrl),
+    occlusionTexture: getTextureInfo(document, material?.occlusionTexture, baseUrl),
+    emissiveTexture: getTextureInfo(document, material?.emissiveTexture, baseUrl),
+    specular: Object.freeze({
+      factor:
+        typeof specular.specularFactor === "number" ? specular.specularFactor : 1,
+      colorFactor: freezeNumericArray(specular.specularColorFactor, [1, 1, 1]),
+      texture: getTextureInfo(document, specular.specularTexture, baseUrl),
+      colorTexture: getTextureInfo(document, specular.specularColorTexture, baseUrl),
+    }),
+    transmission: Object.freeze({
+      factor:
+        typeof transmission.transmissionFactor === "number"
+          ? transmission.transmissionFactor
+          : 0,
+      texture: getTextureInfo(document, transmission.transmissionTexture, baseUrl),
+    }),
+    ior: typeof ior.ior === "number" ? ior.ior : 1.5,
   });
 }
 
@@ -255,7 +357,31 @@ function transformNormal(normal, matrix) {
   return [transformed[0] / length, transformed[1] / length, transformed[2] / length];
 }
 
-function collectScenePrimitives(document, buffers) {
+async function loadGltfDocument(url) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`Failed to load glTF asset: ${response.status} ${response.statusText}`);
+  }
+
+  return {
+    document: await response.json(),
+    baseUrl: resolveFetchBaseUrl(url, response.url),
+  };
+}
+
+async function loadInlineShowcaseDocument() {
+  return loadGltfDocument(resolveShowcaseAssetUrl("brigantine"));
+}
+
+function shouldRetryWithInlineShowcaseFallback(url, error) {
+  if (!shouldUseInlineShowcaseFallback(url)) {
+    return false;
+  }
+
+  return error instanceof TypeError || /^Failed to load glTF asset:/u.test(error.message);
+}
+
+function collectScenePrimitives(document, buffers, baseUrl) {
   const scene = document.scenes?.[document.scene ?? 0];
   if (!scene || !Array.isArray(scene.nodes) || scene.nodes.length === 0) {
     throw new Error("glTF demo asset must expose a default scene with at least one node.");
@@ -298,8 +424,17 @@ function collectScenePrimitives(document, buffers) {
           typeof primitive.attributes.COLOR_0 === "number"
             ? readAccessor(document, primitive.attributes.COLOR_0, buffers)
             : null;
+        const uvs =
+          typeof primitive.attributes.TEXCOORD_0 === "number"
+            ? readAccessor(document, primitive.attributes.TEXCOORD_0, buffers)
+            : null;
+        const tangents =
+          typeof primitive.attributes.TANGENT === "number"
+            ? readAccessor(document, primitive.attributes.TANGENT, buffers)
+            : null;
         const transformedPositions = [];
         const transformedNormals = [];
+        const transformedTangents = [];
 
         for (let index = 0; index < positions.length; index += 3) {
           const point = transformPosition(
@@ -315,19 +450,42 @@ function collectScenePrimitives(document, buffers) {
             );
             transformedNormals.push(normal[0], normal[1], normal[2]);
           }
+          if (tangents) {
+            const tangentOffset = (index / 3) * 4;
+            const tangent = transformNormal(
+              [
+                tangents[tangentOffset],
+                tangents[tangentOffset + 1],
+                tangents[tangentOffset + 2],
+              ],
+              worldMatrix
+            );
+            transformedTangents.push(
+              tangent[0],
+              tangent[1],
+              tangent[2],
+              tangents[tangentOffset + 3] ?? 1
+            );
+          }
         }
 
         const indices =
           typeof primitive.indices === "number"
             ? readAccessor(document, primitive.indices, buffers).map((value) => Number(value))
             : Array.from({ length: transformedPositions.length / 3 }, (_, index) => index);
-        const material = getMaterialInfo(document, primitive);
+        const material = getMaterialInfo(document, primitive, baseUrl);
         const primitiveName =
           `${node.name ?? mesh.name ?? "mesh"}-${primitiveIndex}`;
 
         results.push(
           Object.freeze({
             name: primitiveName,
+            nodeName: node.name ?? null,
+            meshName: mesh.name ?? null,
+            primitiveIndex,
+            materialIndex:
+              typeof primitive.material === "number" ? primitive.material : null,
+            mode: primitive.mode ?? 4,
             positions: Object.freeze(transformedPositions),
             indices: Object.freeze(indices),
             normals:
@@ -335,6 +493,18 @@ function collectScenePrimitives(document, buffers) {
                 ? Object.freeze(transformedNormals)
                 : null,
             colors: colors ? Object.freeze(colors) : null,
+            uvs: uvs ? Object.freeze(uvs) : null,
+            tangents:
+              transformedTangents.length > 0
+                ? Object.freeze(transformedTangents)
+                : null,
+            tangentSpace:
+              uvs && normals
+                ? Object.freeze({
+                    source: tangents ? "asset" : "generated-from-uv-normal-position",
+                    texCoord: 0,
+                  })
+                : null,
             material,
             bounds: computeBounds(transformedPositions),
           })
@@ -365,13 +535,19 @@ function collectScenePrimitives(document, buffers) {
 }
 
 export async function loadGltfModel(url) {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Failed to load glTF asset: ${response.status} ${response.statusText}`);
+  let document;
+  let baseUrl;
+
+  try {
+    ({ document, baseUrl } = await loadGltfDocument(url));
+  } catch (error) {
+    if (!shouldRetryWithInlineShowcaseFallback(url, error)) {
+      throw error;
+    }
+
+    ({ document, baseUrl } = await loadInlineShowcaseDocument());
   }
 
-  const document = await response.json();
-  const baseUrl = resolveFetchBaseUrl(url, response.url);
   const buffers = await Promise.all(
     (document.buffers ?? []).map(async (buffer) => {
       if (typeof buffer.uri !== "string") {
@@ -388,14 +564,18 @@ export async function loadGltfModel(url) {
     })
   );
 
-  const scene = collectScenePrimitives(document, buffers);
+  const scene = collectScenePrimitives(document, buffers, baseUrl);
   const aggregatePositions = [];
   const aggregateIndices = [];
 
   for (const primitive of scene.primitives) {
     const vertexOffset = aggregatePositions.length / 3;
-    aggregatePositions.push(...primitive.positions);
-    aggregateIndices.push(...primitive.indices.map((index) => index + vertexOffset));
+    for (const position of primitive.positions) {
+      aggregatePositions.push(position);
+    }
+    for (const index of primitive.indices) {
+      aggregateIndices.push(index + vertexOffset);
+    }
   }
 
   const color = scene.primitives[0]?.material?.color ?? { r: 0.56, g: 0.33, b: 0.22, a: 1 };
@@ -407,6 +587,9 @@ export async function loadGltfModel(url) {
     bounds: computeBounds(aggregatePositions),
     color: Object.freeze({ ...color }),
     physics: scene.physics,
+    materials: Object.freeze(
+      scene.primitives.map((primitive) => primitive.material)
+    ),
     primitives: Object.freeze(scene.primitives),
   });
 }

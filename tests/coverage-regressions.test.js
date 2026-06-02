@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  GPU_RENDERER_HIT_DRIVEN_PATHTRACE_FEATURE,
   loadGltfModel,
   mountGpuShowcase,
   resolveShowcaseAssetUrl,
@@ -63,11 +64,23 @@ function createCanvasContext() {
     lineTo(...args) {
       push("lineTo", ...args);
     },
+    quadraticCurveTo(...args) {
+      push("quadraticCurveTo", ...args);
+    },
+    bezierCurveTo(...args) {
+      push("bezierCurveTo", ...args);
+    },
     closePath() {
       push("closePath");
     },
     fillRect(...args) {
       push("fillRect", ...args);
+    },
+    rect(...args) {
+      push("rect", ...args);
+    },
+    clip(...args) {
+      push("clip", ...args);
     },
     fill() {
       push("fill");
@@ -93,6 +106,8 @@ function createSceneHarness({
   const listenerRegistry = new Map();
   const removals = [];
   const classNames = new Set();
+  const attributes = new Map();
+  const styleProperties = new Map();
   const styleElements = new Map();
   const ctx = canvasContext ?? createCanvasContext();
 
@@ -136,6 +151,26 @@ function createSceneHarness({
         return classNames.has(name);
       },
     },
+    style: {
+      setProperty(name, value) {
+        styleProperties.set(name, value);
+      },
+      getPropertyValue(name) {
+        return styleProperties.get(name) ?? "";
+      },
+      removeProperty(name) {
+        styleProperties.delete(name);
+      },
+    },
+    setAttribute(name, value) {
+      attributes.set(name, String(value));
+    },
+    getAttribute(name) {
+      return attributes.get(name) ?? null;
+    },
+    removeAttribute(name) {
+      attributes.delete(name);
+    },
     querySelector(selector) {
       return elements[selector] ?? null;
     },
@@ -167,6 +202,8 @@ function createSceneHarness({
     ctx,
     elements,
     root,
+    attributes,
+    styleProperties,
     removals,
     listenerRegistry,
     styleElements,
@@ -356,6 +393,7 @@ test("mountGpuShowcase renders live frames, package hooks, and physics telemetry
     });
 
     assert.equal(showcase.state.focus, "physics");
+    assert.equal(showcase.state.hitDrivenPathtraceEnabled, true);
     assert.equal(harness.root.classList.contains("plasius-showcase-root"), true);
     assert.ok(harness.styleElements.has("plasius-shared-3d-showcase-style"));
     assert.equal(animationFrames.length, 1);
@@ -381,8 +419,8 @@ test("mountGpuShowcase renders live frames, package hooks, and physics telemetry
     assert.deepEqual(showcase.state.demoVisuals.waveDirection, { x: 1, z: 0.25 });
     assert.deepEqual(showcase.state.demoVisuals.waterNear, {
       r: 0.12,
-      g: 0.23,
-      b: 0.33,
+      g: 0.19,
+      b: 0.27,
     });
 
     showcase.state.ships[0].position.x = 13.5;
@@ -436,6 +474,7 @@ test("mountGpuShowcase renders live frames, package hooks, and physics telemetry
     globalThis.window.advanceTime(100);
     const textState = JSON.parse(globalThis.window.render_game_to_text());
     assert.equal(textState.focus, "lighting");
+    assert.equal(textState.hitDrivenPathtraceEnabled, true);
     assert.ok(textState.physics.snapshot);
     assert.equal(textState.package.packageUpdates >= 1, true);
 
@@ -444,7 +483,10 @@ test("mountGpuShowcase renders live frames, package hooks, and physics telemetry
     harness.listenerRegistry.get("focusMode:change")();
     animationFrames.shift().callback(66.8);
     assert.match(harness.elements["#demoStatus"].textContent, /3D scene live/);
-    assert.match(harness.elements["#demoDetails"].textContent, /Moonlit GLTF ships now mix a brigantine and a cutter/);
+    assert.match(
+      harness.elements["#demoDetails"].textContent,
+      /GLTF ships now mix a brigantine and a cutter/
+    );
 
     harness.elements["#focusMode"].value = "physics";
     harness.listenerRegistry.get("focusMode:change")();
@@ -475,7 +517,53 @@ test("mountGpuShowcase renders live frames, package hooks, and physics telemetry
   }
 });
 
-test("mountGpuShowcase supports fullscreen capture mode with a bounded 1080p canvas", async () => {
+test("mountGpuShowcase honors the hit-driven path-trace feature flag", async () => {
+  const originalDocument = globalThis.document;
+  const originalWindow = globalThis.window;
+  const originalFetch = globalThis.fetch;
+  const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
+  const originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
+  const { document } = createTriangleGltfDocument();
+  const harness = createSceneHarness({
+    search: `?${GPU_RENDERER_HIT_DRIVEN_PATHTRACE_FEATURE}=0`,
+  });
+  const animationFrames = [];
+
+  globalThis.document = harness.documentStub;
+  globalThis.window = harness.windowStub;
+  globalThis.fetch = async () => ({
+    ok: true,
+    async json() {
+      return document;
+    },
+  });
+  globalThis.requestAnimationFrame = (callback) => {
+    animationFrames.push(callback);
+    return animationFrames.length;
+  };
+  globalThis.cancelAnimationFrame = () => undefined;
+
+  try {
+    const showcase = await mountGpuShowcase({ root: harness.root });
+
+    assert.equal(showcase.state.hitDrivenPathtraceEnabled, false);
+    assert.equal(animationFrames.length, 1);
+    animationFrames.shift()(16.7);
+
+    const textState = JSON.parse(globalThis.window.render_game_to_text());
+    assert.equal(textState.hitDrivenPathtraceEnabled, false);
+
+    showcase.destroy();
+  } finally {
+    globalThis.document = originalDocument;
+    globalThis.window = originalWindow;
+    globalThis.fetch = originalFetch;
+    globalThis.requestAnimationFrame = originalRequestAnimationFrame;
+    globalThis.cancelAnimationFrame = originalCancelAnimationFrame;
+  }
+});
+
+test("mountGpuShowcase pins fullscreen capture mode to fixed maximum quality", async () => {
   const originalDocument = globalThis.document;
   const originalWindow = globalThis.window;
   const originalFetch = globalThis.fetch;
@@ -485,7 +573,7 @@ test("mountGpuShowcase supports fullscreen capture mode with a bounded 1080p can
   const { document } = createTriangleGltfDocument();
   const harness = createSceneHarness({
     displaySize: { width: 1920, height: 1080 },
-    search: "?capture=1&renderScale=2",
+    search: "?capture=1&renderScale=1",
   });
   const animationFrames = [];
 
@@ -508,14 +596,284 @@ test("mountGpuShowcase supports fullscreen capture mode with a bounded 1080p can
     const showcase = await mountGpuShowcase({ root: harness.root });
 
     assert.equal(showcase.state.captureMode, true);
+    assert.equal(showcase.state.performanceMode, "max");
+    assert.equal(showcase.state.adaptivePerformance, false);
+    assert.equal(showcase.state.fluidDetail.getSnapshot().currentLevel.id, "ultra");
+    assert.equal(showcase.state.clothDetail.getSnapshot().currentLevel.id, "ultra");
+    assert.equal(showcase.state.lightingDetail.getSnapshot().currentLevel.id, "ultra");
+    assert.equal(showcase.state.lastDecision.mode, "fixed-max");
     assert.equal(harness.root.classList.contains("plasius-showcase-root--capture"), true);
+    animationFrames.shift()(16.7);
+    globalThis.window.advanceTime(250);
+    assert.equal(showcase.state.fluidDetail.getSnapshot().currentLevel.id, "ultra");
+    assert.equal(showcase.state.clothDetail.getSnapshot().currentLevel.id, "ultra");
+    assert.equal(showcase.state.lightingDetail.getSnapshot().currentLevel.id, "ultra");
+    assert.equal(harness.elements["#demoCanvas"].width, 1280);
+    assert.equal(harness.elements["#demoCanvas"].height, 720);
+    assert.ok(Math.abs(showcase.state.renderScale - 2 / 3) < 0.001);
+
+    showcase.destroy();
+    assert.equal(harness.root.classList.contains("plasius-showcase-root--capture"), false);
+  } finally {
+    globalThis.document = originalDocument;
+    globalThis.window = originalWindow;
+    globalThis.fetch = originalFetch;
+    globalThis.requestAnimationFrame = originalRequestAnimationFrame;
+    globalThis.cancelAnimationFrame = originalCancelAnimationFrame;
+    if (typeof originalDevicePixelRatio === "undefined") {
+      delete globalThis.devicePixelRatio;
+    } else {
+      globalThis.devicePixelRatio = originalDevicePixelRatio;
+    }
+  }
+});
+
+test("mountGpuShowcase honors resolution=720p for deterministic capture framing", async () => {
+  const originalDocument = globalThis.document;
+  const originalWindow = globalThis.window;
+  const originalFetch = globalThis.fetch;
+  const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
+  const originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
+  const originalDevicePixelRatio = globalThis.devicePixelRatio;
+  const { document } = createTriangleGltfDocument();
+  const harness = createSceneHarness({
+    displaySize: { width: 2560, height: 1440 },
+    search: "?capture=1&quality=ultra&resolution=720p&renderScale=2",
+  });
+  const animationFrames = [];
+
+  globalThis.document = harness.documentStub;
+  globalThis.window = harness.windowStub;
+  globalThis.devicePixelRatio = 2;
+  globalThis.fetch = async () => ({
+    ok: true,
+    async json() {
+      return document;
+    },
+  });
+  globalThis.requestAnimationFrame = (callback) => {
+    animationFrames.push(callback);
+    return animationFrames.length;
+  };
+  globalThis.cancelAnimationFrame = () => undefined;
+
+  try {
+    const showcase = await mountGpuShowcase({ root: harness.root });
+
+    assert.equal(showcase.state.captureMode, true);
+    assert.deepEqual(showcase.state.captureResolution, {
+      label: "720p",
+      width: 1280,
+      height: 720,
+    });
+    assert.equal(harness.root.getAttribute("data-plasius-capture-resolution"), "720p");
+    assert.equal(harness.root.style.getPropertyValue("--plasius-capture-width"), "1280px");
+    assert.equal(harness.root.style.getPropertyValue("--plasius-capture-height"), "720px");
+    assert.equal(
+      harness.root.style.getPropertyValue("--plasius-capture-aspect"),
+      String(1280 / 720)
+    );
+    animationFrames.shift()(16.7);
+    assert.equal(harness.elements["#demoCanvas"].width, 1280);
+    assert.equal(harness.elements["#demoCanvas"].height, 720);
+
+    showcase.destroy();
+    assert.equal(harness.root.getAttribute("data-plasius-capture-resolution"), null);
+    assert.equal(harness.root.style.getPropertyValue("--plasius-capture-width"), "");
+    assert.equal(harness.root.style.getPropertyValue("--plasius-capture-height"), "");
+    assert.equal(harness.root.style.getPropertyValue("--plasius-capture-aspect"), "");
+  } finally {
+    globalThis.document = originalDocument;
+    globalThis.window = originalWindow;
+    globalThis.fetch = originalFetch;
+    globalThis.requestAnimationFrame = originalRequestAnimationFrame;
+    globalThis.cancelAnimationFrame = originalCancelAnimationFrame;
+    if (typeof originalDevicePixelRatio === "undefined") {
+      delete globalThis.devicePixelRatio;
+    } else {
+      globalThis.devicePixelRatio = originalDevicePixelRatio;
+    }
+  }
+});
+
+test("mountGpuShowcase exposes deterministic frame export capture hook", async () => {
+  const originalDocument = globalThis.document;
+  const originalWindow = globalThis.window;
+  const originalFetch = globalThis.fetch;
+  const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
+  const originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
+  const originalDevicePixelRatio = globalThis.devicePixelRatio;
+  const { document } = createTriangleGltfDocument();
+  const previousCaptureFrame = () => "previous-capture";
+  const harness = createSceneHarness({
+    displaySize: { width: 2560, height: 1440 },
+    search: "?capture=1&quality=ultra&resolution=720p&timeOfDay=cycle&frameExport=1&renderScale=2",
+  });
+  const animationFrames = [];
+  const cancelledFrames = [];
+
+  harness.windowStub.__plasiusCaptureFrame = previousCaptureFrame;
+  globalThis.document = harness.documentStub;
+  globalThis.window = harness.windowStub;
+  globalThis.devicePixelRatio = 2;
+  globalThis.fetch = async () => ({
+    ok: true,
+    async json() {
+      return document;
+    },
+  });
+  globalThis.requestAnimationFrame = (callback) => {
+    animationFrames.push(callback);
+    return animationFrames.length;
+  };
+  globalThis.cancelAnimationFrame = (id) => {
+    cancelledFrames.push(id);
+  };
+
+  try {
+    const showcase = await mountGpuShowcase({ root: harness.root });
+
+    assert.equal(showcase.state.captureMode, true);
+    assert.equal(showcase.state.frameExport, true);
+    assert.equal(typeof globalThis.window.__plasiusCaptureFrame, "function");
+    assert.equal(animationFrames.length, 1);
+
+    animationFrames.shift()(16.7);
+    assert.equal(showcase.state.frame, 0);
+    assert.equal(harness.elements["#demoCanvas"].width, 1280);
+    assert.equal(harness.elements["#demoCanvas"].height, 720);
+
+    const firstFrame = globalThis.window.__plasiusCaptureFrame({
+      stepMs: 1000 / 60,
+    });
+    assert.equal(firstFrame.frame, 1);
+    assert.equal(firstFrame.width, 1280);
+    assert.equal(firstFrame.height, 720);
+    assert.equal(firstFrame.performanceMode, "max");
+    assert.equal(firstFrame.timeOfDayMode, "cycle");
+    assert.equal(firstFrame.hitDrivenPathtraceEnabled, true);
+    assert.ok(Math.abs(firstFrame.time - 0.0167) < 0.0002);
+
+    const stillFrame = globalThis.window.__plasiusCaptureFrame({ stepMs: 0 });
+    assert.equal(stillFrame.frame, 1);
+    assert.equal(stillFrame.time, firstFrame.time);
+
+    showcase.destroy();
+    assert.equal(globalThis.window.__plasiusCaptureFrame, previousCaptureFrame);
+    assert.deepEqual(cancelledFrames, [1]);
+  } finally {
+    globalThis.document = originalDocument;
+    globalThis.window = originalWindow;
+    globalThis.fetch = originalFetch;
+    globalThis.requestAnimationFrame = originalRequestAnimationFrame;
+    globalThis.cancelAnimationFrame = originalCancelAnimationFrame;
+    if (typeof originalDevicePixelRatio === "undefined") {
+      delete globalThis.devicePixelRatio;
+    } else {
+      globalThis.devicePixelRatio = originalDevicePixelRatio;
+    }
+  }
+});
+
+test("mountGpuShowcase honors explicit adaptive performance for capture fallback", async () => {
+  const originalDocument = globalThis.document;
+  const originalWindow = globalThis.window;
+  const originalFetch = globalThis.fetch;
+  const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
+  const originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
+  const originalDevicePixelRatio = globalThis.devicePixelRatio;
+  const { document } = createTriangleGltfDocument();
+  const harness = createSceneHarness({
+    displaySize: { width: 1920, height: 1080 },
+    search: "?capture=1&quality=adaptive&renderScale=1",
+  });
+  const animationFrames = [];
+
+  globalThis.document = harness.documentStub;
+  globalThis.window = harness.windowStub;
+  globalThis.devicePixelRatio = 2;
+  globalThis.fetch = async () => ({
+    ok: true,
+    async json() {
+      return document;
+    },
+  });
+  globalThis.requestAnimationFrame = (callback) => {
+    animationFrames.push(callback);
+    return animationFrames.length;
+  };
+  globalThis.cancelAnimationFrame = () => undefined;
+
+  try {
+    const showcase = await mountGpuShowcase({ root: harness.root });
+
+    assert.equal(showcase.state.captureMode, true);
+    assert.equal(showcase.state.performanceMode, "adaptive");
+    assert.equal(showcase.state.adaptivePerformance, true);
+    assert.equal(showcase.state.fluidDetail.getSnapshot().currentLevel.id, "high");
     animationFrames.shift()(16.7);
     assert.equal(harness.elements["#demoCanvas"].width, 1920);
     assert.equal(harness.elements["#demoCanvas"].height, 1080);
     assert.equal(showcase.state.renderScale, 1);
 
     showcase.destroy();
-    assert.equal(harness.root.classList.contains("plasius-showcase-root--capture"), false);
+  } finally {
+    globalThis.document = originalDocument;
+    globalThis.window = originalWindow;
+    globalThis.fetch = originalFetch;
+    globalThis.requestAnimationFrame = originalRequestAnimationFrame;
+    globalThis.cancelAnimationFrame = originalCancelAnimationFrame;
+    if (typeof originalDevicePixelRatio === "undefined") {
+      delete globalThis.devicePixelRatio;
+    } else {
+      globalThis.devicePixelRatio = originalDevicePixelRatio;
+    }
+  }
+});
+
+test("mountGpuShowcase honors quality=ultra outside capture mode", async () => {
+  const originalDocument = globalThis.document;
+  const originalWindow = globalThis.window;
+  const originalFetch = globalThis.fetch;
+  const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
+  const originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
+  const originalDevicePixelRatio = globalThis.devicePixelRatio;
+  const { document } = createTriangleGltfDocument();
+  const harness = createSceneHarness({
+    displaySize: { width: 1280, height: 720 },
+    search: "?quality=ultra&renderScale=2",
+  });
+  const animationFrames = [];
+
+  globalThis.document = harness.documentStub;
+  globalThis.window = harness.windowStub;
+  globalThis.devicePixelRatio = 1;
+  globalThis.fetch = async () => ({
+    ok: true,
+    async json() {
+      return document;
+    },
+  });
+  globalThis.requestAnimationFrame = (callback) => {
+    animationFrames.push(callback);
+    return animationFrames.length;
+  };
+  globalThis.cancelAnimationFrame = () => undefined;
+
+  try {
+    const showcase = await mountGpuShowcase({ root: harness.root });
+
+    assert.equal(showcase.state.captureMode, false);
+    assert.equal(showcase.state.performanceMode, "max");
+    assert.equal(showcase.state.adaptivePerformance, false);
+    assert.equal(showcase.state.fluidDetail.getSnapshot().currentLevel.id, "ultra");
+    assert.equal(showcase.state.clothDetail.getSnapshot().currentLevel.id, "ultra");
+    assert.equal(showcase.state.lightingDetail.getSnapshot().currentLevel.id, "ultra");
+    animationFrames.shift()(16.7);
+    assert.equal(harness.elements["#demoCanvas"].width, 1280);
+    assert.equal(harness.elements["#demoCanvas"].height, 720);
+
+    showcase.destroy();
   } finally {
     globalThis.document = originalDocument;
     globalThis.window = originalWindow;

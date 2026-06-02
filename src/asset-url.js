@@ -1,5 +1,7 @@
 import { INLINE_SHOWCASE_ASSET_URLS } from "./showcase-inline-assets.js";
 
+const showcaseAssetUrlMarker = Symbol.for("@plasius/gpu-shared.showcaseAssetUrl");
+
 const SHOWCASE_ASSET_FILES = Object.freeze({
   brigantine: "brigantine.gltf",
   cutter: "cutter.gltf",
@@ -10,6 +12,17 @@ const SHOWCASE_ASSET_FILES = Object.freeze({
 function createInlineShowcaseAssetUrl(assetName) {
   const inlineUrl = INLINE_SHOWCASE_ASSET_URLS[assetName];
   return inlineUrl ? new URL(inlineUrl) : null;
+}
+
+function markShowcaseAssetUrl(url) {
+  Object.defineProperty(url, showcaseAssetUrlMarker, {
+    configurable: false,
+    enumerable: false,
+    value: true,
+    writable: false,
+  });
+
+  return url;
 }
 
 function getBrowserBaseUrl() {
@@ -54,33 +67,44 @@ function parseResolveArgs(baseUrlOrAssetName, assetName) {
   };
 }
 
+export function shouldUseInlineShowcaseFallback(url) {
+  if (url && typeof url === "object" && url[showcaseAssetUrlMarker] === true) {
+    return true;
+  }
+
+  const href = url instanceof URL ? url.href : String(url ?? "");
+  return href.includes("/assets/brigantine.gltf");
+}
+
 export function resolveShowcaseAssetUrl(baseUrlOrAssetName, assetName) {
   const resolved = parseResolveArgs(baseUrlOrAssetName, assetName);
   const fileName = SHOWCASE_ASSET_FILES[resolved.assetName];
 
   try {
-    return new URL(`../assets/${fileName}`, resolved.baseUrl);
+    return markShowcaseAssetUrl(new URL(`../assets/${fileName}`, resolved.baseUrl));
   } catch {
     const browserBaseUrl = getBrowserBaseUrl();
     if (browserBaseUrl) {
       try {
         const normalizedBaseUrl = new URL(resolved.baseUrl, browserBaseUrl);
-        return new URL(`../assets/${fileName}`, normalizedBaseUrl);
+        return markShowcaseAssetUrl(
+          new URL(`../assets/${fileName}`, normalizedBaseUrl)
+        );
       } catch {
         const inlineAsset = createInlineShowcaseAssetUrl(resolved.assetName);
         if (inlineAsset) {
-          return inlineAsset;
+          return markShowcaseAssetUrl(inlineAsset);
         }
       }
     }
 
     const inlineAsset = createInlineShowcaseAssetUrl(resolved.assetName);
     if (inlineAsset) {
-      return inlineAsset;
+      return markShowcaseAssetUrl(inlineAsset);
     }
 
     try {
-      return new URL(`../assets/${fileName}`, import.meta.url);
+      return markShowcaseAssetUrl(new URL(`../assets/${fileName}`, "file:///"));
     } catch {
       throw new Error(`Unable to resolve showcase asset URL for ${resolved.assetName}.`);
     }

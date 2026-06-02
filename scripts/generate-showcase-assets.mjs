@@ -363,15 +363,15 @@ function addHull(builder, deckBuilder, stations) {
 
     deckBuilder.addQuad(
       current.deckCenter,
-      current.railStarboard,
+      next.deckCenter,
       next.railStarboard,
-      next.deckCenter
+      current.railStarboard
     );
     deckBuilder.addQuad(
       current.railPort,
-      current.deckCenter,
+      next.railPort,
       next.deckCenter,
-      next.railPort
+      current.deckCenter
     );
   }
 
