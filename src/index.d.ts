@@ -48,6 +48,8 @@ export type ShowcaseAssetName =
   | "lighthouse"
   | "harbor-dock";
 
+export type ShowcaseDemoMode = "harbor" | "product-studio";
+
 export type ShowcaseFocusMode =
   | "integrated"
   | "lighting"
@@ -139,9 +141,15 @@ export function createGpuSharedTranslator(
 export interface MountGpuShowcaseOptions {
   root?: HTMLElement;
   focus?: ShowcaseFocusMode | string;
+  mode?: ShowcaseDemoMode | "product" | "studio" | "eames" | string;
+  demoMode?: ShowcaseDemoMode | "product" | "studio" | "eames" | string;
+  productAssetUrl?: string | URL;
   packageName?: string;
   title?: string;
   subtitle?: string;
+  width?: number;
+  height?: number;
+  maxDepth?: number;
   translate?: GpuSharedTranslate;
   captureMode?: boolean;
   renderScale?: number;
@@ -158,7 +166,18 @@ export interface MountGpuShowcaseResult {
   destroy(): void;
 }
 
+export interface MountGpuProductStudioResult {
+  readonly state: Record<string, unknown>;
+  readonly productModel: GltfModel;
+  readonly canvas: HTMLCanvasElement;
+  readonly renderer?: unknown;
+  destroy(): void;
+}
+
 export const showcaseFocusModes: readonly ShowcaseFocusMode[];
+export const showcaseDemoModes: readonly ShowcaseDemoMode[];
+export const GPU_SHOWCASE_REALISTIC_MODELS_FEATURE: "gpu_showcase_realistic_models_v1";
+export const GPU_SHOWCASE_PRODUCT_STUDIO_FEATURE: "gpu_showcase_product_studio_v1";
 
 export function resolveShowcaseAssetUrl(
   baseUrlOrAssetName?: string | URL | ShowcaseAssetName,
@@ -169,4 +188,8 @@ export function loadGltfModel(url: string | URL): Promise<GltfModel>;
 
 export function mountGpuShowcase(
   options?: MountGpuShowcaseOptions
-): Promise<MountGpuShowcaseResult>;
+): Promise<MountGpuShowcaseResult | MountGpuProductStudioResult>;
+
+export function mountGpuProductStudio(
+  options?: MountGpuShowcaseOptions
+): Promise<MountGpuProductStudioResult>;
