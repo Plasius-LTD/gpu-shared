@@ -7,19 +7,24 @@ import {
   gpuSharedEnGbTranslations,
   gpuSharedTranslationKeys,
   gpuSharedTranslations,
+  GPU_SHOWCASE_PRODUCT_STUDIO_FEATURE,
   loadGltfModel,
+  mountGpuProductStudio,
   mountGpuShowcase,
   resolveShowcaseAssetUrl,
+  showcaseDemoModes,
   showcaseFocusModes,
   translateGpuSharedText,
 } from "../src/index.js";
 
 test("public API exports the shared showcase entrypoints", () => {
   assert.equal(typeof mountGpuShowcase, "function");
+  assert.equal(typeof mountGpuProductStudio, "function");
   assert.equal(typeof loadGltfModel, "function");
   assert.equal(typeof resolveShowcaseAssetUrl, "function");
   assert.equal(typeof translateGpuSharedText, "function");
   assert.equal(typeof createGpuSharedTranslator, "function");
+  assert.equal(GPU_SHOWCASE_PRODUCT_STUDIO_FEATURE, "gpu_showcase_product_studio_v1");
 });
 
 test("showcase translation keys resolve through bundled en-GB defaults", () => {
@@ -67,6 +72,43 @@ test("showcase focus modes remain stable for family demos", () => {
     "performance",
     "debug",
   ]);
+});
+
+test("showcase demo modes include product studio", () => {
+  assert.deepEqual(showcaseDemoModes, ["harbor", "product-studio"]);
+});
+
+test("mountGpuShowcase routes product studio mode to the product runtime loader", async () => {
+  let receivedOptions = null;
+  let receivedFlags = null;
+  const destroy = () => undefined;
+  const result = await mountGpuShowcase({
+    demoMode: "product-studio",
+    productAssetUrl: "/data/models/eames-lounge-chair-ottoman/Eames_Lounge_Chair_Ottoman.gltf",
+    title: "Eames Product Studio",
+    __featureFlags: new Map([[GPU_SHOWCASE_PRODUCT_STUDIO_FEATURE, true]]),
+    __productStudioRuntimeLoader: async () => ({
+      async mountGpuProductStudio(options, featureFlags) {
+        receivedOptions = options;
+        receivedFlags = featureFlags;
+        return { state: { mode: "product-studio" }, productModel: {}, canvas: {}, destroy };
+      },
+    }),
+  });
+
+  assert.deepEqual(result, {
+    state: { mode: "product-studio" },
+    productModel: {},
+    canvas: {},
+    destroy,
+  });
+  assert.equal(receivedOptions.demoMode, "product-studio");
+  assert.equal(
+    receivedOptions.productAssetUrl,
+    "/data/models/eames-lounge-chair-ottoman/Eames_Lounge_Chair_Ottoman.gltf"
+  );
+  assert.equal(receivedOptions.__productStudioRuntimeLoader, undefined);
+  assert.equal(receivedFlags.get(GPU_SHOWCASE_PRODUCT_STUDIO_FEATURE), true);
 });
 
 test("showcase asset resolution targets the shared brigantine asset", () => {
