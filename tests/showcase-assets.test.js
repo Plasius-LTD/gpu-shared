@@ -100,6 +100,14 @@ function getFaceNormal(a, b, c) {
   return normalizeVec3(crossVec3(subtractVec3(b, a), subtractVec3(c, a)));
 }
 
+function getCentroid(points) {
+  return [
+    (points[0][0] + points[1][0] + points[2][0]) / 3,
+    (points[0][1] + points[1][1] + points[2][1]) / 3,
+    (points[0][2] + points[1][2] + points[2][2]) / 3,
+  ];
+}
+
 function forEachTriangle(geometry, callback) {
   for (let index = 0; index < geometry.indices.length; index += 3) {
     const vertexIndices = [
@@ -114,7 +122,12 @@ function forEachTriangle(geometry, callback) {
       normalizeVec3(getVertex(geometry.normals, vertexIndex))
     );
 
-    callback({ points, normals, faceNormal: getFaceNormal(...points) });
+    callback({
+      points,
+      normals,
+      faceNormal: getFaceNormal(...points),
+      triangleIndex: index / 3,
+    });
   }
 }
 
@@ -235,5 +248,93 @@ test("lighthouse cylindrical bands expose smooth radial side normals", () => {
 
     assert.ok(checkedSides > 0, `${materialName} should expose cylindrical side faces`);
     assert.ok(smoothSides > 0, `${materialName} should use per-vertex side normals`);
+  }
+});
+
+test("ship hull deck surfaces use upward winding for single-sided rendering", () => {
+  const hullDeckTriangleCounts = Object.freeze({
+    "brigantine.gltf": 24,
+    "cutter.gltf": 16,
+  });
+
+  for (const [assetName, triangleCount] of Object.entries(hullDeckTriangleCounts)) {
+    const document = loadAssetDocument(assetName);
+    const buffers = document.buffers.map((buffer) => decodeDataUri(buffer.uri));
+    const mesh = document.meshes.find((candidate) => candidate.name.endsWith("-hull"));
+    assert.ok(mesh, `${assetName} should include a hull mesh`);
+    const primitive = mesh.primitives.find(
+      (candidate) => document.materials[candidate.material].name === "deck-plank"
+    );
+    assert.ok(primitive, `${assetName} hull mesh should include deck planking`);
+
+    const geometry = getPrimitiveGeometry(document, buffers, primitive);
+    let checkedTriangles = 0;
+
+    forEachTriangle(geometry, ({ faceNormal, triangleIndex }) => {
+      if (triangleIndex >= triangleCount) {
+        return;
+      }
+
+      checkedTriangles += 1;
+      assert.ok(
+        faceNormal[1] > 0.82,
+        `${assetName}/${mesh.name}/deck-plank triangle ${triangleIndex} should face upward for single-sided rendering`
+      );
+    });
+
+    assert.equal(
+      checkedTriangles,
+      triangleCount,
+      `${assetName} should expose the expected hull deck triangle count`
+    );
+  }
+});
+
+test("ship painted hull sides and caps use outward winding for single-sided rendering", () => {
+  for (const assetName of ["brigantine.gltf", "cutter.gltf"]) {
+    const document = loadAssetDocument(assetName);
+    const buffers = document.buffers.map((buffer) => decodeDataUri(buffer.uri));
+    const mesh = document.meshes.find((candidate) => candidate.name.endsWith("-hull"));
+    assert.ok(mesh, `${assetName} should include a hull mesh`);
+    const primitive = mesh.primitives.find(
+      (candidate) => document.materials[candidate.material].name === "painted-hull"
+    );
+    assert.ok(primitive, `${assetName} hull mesh should include painted hull sides`);
+
+    const geometry = getPrimitiveGeometry(document, buffers, primitive);
+    const zValues = [];
+    for (let index = 2; index < geometry.positions.length; index += 3) {
+      zValues.push(geometry.positions[index]);
+    }
+    const minZ = Math.min(...zValues);
+    const maxZ = Math.max(...zValues);
+    let checkedSides = 0;
+    let checkedCaps = 0;
+
+    forEachTriangle(geometry, ({ points, faceNormal, triangleIndex }) => {
+      const centroid = getCentroid(points);
+
+      if (Math.abs(faceNormal[0]) >= Math.abs(faceNormal[2]) && Math.abs(centroid[0]) > 0.04) {
+        const expectedSideNormal = [Math.sign(centroid[0]), 0, 0];
+        checkedSides += 1;
+        assert.ok(
+          dotVec3(faceNormal, expectedSideNormal) > 0.4,
+          `${assetName}/${mesh.name}/painted-hull triangle ${triangleIndex} should face away from the centerline`
+        );
+        return;
+      }
+
+      if (Math.abs(faceNormal[2]) > 0.75 && (centroid[2] <= minZ + 0.001 || centroid[2] >= maxZ - 0.001)) {
+        const expectedCapNormal = [0, 0, centroid[2] >= maxZ - 0.001 ? 1 : -1];
+        checkedCaps += 1;
+        assert.ok(
+          dotVec3(faceNormal, expectedCapNormal) > 0.95,
+          `${assetName}/${mesh.name}/painted-hull triangle ${triangleIndex} should cap the hull outward`
+        );
+      }
+    });
+
+    assert.ok(checkedSides > 0, `${assetName} should expose outward hull side faces`);
+    assert.ok(checkedCaps > 0, `${assetName} should expose outward hull cap faces`);
   }
 });

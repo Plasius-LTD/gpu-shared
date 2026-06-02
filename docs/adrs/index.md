@@ -4,3 +4,4 @@
 - [ADR-0002 Shared Showcase Runtime Ownership](./adr-0002-shared-showcase-runtime-ownership.md)
 - [ADR-0003 Browser-Safe Physics Consumption](./adr-0003-browser-safe-physics-consumption.md)
 - [ADR-0004 Showcase Asset Catalog and Richer GLTF Contract](./adr-0004-showcase-asset-catalog.md)
+- [ADR-0005 Product Studio Demo Mode](./adr-0005-product-studio-demo-mode.md)

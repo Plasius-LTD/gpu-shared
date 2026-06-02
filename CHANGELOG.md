@@ -7,17 +7,86 @@ All notable changes to this project will be documented in this file.
 - **Added**
   - Deterministic showcase asset generation for a richer shared brigantine,
     cutter, lighthouse, and harbor-dock catalog.
+  - A Three.js-free product-studio demo mode for rendering the workspace-local
+    Eames lounge chair and ottoman test model from the shared runtime.
   - Fullscreen capture mode for slide-deck screenshots and video recording,
     including scene-only layout and bounded 1080p canvas scaling.
+  - A deterministic showcase video capture script that renders PNG frames
+    through local Chrome and encodes them with FFmpeg as MP4 or MPEG output.
 
 - **Changed**
   - Expanded the shared GLTF loader contract to preserve the legacy flattened
     mesh fields while exposing transformed multi-primitive/material data for the
     realistic showcase scene.
+  - The shared GLTF loader now preserves UVs, texture descriptors, normal-map
+    bindings, metallic/roughness textures, alpha state, emissive state, and
+    generated tangent-space inputs for product-quality material rendering.
   - The shared harbor runtime now renders distinct ship models and modeled
     harbor structures instead of one tiny hull mesh plus placeholder boxes.
   - Showcase lighting now adds local lantern response, a lighthouse beam pass,
     and a subtle atmospheric grade for more realistic recorded frames.
+  - Showcase lighting now uses a balanced night environment with softer
+    moonlight, horizon fill, warm bounce, and less saturated local glows.
+  - Showcase water now renders irregular wave crests, Kelvin wake arms, and
+    localized foam patches instead of straight mesh-row highlight lines.
+  - Showcase capture mode now defaults to fixed maximum-quality rendering,
+    disables adaptive visual-detail changes, and starts water, cloth, and
+    lighting on new ultra tiers for recording.
+  - Showcase water now uses `@plasius/gpu-fluid` water-surface samples,
+    `@plasius/gpu-lighting` water ray-trace pass metadata, soft specular glints,
+    patch-based wake foam, mirrored scene reflections, and sampled water-shadow
+    occlusion so ray-traced lighting bands have a visible rendering pass instead
+    of only metadata.
+  - Showcase water now shades from smoothed `@plasius/gpu-fluid` water normals
+    and renders distinct wake-foam, bow-spray, impact-spray, and ripple-foam
+    particle effects.
+  - Showcase scene shadows now follow `@plasius/gpu-lighting` post-process
+    shadow-mask metadata, removing polygon-level shadow darkening from
+    ray-traced shadow modes.
+  - Showcase ultra lighting now reports and uses per-pixel water reflection,
+    water shadow, and scene shadow resolves with zero polygon contribution for
+    RT-owned shadow/reflection effects.
+  - Showcase documentation and tests now lock `quality=ultra` as the explicit
+    query flag for fixed maximum-quality rendering.
+  - Showcase fixed maximum-quality rendering now caps the backing canvas near
+    1280x720 pixels so ultra post-processing does not push local MacBook-class
+    GPUs into browser crashes.
+  - Showcase capture mode now accepts `resolution=720p`/`captureResolution` to
+    constrain the recording frame to a deterministic 1280x720 16:9 scene area.
+  - Showcase scene composition now adds a procedural shoreline, raised quay,
+    seawall, outer breakwater, and right-side pier so modeled harbor buildings
+    sit on coastal structures instead of floating on the water.
+  - Showcase water now extends the far and horizon bands well past the harbor
+    mouth so the sea reads as open water toward the distance.
+  - Showcase rendering now accepts `timeOfDay=day|dawn|dusk|night|cycle` and
+    blends sky, water, sun/moon reflections, stars, and local light balance for
+    day/night capture transitions.
+  - Showcase capture mode now accepts `frameExport=1`/`frameExport: true` for
+    frame-by-frame simulation export, allowing slow ultra-quality renders to be
+    encoded into a smooth 60 FPS demo video.
+  - The shared showcase now defaults
+    `gpu-renderer.hit-driven-pathtrace.enabled` on, accepts remote
+    `featureFlags`, and exposes the resolved flag through scene/text/capture
+    state for all gpu-* demo consumers.
+  - Showcase lighting now follows a more physically grounded response: rough
+    water damps tall/rough object reflections, ship reflections are limited to
+    low hull/deck geometry, local light bloom follows distance falloff, and
+    ship shadows combine contact darkening with softer ray-traced occlusion.
+  - Hit-driven showcase shading now interpolates authored vertex normals at
+    each trace impact point and shades smoothable triangles as sub-triangle hit
+    patches, reducing faceted hull, cloth, and water lighting.
+  - Renderer lighting captures now separate validation cloth from harbor
+    composition, constrain the moon/halo to an angular sky body, render moon
+    water response as broken glints instead of a screen-space oval, and keep
+    procedural piers/breakwaters at the harbor mouth rather than across the
+    foreground water.
+  - Showcase water now renders as contiguous renderer-owned near/mid/far/horizon
+    slabs with shared depth boundaries, per-hit color interpolation, and fixed
+    harbor-footprint clipping instead of overlapping nested sheets plus a
+    competing screen-space sea layer.
+  - Showcase water now consumes the `@plasius/gpu-fluid` large-area zone layout
+    contract for stitched near/mid/far/horizon water geometry while keeping
+    harbor-specific exclusions and material colors in the shared renderer.
 
 - **Fixed**
   - The shared showcase now propagates the realistic-model feature flag into
@@ -29,6 +98,9 @@ All notable changes to this project will be documented in this file.
   - Generated cylindrical showcase geometry now carries smooth radial side
     normals, reducing the faceted placeholder look on lighthouse bands, masts,
     posts, and lantern glass.
+  - Generated brigantine and cutter deck planking now emits upward-facing
+    triangle winding and outward hull cap checks so single-sided rendering no
+    longer drops visible ship surfaces.
   - The showcase renderer now culls with geometric face normals while shading
     with smoothed asset normals, keeping curved surfaces stable at glancing
     camera angles.
@@ -40,6 +112,15 @@ All notable changes to this project will be documented in this file.
   - Low-lying ship triangles no longer pick up the water reflection term just
     because they are near the shoreline plane, so hulls stop reading like
     reflective water surfaces.
+  - The showcase capture script now waits for Chrome to exit and retries
+    temporary profile cleanup, avoiding macOS `Session Storage` cleanup races
+    after one-frame screenshot captures.
+  - The showcase capture script no longer passes target dimensions into
+    Chrome's `Target.createTarget` CDP call, avoiding Chrome for Testing
+    failures that require target positions to be set only for new windows.
+  - The showcase capture script now fails fast on Chrome navigation errors and
+    reports page, console, runtime, and network diagnostics when the demo
+    capture hook does not appear.
 
 - **Security**
   - (placeholder)

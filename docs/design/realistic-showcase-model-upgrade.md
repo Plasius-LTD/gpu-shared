@@ -75,6 +75,18 @@ runtime contract that consumes it.
 - Maintain the existing browser-safe canvas path and avoid introducing a new
   renderer dependency in this package.
 
+### 5. Add product-studio validation mode
+
+- Add a Three.js-free `mode=product-studio` mount path for local product-model
+  validation.
+- Default the mode to the workspace-local Eames lounge chair and ottoman GLTF
+  under `/data/models/eames-lounge-chair-ottoman/` when that folder is served by
+  the repo-level demo server.
+- Use only package-local code and `@plasius/gpu-*` planning/telemetry packages
+  for material rendering, lighting pass metadata, performance detail, and debug
+  snapshots.
+- Gate the mode with `gpu_showcase_product_studio_v1`.
+
 ## Non-Goals
 
 - Claiming true end-to-end photorealism from the current software canvas path.
@@ -84,6 +96,9 @@ runtime contract that consumes it.
 ## Validation
 
 - Add/update tests for the richer GLTF loader contract.
+- Add tests for UVs, base-color textures, normal maps, roughness textures,
+  alpha state, emissive state, and generated tangent-space inputs.
+- Add tests for the product-studio mode routing and disabled feature-flag state.
 - Add regression tests proving the shared asset catalog exposes multiple
   primitives/nodes/material reads.
 - Add runtime regression coverage showing the shared showcase loads the richer

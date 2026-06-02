@@ -45,6 +45,8 @@ test("readme documents package-surface imports for browser demos", () => {
   assert.match(readme, /import \{ mountGpuShowcase \} from "@plasius\/gpu-shared"/);
   assert.match(readme, /import map/i);
   assert.match(readme, /resolveShowcaseAssetUrl\("lighthouse"\)/);
+  assert.match(readme, /mode: "product-studio"/);
+  assert.match(readme, /gpu_showcase_product_studio_v1/);
 });
 
 test("bundled lighting dependency uses the bundle-safe module URL release", () => {
