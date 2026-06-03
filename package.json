@@ -1,6 +1,6 @@
 {
   "name": "@plasius/gpu-shared",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "description": "Shared browser-safe demo runtime and asset helpers for the Plasius gpu-* package family.",
   "type": "module",
   "sideEffects": false,
@@ -33,7 +33,7 @@
     "demo": "python3 -m http.server --directory ..",
     "demo:example": "node demo/example.js",
     "generate:assets": "node scripts/generate-showcase-assets.mjs",
-    "typecheck": "node --check src/index.js && node --check src/showcase-runtime.js && node --check src/gltf-loader.js && node --check demo/main.js",
+    "typecheck": "node --check src/index.js && node --check src/showcase-runtime.js && node --check src/gltf-loader.js && node --check src/product-studio-runtime.js && node --check demo/main.js",
     "audit:eslint": "eslint . --max-warnings=0",
     "audit:deps": "npm ls --all --omit=optional --omit=peer > /dev/null 2>&1 || true",
     "audit:npm": "npm audit --audit-level=high --omit=dev",
@@ -57,17 +57,15 @@
   "author": "Plasius LTD <development@plasius.co.uk>",
   "license": "Apache-2.0",
   "dependencies": {
-    "@plasius/gpu-cloth": "^0.1.4",
-    "@plasius/gpu-debug": "^0.1.5",
-    "@plasius/gpu-fluid": "^0.1.4",
-    "@plasius/gpu-lighting": "^0.1.16",
-    "@plasius/gpu-performance": "^0.1.6",
-    "@plasius/gpu-physics": "^0.1.13"
   },
   "peerDependencies": {
+    "@plasius/gpu-renderer": "^0.1.14",
     "@plasius/translations": "^1.0.17"
   },
   "peerDependenciesMeta": {
+    "@plasius/gpu-renderer": {
+      "optional": true
+    },
     "@plasius/translations": {
       "optional": true
     }
