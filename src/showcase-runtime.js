@@ -679,7 +679,9 @@ async function loadShowcaseFeatureModule(featureLabel, loader) {
     return module;
   } catch (error) {
     const message = error?.message ?? String(error);
-    throw new Error(`Unable to load showcase ${featureLabel} feature package: ${message}`);
+    throw new Error(`Unable to load showcase ${featureLabel} feature package: ${message}`, {
+      cause: error,
+    });
   }
 }
 
