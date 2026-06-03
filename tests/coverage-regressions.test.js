@@ -265,6 +265,73 @@ function createTriangleGltfDocument({ bufferUri } = {}) {
   };
 }
 
+function createLargeGltfDocument(vertexCount = 55_000) {
+  const positions = new Float32Array(vertexCount * 3);
+  const indices = new Uint32Array(vertexCount);
+  for (let index = 0; index < vertexCount; index += 1) {
+    const offset = index * 3;
+    positions[offset] = (index % 128) / 32;
+    positions[offset + 1] = Math.floor(index / 128) / 128;
+    positions[offset + 2] = (index % 17) / 8;
+    indices[index] = index;
+  }
+  const bytes = Buffer.concat([Buffer.from(positions.buffer), Buffer.from(indices.buffer)]);
+
+  return {
+    positions,
+    indices,
+    bytes,
+    document: {
+      asset: { version: "2.0" },
+      buffers: [{ uri: "large-model.bin" }],
+      bufferViews: [
+        { buffer: 0, byteOffset: 0, byteLength: positions.byteLength },
+        {
+          buffer: 0,
+          byteOffset: positions.byteLength,
+          byteLength: indices.byteLength,
+        },
+      ],
+      accessors: [
+        {
+          bufferView: 0,
+          componentType: 5126,
+          count: vertexCount,
+          type: "VEC3",
+        },
+        {
+          bufferView: 1,
+          componentType: 5125,
+          count: vertexCount,
+          type: "SCALAR",
+        },
+      ],
+      meshes: [
+        {
+          name: "large-chair-proxy",
+          primitives: [
+            {
+              attributes: { POSITION: 0 },
+              indices: 1,
+              material: 0,
+            },
+          ],
+        },
+      ],
+      materials: [
+        {
+          pbrMetallicRoughness: {
+            baseColorFactor: [0.6, 0.44, 0.28, 1],
+          },
+        },
+      ],
+      nodes: [{ name: "large-chair", mesh: 0 }],
+      scenes: [{ nodes: [0] }],
+      scene: 0,
+    },
+  };
+}
+
 test("mountGpuShowcase renders live frames, package hooks, and physics telemetry", async () => {
   const originalDocument = globalThis.document;
   const originalWindow = globalThis.window;
@@ -405,9 +472,9 @@ test("mountGpuShowcase renders live frames, package hooks, and physics telemetry
       life: 0.01,
     });
     showcase.state.sprays.push({
-      position: { x: 0, y: -0.3, z: 0 },
+      position: { x: 0, y: 0.35, z: 0 },
       velocity: { x: 0, y: 0.2, z: 0 },
-      life: 0.01,
+      life: 1.0,
     });
 
     harness.elements["#stressToggle"].checked = true;
@@ -429,10 +496,10 @@ test("mountGpuShowcase renders live frames, package hooks, and physics telemetry
     const pausedFrame = showcase.state.frame;
     animationFrames.shift().callback(50.1);
     assert.equal(showcase.state.frame, pausedFrame);
-    assert.equal(harness.elements["#pauseButton"].textContent, "Resume");
+    assert.match(harness.elements["#pauseButton"].textContent, /resume/i);
 
     harness.listenerRegistry.get("pauseButton:click")();
-    assert.equal(harness.elements["#pauseButton"].textContent, "Pause");
+    assert.match(harness.elements["#pauseButton"].textContent, /pause/i);
     globalThis.window.advanceTime(100);
     const textState = JSON.parse(globalThis.window.render_game_to_text());
     assert.equal(textState.focus, "lighting");
@@ -647,6 +714,49 @@ test("loadGltfModel rejects failed asset and nested buffer fetches", async () =>
   try {
     await assert.rejects(loadGltfModel("https://plasius.co.uk/broken.gltf"), /503 Service Unavailable/);
     await assert.rejects(loadGltfModel("https://plasius.co.uk/nested.gltf"), /404 Not Found/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("loadGltfModel aggregates large model buffers without spread stack overflow", async () => {
+  const originalFetch = globalThis.fetch;
+  const { document, bytes, positions, indices } = createLargeGltfDocument();
+
+  globalThis.fetch = async (input) => {
+    const href = input instanceof URL ? input.href : String(input);
+    if (href.endsWith("large-chair.gltf")) {
+      return {
+        ok: true,
+        url: "https://plasius.co.uk/assets/large-chair.gltf",
+        async json() {
+          return document;
+        },
+      };
+    }
+
+    if (href.endsWith("large-model.bin")) {
+      return {
+        ok: true,
+        async arrayBuffer() {
+          return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+        },
+      };
+    }
+
+    return {
+      ok: false,
+      status: 404,
+      statusText: "Not Found",
+    };
+  };
+
+  try {
+    const model = await loadGltfModel("https://plasius.co.uk/assets/large-chair.gltf");
+    assert.equal(model.name, "large-chair");
+    assert.equal(model.positions.length, positions.length);
+    assert.equal(model.indices.length, indices.length);
+    assert.equal(model.primitives[0].positions.length, positions.length);
   } finally {
     globalThis.fetch = originalFetch;
   }

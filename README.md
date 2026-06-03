@@ -23,9 +23,8 @@ npm install @plasius/gpu-shared
 
 - Moves shared 3D showcase/demo runtime ownership out of `gpu-demo-viewer`.
 - Provides one package home for GLTF loading and harbor/showcase mounting.
-- Reuses `@plasius/gpu-cloth`, `@plasius/gpu-fluid`, `@plasius/gpu-lighting`,
-  `@plasius/gpu-performance`, `@plasius/gpu-debug`, and browser-safe physics
-  planning from `@plasius/gpu-physics/browser`.
+- Coordinates cloth, fluid, lighting, performance, debug, and physics integration
+  through explicit feature adapters supplied by family packages at mount time.
 - Keeps package demos aligned on the same family-owned scene contract instead of
   carrying duplicated runtime copies.
 - Preserves one shared fix point for cloth motion, visible water continuity, and
@@ -35,6 +34,10 @@ npm install @plasius/gpu-shared
   hull mesh plus placeholder box geometry.
 
 ## Usage
+
+The package remains feature-contract neutral at install time; family packages
+inject domain contracts through `__showcaseFeatureLoaders` so `gpu-shared` does
+not hard-reference package-private imports.
 
 ```js
 import { mountGpuShowcase } from "@plasius/gpu-shared";
@@ -48,6 +51,15 @@ const showcase = await mountGpuShowcase({
 
 // Teardown is safe to call repeatedly from a route/page cleanup.
 showcase.destroy();
+```
+
+```js
+await mountGpuShowcase({
+  packageName: "@plasius/gpu-cloth",
+  __showcaseFeatureLoaders: {
+    cloth: () => import("@plasius/gpu-cloth/dist/index.js"),
+  },
+});
 ```
 
 ### Showcase Translations
@@ -78,6 +90,46 @@ await mountGpuShowcase({
 
 console.log(i18n.t(gpuSharedTranslationKeys.debugMainColorBuffer));
 ```
+
+### Product Studio Mode
+
+Consumers can route the shared showcase entrypoint to Product Studio by passing
+`demoMode: "product-studio"` and a Product Studio GLTF URL. This mode loads the
+model with the shared GLTF loader and delegates GPU execution to
+`@plasius/gpu-renderer`.
+Product Studio submits source triangle mesh data to the renderer. Display-quality
+path tracing anywhere in the project requires the renderer mesh BVH path so ray
+hits use source triangles, barycentric data, geometric normals, and interpolated
+vertex normals for bounce decisions.
+When `@plasius/gpu-lighting` exposes `createWavefrontEnvironmentLightingOptions`,
+Product Studio uses the lighting-owned `product-studio` environment preset;
+older installed lighting packages fall back to the previous local colours.
+The shared Product Studio adapter defaults to 8 samples per pixel for the
+Eames-quality benchmark render and uses a rough studio floor so the current
+single-frame preview is not dominated by unresolved low-sample reflection
+noise. The Product Studio canvas preserves a 16:9 presentation ratio inside
+flexible host layouts so the rendered product is not stretched by non-16:9
+containers.
+
+```js
+import { mountGpuShowcase } from "@plasius/gpu-shared";
+
+await mountGpuShowcase({
+  root: document.getElementById("app"),
+  demoMode: "product-studio",
+  productAssetUrl:
+    "/data/models/eames-lounge-chair-ottoman/Eames_Lounge_Chair_Ottoman.gltf",
+  samplesPerPixel: 8,
+});
+```
+
+The legacy analytic proxy scene-object path is disabled and is not a customer
+visible fallback. Stale callers must move to `createProductStudioMeshes(...)`
+or `mountGpuShowcase({ demoMode: "product-studio" })`, both of which use mesh
+inputs for renderer-owned BVH construction.
+
+Install `@plasius/gpu-renderer` alongside `@plasius/gpu-shared` when Product
+Studio mode is used. Harbor-only consumers do not need the renderer peer.
 
 For browser-only demos served without a bundler, keep the import surface on the
 published package name and resolve it with an import map rather than importing a

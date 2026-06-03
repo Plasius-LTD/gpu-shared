@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 const repoRoot = fileURLToPath(new URL("../", import.meta.url));
 const packageJson = JSON.parse(readFileSync(path.join(repoRoot, "package.json"), "utf8"));
 const packageLock = JSON.parse(readFileSync(path.join(repoRoot, "package-lock.json"), "utf8"));
+const showcaseRuntime = readFileSync(path.join(repoRoot, "src", "showcase-runtime.js"), "utf8");
 const readme = readFileSync(path.join(repoRoot, "README.md"), "utf8");
 
 function compareVersions(actual, expected) {
@@ -49,12 +50,33 @@ test("readme documents package-surface imports for browser demos", () => {
   assert.match(readme, /@plasius\/translations/);
 });
 
-test("bundled lighting dependency uses the bundle-safe module URL release", () => {
-  const dependencyRange = packageJson.dependencies["@plasius/gpu-lighting"];
-  const lockedLighting = packageLock.packages["node_modules/@plasius/gpu-lighting"];
-  const minimumVersion = dependencyRange.replace(/^[^^~]+/, "");
+test("showcase feature packages are adapter-injected from mount options", () => {
+  const featureKeys = [
+    "@plasius/gpu-cloth",
+    "@plasius/gpu-fluid",
+    "@plasius/gpu-lighting",
+    "@plasius/gpu-performance",
+    "@plasius/gpu-debug",
+    "@plasius/gpu-physics",
+  ];
 
-  assert.match(dependencyRange, /^\^0\.1\.\d+$/);
-  assert.ok(lockedLighting, "package-lock.json must pin @plasius/gpu-lighting");
-  assert.equal(compareVersions(lockedLighting.version, minimumVersion.slice(1)) >= 0, true);
+  for (const featureKey of featureKeys) {
+    assert.equal(packageJson.dependencies?.[featureKey], undefined);
+    assert.equal(packageLock.packages[""]?.dependencies?.[featureKey], undefined);
+    assert.equal(
+      packageLock.packages["node_modules/@plasius/gpu-shared"]?.dependencies?.[featureKey],
+      undefined
+    );
+  }
+
+  assert.match(
+    showcaseRuntime,
+    /__showcaseFeatureLoaders/,
+    "Runtime should resolve feature dependencies through injected loaders."
+  );
+  assert.match(
+    showcaseRuntime,
+    /resolveShowcaseFeatureLoaders\(/,
+    "Runtime should provide a stable loader resolution path."
+  );
 });
