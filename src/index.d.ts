@@ -208,6 +208,7 @@ export interface MountGpuProductStudioResult {
     rendererStats: Record<string, unknown>;
   }>;
   readonly model: GltfModel;
+  readonly productModel: GltfModel;
   readonly canvas: HTMLCanvasElement;
   readonly renderer: unknown;
   readonly meshes: readonly ProductStudioMesh[];

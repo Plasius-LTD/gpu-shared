@@ -145,6 +145,12 @@ function appendValues(target, values) {
   }
 }
 
+function appendIndicesWithOffset(target, values, vertexOffset) {
+  for (let index = 0; index < values.length; index += 1) {
+    target.push(values[index] + vertexOffset);
+  }
+}
+
 function resolveBrowserRequestBaseUrl() {
   if (
     typeof document !== "undefined" &&
@@ -413,9 +419,7 @@ async function buildGltfModel(document, baseUrl) {
   for (const primitive of scene.primitives) {
     const vertexOffset = aggregatePositions.length / 3;
     appendValues(aggregatePositions, primitive.positions);
-    for (const index of primitive.indices) {
-      aggregateIndices.push(index + vertexOffset);
-    }
+    appendIndicesWithOffset(aggregateIndices, primitive.indices, vertexOffset);
   }
 
   const color = scene.primitives[0]?.material?.color ?? { r: 0.56, g: 0.33, b: 0.22, a: 1 };

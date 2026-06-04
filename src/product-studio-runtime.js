@@ -452,6 +452,7 @@ export async function mountGpuProductStudio(options = {}, featureFlags = null) {
   return Object.freeze({
     state,
     model,
+    productModel: model,
     canvas,
     renderer,
     meshes,

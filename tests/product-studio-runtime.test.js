@@ -210,6 +210,7 @@ test("mountGpuProductStudio loads the model and delegates mesh BVH renderer inpu
   assert.equal(result.state.rendererStats.samplesPerPixel, 8);
   assert.equal(result.state.rendererStats.screenRays, 960 * 540);
   assert.equal(result.state.rendererStats.primaryRays, 960 * 540 * 8);
+  assert.equal(result.productModel, result.model);
   const styleText = document.getElementById("plasius-product-studio-wavefront-style").textContent;
   assert.match(styleText, /aspect-ratio:\s*16 \/ 9/);
   assert.match(styleText, /object-fit:\s*contain/);

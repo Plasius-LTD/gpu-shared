@@ -1,3 +1,8 @@
+import {
+  GPU_SHOWCASE_PRODUCT_STUDIO_FEATURE,
+  GPU_SHOWCASE_REALISTIC_MODELS_FEATURE,
+} from "./feature-flags.js";
+
 export { resolveShowcaseAssetUrl } from "./asset-url.js";
 export {
   createGpuSharedTranslator,
@@ -9,7 +14,7 @@ export { gpuSharedEnGbTranslations } from "./translations/en-GB.js";
 export {
   GPU_SHOWCASE_PRODUCT_STUDIO_FEATURE,
   GPU_SHOWCASE_REALISTIC_MODELS_FEATURE,
-} from "./feature-flags.js";
+};
 export {
   createProductStudioMeshes,
   mountGpuProductStudio,
@@ -31,6 +36,29 @@ export async function loadGltfModel(url) {
   return module.loadGltfModel(url);
 }
 
+function isProductStudioFeatureEnabled(featureFlags) {
+  if (typeof featureFlags?.get === "function") {
+    return featureFlags.get(GPU_SHOWCASE_PRODUCT_STUDIO_FEATURE) === true;
+  }
+
+  const direct = featureFlags?.[GPU_SHOWCASE_PRODUCT_STUDIO_FEATURE];
+  if (typeof direct === "boolean") {
+    return direct;
+  }
+
+  const flagsValue = featureFlags?.flags?.[GPU_SHOWCASE_PRODUCT_STUDIO_FEATURE];
+  if (typeof flagsValue === "boolean") {
+    return flagsValue;
+  }
+
+  const enabledValue = featureFlags?.enabled?.[GPU_SHOWCASE_PRODUCT_STUDIO_FEATURE];
+  if (typeof enabledValue === "boolean") {
+    return enabledValue;
+  }
+
+  return false;
+}
+
 export async function mountGpuShowcase(options = {}) {
   const demoMode = options.demoMode ?? options.mode;
   if (
@@ -39,6 +67,12 @@ export async function mountGpuShowcase(options = {}) {
     demoMode === "studio" ||
     demoMode === "eames"
   ) {
+    if (!isProductStudioFeatureEnabled(options.__featureFlags)) {
+      throw new Error(
+        `${GPU_SHOWCASE_PRODUCT_STUDIO_FEATURE} must be enabled before Product Studio can mount.`
+      );
+    }
+
     const productRuntimeLoader =
       typeof options.__productRuntimeLoader === "function"
         ? options.__productRuntimeLoader

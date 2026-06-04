@@ -1,6 +1,6 @@
 {
   "name": "@plasius/gpu-shared",
-  "version": "0.1.14",
+  "version": "0.1.15",
   "description": "Shared browser-safe demo runtime and asset helpers for the Plasius gpu-* package family.",
   "type": "module",
   "sideEffects": false,
@@ -56,10 +56,8 @@
   ],
   "author": "Plasius LTD <development@plasius.co.uk>",
   "license": "Apache-2.0",
-  "dependencies": {
-  },
   "peerDependencies": {
-    "@plasius/gpu-renderer": "^0.1.14",
+    "@plasius/gpu-renderer": "^0.1.15",
     "@plasius/translations": "^1.0.17"
   },
   "peerDependenciesMeta": {
@@ -72,6 +70,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@plasius/gpu-lighting": "^0.1.19",
     "@plasius/translations": "^1.0.17",
     "c8": "^11.0.0",
     "eslint": "^10.3.0",
