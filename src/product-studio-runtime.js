@@ -374,7 +374,9 @@ async function resolveWavefrontLightingOptions(options) {
       : () => import("@plasius/gpu-lighting").catch(() => null);
   const lightingModule = await lightingLoader();
 
-  if (typeof lightingModule?.createWavefrontEnvironmentLightingOptions !== "function") {
+  if (
+    typeof lightingModule?.createWavefrontEnvironmentLightingOptions !== "function"
+  ) {
     return fallback;
   }
 

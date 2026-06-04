@@ -139,6 +139,18 @@ function computeBounds(positions) {
   });
 }
 
+function appendValues(target, values) {
+  for (let index = 0; index < values.length; index += 1) {
+    target.push(values[index]);
+  }
+}
+
+function appendIndicesWithOffset(target, values, vertexOffset) {
+  for (let index = 0; index < values.length; index += 1) {
+    target.push(values[index] + vertexOffset);
+  }
+}
+
 function resolveBrowserRequestBaseUrl() {
   if (
     typeof document !== "undefined" &&
@@ -381,18 +393,6 @@ async function loadGltfDocument(url) {
 async function loadInlineShowcaseDocument() {
   const module = await import("./showcase-inline-assets.js");
   return loadGltfDocument(new URL(module.INLINE_SHOWCASE_ASSET_URLS.brigantine));
-}
-
-function appendValues(target, values) {
-  for (let index = 0; index < values.length; index += 1) {
-    target.push(values[index]);
-  }
-}
-
-function appendIndicesWithOffset(target, values, vertexOffset) {
-  for (let index = 0; index < values.length; index += 1) {
-    target.push(values[index] + vertexOffset);
-  }
 }
 
 async function buildGltfModel(document, baseUrl) {

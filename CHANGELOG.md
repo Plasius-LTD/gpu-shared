@@ -11,10 +11,28 @@ All notable changes to this project will be documented in this file.
     including scene-only layout and bounded 1080p canvas scaling.
   - Bundled `en-GB` translation keys and dictionaries for shared showcase labels
     that can be consumed through `@plasius/translations`.
-  - Public `createProductStudioMeshes(...)` helper for converting Product
-    Studio GLTF primitives into renderer-owned triangle mesh inputs.
+  - Added Product Studio mode routing for `mountGpuShowcase(...)`, including
+    Eames GLTF loading, source triangle mesh submission, and
+    delegation to the `@plasius/gpu-renderer` WebGPU wavefront renderer.
 
 - **Changed**
+  - Documented that project-wide display-quality path tracing requires renderer
+    mesh BVH intersections and triangle normals; bounded model proxies are now
+    disabled rather than exposed as a debug bridge.
+  - Product Studio now submits GLTF primitive mesh inputs to the renderer with
+    `displayQuality: true` instead of submitting analytic scene objects.
+  - Product Studio wavefront rendering now consumes
+    `@plasius/gpu-lighting` environment presets when available instead of
+    relying only on local hardcoded environment colours.
+  - Product Studio now defaults to 8 wavefront samples per pixel for the Eames
+    quality benchmark and uses a rough studio floor to avoid unresolved
+    low-sample reflection noise dominating the preview.
+  - Product Studio now preserves a 16:9 canvas presentation ratio inside
+    flexible host layouts so benchmark renders are not stretched by non-16:9
+    containers.
+  - Refactored feature loading so `@plasius/gpu-shared` uses injectable
+    `__showcaseFeatureLoaders` for cloth/fluid/lighting/performance/debug/
+    physics contracts and no longer imports sibling feature packages directly.
   - Routed showcase chrome and debug allocation labels through package-owned
     translation keys with an optional consumer translator override.
   - Expanded the shared GLTF loader contract to preserve the legacy flattened
@@ -24,10 +42,8 @@ All notable changes to this project will be documented in this file.
     harbor structures instead of one tiny hull mesh plus placeholder boxes.
   - Showcase lighting now adds local lantern response, a lighthouse beam pass,
     and a subtle atmospheric grade for more realistic recorded frames.
-  - Product Studio source now mounts the `@plasius/gpu-renderer` mesh-BVH
-    wavefront renderer with triangle meshes, denoise, samples-per-pixel, and
-    `@plasius/gpu-lighting` environment options instead of analytic
-    scene-object boxes.
+  - Declared `@plasius/gpu-renderer` as an optional Product Studio peer instead
+    of a harbor/showcase hard dependency.
 
 - **Fixed**
   - Restored the package CD workflow so protected `main` releases are prepared by PR and published without direct branch pushes.

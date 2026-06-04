@@ -1,35 +1,3 @@
-import {
-  clothGarmentKinds,
-  clothProfileNames,
-  createClothRepresentationPlan,
-  selectClothRepresentationBand,
-} from "@plasius/gpu-cloth";
-import {
-  fluidBodyKinds,
-  fluidProfileNames,
-  createFluidContinuityEnvelope,
-  createFluidRepresentationPlan,
-  selectFluidRepresentationBand,
-} from "@plasius/gpu-fluid";
-import {
-  createLightingBandPlan,
-  defaultLightingProfile,
-  getLightingProfile,
-  lightingDistanceBands,
-} from "@plasius/gpu-lighting";
-import {
-  createDeviceProfile,
-  createGpuPerformanceGovernor,
-  createQualityLadderAdapter,
-} from "@plasius/gpu-performance";
-import { createGpuDebugSession } from "@plasius/gpu-debug";
-import {
-  createPhysicsSimulationPlan,
-  createPhysicsWorldSnapshot,
-  defaultPhysicsWorkerProfile,
-  getPhysicsWorkerManifest,
-} from "@plasius/gpu-physics/browser";
-
 import { resolveShowcaseAssetUrl } from "./asset-url.js";
 import { loadGltfModel } from "./gltf-loader.js";
 import { GPU_SHOWCASE_REALISTIC_MODELS_FEATURE } from "./feature-flags.js";
@@ -60,6 +28,772 @@ const CAMERA_PRESETS = Object.freeze({
   performance: Object.freeze({ yaw: -0.65, pitch: 0.36, distance: 24, target: [0, 2.2, 0] }),
   debug: Object.freeze({ yaw: -0.7, pitch: 0.32, distance: 24, target: [0, 2.2, 0] }),
 });
+
+const FALLBACK_LIGHTING_DISTANCE_BANDS = Object.freeze([
+  Object.freeze({
+    band: "near",
+    primaryShadowSource: "ray-traced-primary",
+    rtParticipation: Object.freeze({
+      reflections: "full",
+      globalIllumination: "high",
+      directShadows: "premium",
+    }),
+    updateCadenceDivisor: 1,
+  }),
+  Object.freeze({
+    band: "mid",
+    primaryShadowSource: "ray-traced-secondary",
+    rtParticipation: Object.freeze({
+      reflections: "medium",
+      globalIllumination: "medium",
+      directShadows: "selective",
+    }),
+    updateCadenceDivisor: 2,
+  }),
+  Object.freeze({
+    band: "far",
+    primaryShadowSource: "baked",
+    rtParticipation: Object.freeze({
+      reflections: "low",
+      globalIllumination: "low",
+      directShadows: "none",
+    }),
+    updateCadenceDivisor: 4,
+  }),
+  Object.freeze({
+    band: "horizon",
+    primaryShadowSource: "impression",
+    rtParticipation: Object.freeze({
+      reflections: "off",
+      globalIllumination: "off",
+      directShadows: "none",
+    }),
+    updateCadenceDivisor: 8,
+  }),
+]);
+const FALLBACK_LIGHTING_PROFILE = "cinematic";
+const FALLBACK_PHYSICS_PROFILE = "cinematic";
+const FALLBACK_PERFORMANCE_LEVELS = Object.freeze({
+  fluid: Object.freeze([
+    Object.freeze({
+      id: "low",
+      config: Object.freeze({ nearResolution: 10, midResolution: 6, splashCount: 10 }),
+      estimatedCostMs: 0.8,
+    }),
+    Object.freeze({
+      id: "medium",
+      config: Object.freeze({ nearResolution: 16, midResolution: 8, splashCount: 18 }),
+      estimatedCostMs: 1.4,
+    }),
+    Object.freeze({
+      id: "high",
+      config: Object.freeze({ nearResolution: 24, midResolution: 12, splashCount: 28 }),
+      estimatedCostMs: 2.4,
+    }),
+  ]),
+  cloth: Object.freeze([
+    Object.freeze({
+      id: "low",
+      config: Object.freeze({ cols: 10, rows: 7 }),
+      estimatedCostMs: 0.7,
+    }),
+    Object.freeze({
+      id: "medium",
+      config: Object.freeze({ cols: 16, rows: 11 }),
+      estimatedCostMs: 1.3,
+    }),
+    Object.freeze({
+      id: "high",
+      config: Object.freeze({ cols: 24, rows: 16 }),
+      estimatedCostMs: 2.1,
+    }),
+  ]),
+  lighting: Object.freeze([
+    Object.freeze({
+      id: "low",
+      config: Object.freeze({ shadowStrength: 0.18, reflectionStrength: 0.08 }),
+      estimatedCostMs: 0.5,
+    }),
+    Object.freeze({
+      id: "medium",
+      config: Object.freeze({ shadowStrength: 0.34, reflectionStrength: 0.16 }),
+      estimatedCostMs: 1.0,
+    }),
+    Object.freeze({
+      id: "high",
+      config: Object.freeze({ shadowStrength: 0.5, reflectionStrength: 0.24 }),
+      estimatedCostMs: 1.8,
+    }),
+  ]),
+});
+
+function createFallbackClothFeatureModule() {
+  const fallback = createFallbackClothFeatureAdapters();
+  return {
+    clothGarmentKinds: fallback.garmentKinds,
+    clothProfileNames: fallback.profileNames,
+    createClothRepresentationPlan: fallback.createPlan,
+    selectClothRepresentationBand: fallback.selectBand,
+  };
+}
+
+function createFallbackFluidFeatureModule() {
+  const fallback = createFallbackFluidFeatureAdapters();
+  return {
+    fluidBodyKinds: fallback.bodyKinds,
+    fluidProfileNames: fallback.profileNames,
+    createFluidContinuityEnvelope: fallback.createContinuityEnvelope,
+    createFluidRepresentationPlan: fallback.createPlan,
+    selectFluidRepresentationBand: fallback.selectBand,
+  };
+}
+
+function createFallbackLightingFeatureModule() {
+  return {
+    createLightingBandPlan({ profile = FALLBACK_LIGHTING_PROFILE, importance = "high" } = {}) {
+      const defaultPlan = {
+        profile,
+        importance,
+        bands: FALLBACK_LIGHTING_DISTANCE_BANDS,
+      };
+      return defaultPlan;
+    },
+    defaultLightingProfile: FALLBACK_LIGHTING_PROFILE,
+    getLightingProfile(profile = FALLBACK_LIGHTING_PROFILE) {
+      return {
+        name: profile,
+        bands: FALLBACK_LIGHTING_DISTANCE_BANDS,
+      };
+    },
+    lightingDistanceBands: FALLBACK_LIGHTING_DISTANCE_BANDS,
+  };
+}
+
+function createFallbackPerformanceQualityState(levels = [], initialLevel = "high", profile = "") {
+  const fallbackLevels = levels.length ? levels : FALLBACK_PERFORMANCE_LEVELS[profile] ?? [];
+  const resolvedLevels = fallbackLevels.map((entry) => ({
+    id: String(entry?.id ?? "high"),
+    config: entry?.config ?? {},
+    estimatedCostMs: Number.isFinite(Number(entry?.estimatedCostMs))
+      ? Number(entry.estimatedCostMs)
+      : 1.0,
+  }));
+  if (resolvedLevels.length === 0) {
+    return {
+      module: {
+        id: "high",
+        config: Object.freeze({}),
+        estimatedCostMs: 1.0,
+      },
+      getSnapshot() {
+        return {
+          currentLevel: {
+            id: "high",
+            config: Object.freeze({}),
+            estimatedCostMs: 1.0,
+          },
+        };
+      },
+      id: "high",
+    };
+  }
+  const initial = resolvedLevels.find((entry) => entry.id === initialLevel) ?? resolvedLevels[0];
+  return {
+    id: initial.id,
+    getSnapshot() {
+      return {
+        currentLevel: {
+          id: initial.id,
+          config: initial.config,
+          estimatedCostMs: initial.estimatedCostMs,
+        },
+      };
+    },
+  };
+}
+
+function createFallbackPerformanceFeatureModule() {
+  const moduleIds = new Set(["fluid-detail", "cloth-detail", "lighting-detail"]);
+
+  return {
+    createDeviceProfile(profile = {}) {
+      return {
+        deviceClass: "desktop",
+        mode: "flat",
+        refreshRateHz: Number.isFinite(profile?.refreshRateHz)
+          ? Number(profile.refreshRateHz)
+          : 60,
+        supportedFrameRates: Array.isArray(profile?.supportedFrameRates)
+          ? profile.supportedFrameRates
+          : [60, 90],
+        supportsWebGpu: true,
+      };
+    },
+    createQualityLadderAdapter({ id, domain, levels, initialLevel }) {
+      return {
+        id: String(id ?? ""),
+        domain,
+        ...createFallbackPerformanceQualityState(
+          domain === "fluid" ? FALLBACK_PERFORMANCE_LEVELS.fluid : domain === "cloth" ? FALLBACK_PERFORMANCE_LEVELS.cloth : FALLBACK_PERFORMANCE_LEVELS.lighting,
+          initialLevel,
+          domain
+        ),
+      };
+    },
+    createGpuPerformanceGovernor({ device, modules = [], adaptation = {} } = {}) {
+      let pressureLevel = "stable";
+      let frameSamples = 0;
+      let averageMs = 16.67;
+
+      const clamp = (next = 16.67) => (Number.isFinite(next) ? Math.max(1, next) : 16.67);
+      const target = Object.freeze({
+        targetFrameTimeMs: 16.67,
+        downgradeFrameTimeMs: clamp(adaptation?.degradeThresholdMs ?? 20),
+        upgradeFrameTimeMs: clamp(adaptation?.upgradeThresholdMs ?? 14),
+      });
+
+      return {
+        recordFrame({ frameTimeMs = averageMs } = {}) {
+          const sample = Number.isFinite(Number(frameTimeMs)) ? Number(frameTimeMs) : averageMs;
+          frameSamples += 1;
+          averageMs = clamp((averageMs * (frameSamples - 1) + sample) / frameSamples);
+          const fps = 1000 / averageMs;
+
+          pressureLevel =
+            sample > target.downgradeFrameTimeMs
+              ? "degrade"
+              : pressureLevel === "degrade" && sample <= target.upgradeFrameTimeMs
+                ? "stable"
+                : pressureLevel;
+
+          return {
+            pressureLevel,
+            metrics: {
+              fps,
+              averageFrameTimeMs: averageMs,
+            },
+            adjustments: pressureLevel === "degrade" ? [{ type: "capability-step-down" }] : [],
+          };
+        },
+        getTarget() {
+          return target;
+        },
+        getState() {
+          return {
+            modules: modules
+              .filter((entry) => entry != null && typeof entry.id === "string" && moduleIds.has(entry.id))
+              .map((entry) => ({
+                isAtMaximum: pressureLevel === "stable",
+              })),
+          };
+        },
+      };
+    },
+  };
+}
+
+function createFallbackDebugFeatureModule() {
+  let queueSamples = 0;
+  let queuePeakDepth = 0;
+  let readyLaneSamples = 0;
+  let readyLanePeakDepth = 0;
+  let dispatchSamples = 0;
+  let dispatchDurationTotal = 0;
+  let dependencyUnlockSamples = 0;
+  let dependencyUnlockCount = 0;
+  let pipelineSamples = 0;
+  let pipelineAgeTotal = 0;
+  let frameSamples = 0;
+  let frameTimeTotal = 0;
+  let gpuBusyTotal = 0;
+  let frameDroppedSamples = 0;
+  let memoryTotalBytes = 0;
+
+  function ensureNumber(value, fallback = 0) {
+    const asNumber = Number(value);
+    return Number.isFinite(asNumber) ? asNumber : fallback;
+  }
+
+  function createDebugSession({ adapter } = {}) {
+    const memoryHint = Number.isFinite(Number(adapter?.memoryCapacityHintBytes))
+      ? Number(adapter.memoryCapacityHintBytes)
+      : 0;
+
+    memoryTotalBytes = Math.max(0, memoryHint);
+
+    return {
+      trackAllocation({ sizeBytes = 0 } = {}) {
+        memoryTotalBytes += ensureNumber(sizeBytes);
+      },
+      recordQueue({ depth = 0 } = {}) {
+        queueSamples += 1;
+        queuePeakDepth = Math.max(queuePeakDepth, ensureNumber(depth, 0));
+      },
+      recordReadyLane({ depth = 0 } = {}) {
+        readyLaneSamples += 1;
+        readyLanePeakDepth = Math.max(readyLanePeakDepth, ensureNumber(depth, 0));
+      },
+      recordDispatch({ durationMs = 0 } = {}) {
+        dispatchSamples += 1;
+        dispatchDurationTotal += ensureNumber(durationMs);
+      },
+      recordDependencyUnlock({ unlockCount = 0 } = {}) {
+        dependencyUnlockSamples += 1;
+        dependencyUnlockCount += ensureNumber(unlockCount);
+      },
+      recordPipelinePhase({ snapshotAgeMs = 0 } = {}) {
+        pipelineSamples += 1;
+        pipelineAgeTotal += ensureNumber(snapshotAgeMs);
+      },
+      recordFrame({
+        frameTimeMs = 16.67,
+        targetFrameTimeMs = 16.67,
+        gpuBusyMs = 0,
+        dropped = false,
+      } = {}) {
+        frameSamples += 1;
+        frameTimeTotal += ensureNumber(frameTimeMs);
+        gpuBusyTotal += ensureNumber(gpuBusyMs);
+        frameDroppedSamples += dropped === true ? 1 : 0;
+        targetFrameTimeMs;
+      },
+      getSnapshot() {
+        const queueAverageDepth = queueSamples > 0 ? queuePeakDepth / queueSamples : 0;
+        return {
+          frames: {
+            sampleCount: frameSamples,
+            averageFrameTimeMs: frameSamples > 0 ? frameTimeTotal / frameSamples : 0,
+            averageGpuBusyMs: frameSamples > 0 ? gpuBusyTotal / frameSamples : 0,
+            droppedCount: frameDroppedSamples,
+          },
+          queues: {
+            sampleCount: queueSamples,
+            peakDepth: queuePeakDepth,
+            averageDepth: queueAverageDepth,
+          },
+          dispatch: {
+            sampleCount: dispatchSamples,
+            averageDurationMs: dispatchSamples > 0 ? dispatchDurationTotal / dispatchSamples : 0,
+          },
+          dag: {
+            peakReadyLaneDepth: readyLanePeakDepth,
+            totalUnlockCount: dependencyUnlockCount,
+            unlockSamples: dependencyUnlockSamples,
+          },
+          pipeline: {
+            sampleCount: pipelineSamples,
+            averageSnapshotAgeMs: pipelineSamples > 0 ? pipelineAgeTotal / pipelineSamples : 0,
+          },
+          memory: {
+            totalTrackedBytes: memoryTotalBytes,
+          },
+        };
+      },
+    };
+  }
+
+  return {
+    createGpuDebugSession({ adapter } = {}) {
+      return createDebugSession({ adapter });
+    },
+    createSession({ adapter } = {}) {
+      return createDebugSession({ adapter });
+    },
+  };
+}
+
+function createFallbackPhysicsFeatureModule() {
+  const fallbackPlan = Object.freeze({
+    snapshotStageId: "baseline",
+    stageOrder: Object.freeze(["authoritative"]),
+    secondarySimulationStageIds: Object.freeze(["visual"]),
+  });
+  return {
+    createPhysicsSimulationPlan() {
+      return {
+        snapshotStageId: "baseline",
+        stageOrder: fallbackPlan.stageOrder,
+        secondarySimulationStageIds: fallbackPlan.secondarySimulationStageIds,
+      };
+    },
+    createPhysicsWorldSnapshot(input = {}) {
+      return {
+        stage: "baseline",
+        stability: "stable",
+        stageId: fallbackPlan.snapshotStageId,
+        metadata: input.metadata ?? {},
+        bodyCount: input.bodyCount ?? 0,
+        dynamicBodyCount: input.dynamicBodyCount ?? 0,
+        contactCount: input.contactCount ?? 0,
+        snapshotStageId: fallbackPlan.snapshotStageId,
+      };
+    },
+    defaultPhysicsWorkerProfile: FALLBACK_PHYSICS_PROFILE,
+    getPhysicsWorkerManifest() {
+      return {
+        jobs: [
+          Object.freeze({
+            worker: Object.freeze({ authority: "authoritative", jobType: "simulate" }),
+          }),
+        ],
+        suggestedAllocationIds: Object.freeze(["physics-workspace"]),
+      };
+    },
+  };
+}
+
+const SHOWCASE_FEATURE_LOADERS = Object.freeze({
+  cloth: () => Promise.resolve(createFallbackClothFeatureModule()),
+  fluid: () => Promise.resolve(createFallbackFluidFeatureModule()),
+  lighting: () => Promise.resolve(createFallbackLightingFeatureModule()),
+  performance: () => Promise.resolve(createFallbackPerformanceFeatureModule()),
+  debug: () => Promise.resolve(createFallbackDebugFeatureModule()),
+  physics: () => Promise.resolve(createFallbackPhysicsFeatureModule()),
+});
+
+const DEFAULT_FLUID_BAND_THRESHOLDS = Object.freeze({
+  near: Object.freeze({ minDistance: 0, maxDistance: 22 }),
+  mid: Object.freeze({ minDistance: 22, maxDistance: 90 }),
+  far: Object.freeze({ minDistance: 90, maxDistance: 260 }),
+  horizon: Object.freeze({ minDistance: 260, maxDistance: Number.POSITIVE_INFINITY }),
+});
+
+const DEFAULT_CLOTH_BAND_THRESHOLDS = Object.freeze({
+  near: Object.freeze({ minDistance: 0, maxDistance: 24 }),
+  mid: Object.freeze({ minDistance: 24, maxDistance: 86 }),
+  far: Object.freeze({ minDistance: 86, maxDistance: 190 }),
+  horizon: Object.freeze({ minDistance: 190, maxDistance: Number.POSITIVE_INFINITY }),
+});
+
+function resolveFluidBandSelection(distance, thresholds = DEFAULT_FLUID_BAND_THRESHOLDS) {
+  if (!Number.isFinite(distance)) {
+    return "horizon";
+  }
+  if (distance <= (thresholds.near?.maxDistance ?? DEFAULT_FLUID_BAND_THRESHOLDS.near.maxDistance)) {
+    return "near";
+  }
+  if (distance <= (thresholds.mid?.maxDistance ?? DEFAULT_FLUID_BAND_THRESHOLDS.mid.maxDistance)) {
+    return "mid";
+  }
+  if (distance <= (thresholds.far?.maxDistance ?? DEFAULT_FLUID_BAND_THRESHOLDS.far.maxDistance)) {
+    return "far";
+  }
+  return "horizon";
+}
+
+function createFallbackFluidFeatureAdapters() {
+  const defaultContinuityBand = Object.freeze({
+    amplitudeFloor: 0.22,
+    frequencyFloor: 0.05,
+    blendWindowMeters: 14,
+    retainFoamHistory: true,
+    retainDirectionality: true,
+  });
+  return {
+    bodyKinds: Object.freeze(["ocean"]),
+    profileNames: Object.freeze(["cinematic"]),
+    createContinuityEnvelope() {
+      return Object.freeze({
+        bands: Object.freeze({
+          near: defaultContinuityBand,
+          mid: Object.freeze({
+            ...defaultContinuityBand,
+            blendWindowMeters: 22,
+            amplitudeFloor: 0.17,
+          }),
+          far: Object.freeze({
+            ...defaultContinuityBand,
+            blendWindowMeters: 34,
+            amplitudeFloor: 0.12,
+          }),
+          horizon: Object.freeze({
+            ...defaultContinuityBand,
+            blendWindowMeters: 42,
+            amplitudeFloor: 0.09,
+          }),
+        }),
+      });
+    },
+    createPlan({ fluidBodyId = "harbor", kind = "ocean", profile = "cinematic" }) {
+      return Object.freeze({
+        fluidBodyId,
+        kind,
+        profile,
+        thresholds: DEFAULT_FLUID_BAND_THRESHOLDS,
+        representations: Object.freeze([
+          Object.freeze({
+            band: "near",
+            output: "raster",
+            rtParticipation: "full",
+            shading: Object.freeze({ refraction: 0.14, reflectionMode: "full", caustics: true }),
+          }),
+          Object.freeze({
+            band: "mid",
+            output: "raster",
+            rtParticipation: "reduced",
+            shading: Object.freeze({ reflectionMode: "partial" }),
+          }),
+          Object.freeze({
+            band: "far",
+            output: "raster",
+            rtParticipation: "low",
+            shading: Object.freeze({ reflectionMode: "partial" }),
+          }),
+          Object.freeze({
+            band: "horizon",
+            output: "coarse",
+            rtParticipation: "off",
+            shading: Object.freeze({ reflectionMode: "reduced" }),
+          }),
+        ]),
+      });
+    },
+    selectBand(distance, thresholds = DEFAULT_FLUID_BAND_THRESHOLDS) {
+      return resolveFluidBandSelection(distance, thresholds);
+    },
+  };
+}
+
+function createFallbackClothFeatureAdapters() {
+  const defaultContinuity = Object.freeze({
+    amplitudeFloor: 0.22,
+    wrinkleFloor: 0.32,
+    damping: 0.58,
+    creaseBias: 0.14,
+  });
+  return {
+    garmentKinds: Object.freeze(["flag"]),
+    profileNames: Object.freeze(["cinematic"]),
+    createPlan() {
+      return Object.freeze({
+        thresholds: DEFAULT_CLOTH_BAND_THRESHOLDS,
+        representations: Object.freeze([
+          Object.freeze({
+            band: "near",
+            continuity: defaultContinuity,
+          }),
+          Object.freeze({
+            band: "mid",
+            continuity: defaultContinuity,
+          }),
+          Object.freeze({
+            band: "far",
+            continuity: defaultContinuity,
+          }),
+          Object.freeze({
+            band: "horizon",
+            continuity: defaultContinuity,
+          }),
+        ]),
+      });
+    },
+    selectBand(distance, thresholds = DEFAULT_CLOTH_BAND_THRESHOLDS) {
+      if (!Number.isFinite(distance)) {
+        return "horizon";
+      }
+      if (distance <= (thresholds.near?.maxDistance ?? DEFAULT_CLOTH_BAND_THRESHOLDS.near.maxDistance)) {
+        return "near";
+      }
+      if (distance <= (thresholds.mid?.maxDistance ?? DEFAULT_CLOTH_BAND_THRESHOLDS.mid.maxDistance)) {
+        return "mid";
+      }
+      if (distance <= (thresholds.far?.maxDistance ?? DEFAULT_CLOTH_BAND_THRESHOLDS.far.maxDistance)) {
+        return "far";
+      }
+      return "horizon";
+    },
+  };
+}
+
+function normalizeClothFeatureAdapters(clothFeatures) {
+  const fallback = createFallbackClothFeatureAdapters();
+  if (clothFeatures == null || typeof clothFeatures !== "object") {
+    return fallback;
+  }
+
+  return {
+    garmentKinds:
+      Array.isArray(clothFeatures.garmentKinds) && clothFeatures.garmentKinds.length > 0
+        ? clothFeatures.garmentKinds
+        : fallback.garmentKinds,
+    profileNames:
+      Array.isArray(clothFeatures.profileNames) && clothFeatures.profileNames.length > 0
+        ? clothFeatures.profileNames
+        : fallback.profileNames,
+    createPlan: assertRequiredFunction(clothFeatures, "cloth", "createPlan"),
+    selectBand: assertRequiredFunction(clothFeatures, "cloth", "selectBand"),
+  };
+}
+
+function normalizeFluidFeatureAdapters(fluidFeatures) {
+  const fallback = createFallbackFluidFeatureAdapters();
+  if (fluidFeatures == null || typeof fluidFeatures !== "object") {
+    return fallback;
+  }
+
+  return {
+    bodyKinds:
+      Array.isArray(fluidFeatures.bodyKinds) && fluidFeatures.bodyKinds.length > 0
+        ? fluidFeatures.bodyKinds
+        : fallback.bodyKinds,
+    profileNames:
+      Array.isArray(fluidFeatures.profileNames) && fluidFeatures.profileNames.length > 0
+        ? fluidFeatures.profileNames
+        : fallback.profileNames,
+    createContinuityEnvelope: assertRequiredFunction(
+      fluidFeatures,
+      "fluid",
+      "createContinuityEnvelope"
+    ),
+    createPlan: assertRequiredFunction(fluidFeatures, "fluid", "createPlan"),
+    selectBand: assertRequiredFunction(fluidFeatures, "fluid", "selectBand"),
+  };
+}
+
+function assertRequiredFunction(module, featureLabel, exportName) {
+  const value = module?.[exportName];
+  if (typeof value !== "function") {
+    throw new Error(
+      `Showcase ${featureLabel} feature package must export "${exportName}" as a function.`
+    );
+  }
+  return value;
+}
+
+function assertRequiredArray(module, featureLabel, exportName) {
+  const value = module?.[exportName];
+  if (!Array.isArray(value)) {
+    throw new Error(
+      `Showcase ${featureLabel} feature package must export "${exportName}" as an array.`
+    );
+  }
+  return value;
+}
+
+async function loadShowcaseFeatureModule(featureLabel, loader) {
+  try {
+    const module = await loader();
+    if (module == null || typeof module !== "object") {
+      throw new Error("module is missing or not an object.");
+    }
+    return module;
+  } catch (error) {
+    const message = error?.message ?? String(error);
+    throw new Error(`Unable to load showcase ${featureLabel} feature package: ${message}`, {
+      cause: error,
+    });
+  }
+}
+
+function resolveShowcaseFeatureLoaders(options = {}) {
+  const overrides = options.__showcaseFeatureLoaders;
+  return {
+    cloth:
+      typeof overrides?.cloth === "function"
+        ? overrides.cloth
+        : SHOWCASE_FEATURE_LOADERS.cloth,
+    fluid:
+      typeof overrides?.fluid === "function"
+        ? overrides.fluid
+        : SHOWCASE_FEATURE_LOADERS.fluid,
+    lighting:
+      typeof overrides?.lighting === "function"
+        ? overrides.lighting
+        : SHOWCASE_FEATURE_LOADERS.lighting,
+    performance:
+      typeof overrides?.performance === "function"
+        ? overrides.performance
+        : SHOWCASE_FEATURE_LOADERS.performance,
+    debug:
+      typeof overrides?.debug === "function"
+        ? overrides.debug
+        : SHOWCASE_FEATURE_LOADERS.debug,
+    physics:
+      typeof overrides?.physics === "function"
+        ? overrides.physics
+        : SHOWCASE_FEATURE_LOADERS.physics,
+  };
+}
+
+async function resolveShowcaseFeatureAdapters(options = {}) {
+  const loaders = resolveShowcaseFeatureLoaders(options);
+  const [
+    clothModule,
+    fluidModule,
+    lightingModule,
+    performanceModule,
+    debugModule,
+    physicsModule,
+  ] = await Promise.all([
+    loadShowcaseFeatureModule("cloth", loaders.cloth),
+    loadShowcaseFeatureModule("fluid", loaders.fluid),
+    loadShowcaseFeatureModule("lighting", loaders.lighting),
+    loadShowcaseFeatureModule("performance", loaders.performance),
+    loadShowcaseFeatureModule("debug", loaders.debug),
+    loadShowcaseFeatureModule("physics", loaders.physics),
+  ]);
+
+  return {
+    cloth: {
+      garmentKinds: assertRequiredArray(clothModule, "cloth", "clothGarmentKinds"),
+      profileNames: assertRequiredArray(clothModule, "cloth", "clothProfileNames"),
+      createPlan: assertRequiredFunction(clothModule, "cloth", "createClothRepresentationPlan"),
+      selectBand: assertRequiredFunction(clothModule, "cloth", "selectClothRepresentationBand"),
+    },
+    fluid: {
+      bodyKinds: assertRequiredArray(fluidModule, "fluid", "fluidBodyKinds"),
+      profileNames: assertRequiredArray(fluidModule, "fluid", "fluidProfileNames"),
+      createContinuityEnvelope: assertRequiredFunction(
+        fluidModule,
+        "fluid",
+        "createFluidContinuityEnvelope"
+      ),
+      createPlan: assertRequiredFunction(fluidModule, "fluid", "createFluidRepresentationPlan"),
+      selectBand: assertRequiredFunction(fluidModule, "fluid", "selectFluidRepresentationBand"),
+    },
+    lighting: {
+      createBandPlan: assertRequiredFunction(lightingModule, "lighting", "createLightingBandPlan"),
+      defaultProfile: lightingModule.defaultLightingProfile,
+      getProfile: assertRequiredFunction(lightingModule, "lighting", "getLightingProfile"),
+      distanceBands: assertRequiredArray(lightingModule, "lighting", "lightingDistanceBands"),
+    },
+    performance: {
+      createDeviceProfile: assertRequiredFunction(
+        performanceModule,
+        "performance",
+        "createDeviceProfile"
+      ),
+      createGovernor: assertRequiredFunction(
+        performanceModule,
+        "performance",
+        "createGpuPerformanceGovernor"
+      ),
+      createQualityAdapter: assertRequiredFunction(
+        performanceModule,
+        "performance",
+        "createQualityLadderAdapter"
+      ),
+    },
+    debug: {
+      createSession: assertRequiredFunction(debugModule, "debug", "createGpuDebugSession"),
+    },
+    physics: {
+      createSimulationPlan: assertRequiredFunction(
+        physicsModule,
+        "physics",
+        "createPhysicsSimulationPlan"
+      ),
+      createWorldSnapshot: assertRequiredFunction(
+        physicsModule,
+        "physics",
+        "createPhysicsWorldSnapshot"
+      ),
+      defaultProfile: physicsModule.defaultPhysicsWorkerProfile,
+      getManifest: assertRequiredFunction(physicsModule, "physics", "getPhysicsWorkerManifest"),
+    },
+  };
+}
+
 export const showcaseFocusModes = Object.freeze(Object.keys(CAMERA_PRESETS));
 
 const FOCUS_MODE_TRANSLATION_KEYS = Object.freeze({
@@ -840,7 +1574,23 @@ function resolveShipModel(state, ship, fallbackModel = null) {
   );
 }
 
-function createPerformanceGovernor() {
+function createPerformanceGovernor(performanceFeatures) {
+  const createQualityLadderAdapter = assertRequiredFunction(
+    performanceFeatures,
+    "performance",
+    "createQualityAdapter"
+  );
+  const createDeviceProfile = assertRequiredFunction(
+    performanceFeatures,
+    "performance",
+    "createDeviceProfile"
+  );
+  const createGpuPerformanceGovernor = assertRequiredFunction(
+    performanceFeatures,
+    "performance",
+    "createGovernor"
+  );
+
   const fluidDetail = createQualityLadderAdapter({
     id: "fluid-detail",
     domain: "geometry",
@@ -1154,11 +1904,11 @@ function resizeCanvasToDisplaySize(canvas, state) {
   state.renderScale = scale;
 }
 
-function resolveClothPresentation(state, meshDetail) {
-  const clothPlan = createClothRepresentationPlan({
+function resolveClothPresentation(state, meshDetail, clothFeatures) {
+  const clothPlan = clothFeatures.createPlan({
     garmentId: "shore-flag",
-    kind: state.focus === "cloth" ? "flag" : clothGarmentKinds[0],
-    profile: state.focus === "cloth" ? "cinematic" : clothProfileNames[0],
+    kind: state.focus === "cloth" ? "flag" : clothFeatures.garmentKinds[0],
+    profile: state.focus === "cloth" ? "cinematic" : clothFeatures.profileNames[0],
     supportsRayTracing: true,
     nearFieldMaxMeters: 18,
     midFieldMaxMeters: 55,
@@ -1176,7 +1926,7 @@ function resolveClothPresentation(state, meshDetail) {
         )
       );
   const cameraDistance = lengthVec3(subVec3(state.camera.target, fallbackEye));
-  const band = selectClothRepresentationBand(cameraDistance, clothPlan.thresholds);
+  const band = clothFeatures.selectBand(cameraDistance, clothPlan.thresholds);
   const representation =
     clothPlan.representations.find((entry) => entry.band === band) ?? clothPlan.representations[0];
   return {
@@ -1538,8 +2288,9 @@ function resolveVisualConfig(nearLighting, lightingSnapshot, customVisuals = {})
   };
 }
 
-function buildClothSurface(model, state, meshDetail, visuals) {
-  const clothPresentation = resolveClothPresentation(state, meshDetail);
+function buildClothSurface(model, state, meshDetail, visuals, clothFeatures) {
+  const resolvedClothFeatures = normalizeClothFeatureAdapters(clothFeatures);
+  const clothPresentation = resolveClothPresentation(state, meshDetail, resolvedClothFeatures);
   const clothState = ensureShowcaseClothState(state, meshDetail, clothPresentation);
 
   return {
@@ -1708,11 +2459,12 @@ function buildWaterMotionEffects(state) {
   });
 }
 
-function buildWaterBands(state, fluidDetail, visuals) {
-  const fluidPlan = createFluidRepresentationPlan({
+function buildWaterBands(state, fluidDetail, visuals, fluidFeatures) {
+  const resolvedFluidFeatures = normalizeFluidFeatureAdapters(fluidFeatures);
+  const fluidPlan = resolvedFluidFeatures.createPlan({
     fluidBodyId: "harbor",
-    kind: state.focus === "fluid" ? "ocean" : fluidBodyKinds[0],
-    profile: state.focus === "fluid" ? "cinematic" : fluidProfileNames[0],
+    kind: state.focus === "fluid" ? "ocean" : resolvedFluidFeatures.bodyKinds[0],
+    profile: state.focus === "fluid" ? "cinematic" : resolvedFluidFeatures.profileNames[0],
     supportsRayTracing: true,
     nearFieldMaxMeters: 40,
     midFieldMaxMeters: 150,
@@ -1731,7 +2483,7 @@ function buildWaterBands(state, fluidDetail, visuals) {
     const representation =
       fluidPlan.representations.find((entry) => entry.band === bandSpec.band) ??
       fluidPlan.representations[0];
-    const continuity = createFluidContinuityEnvelope({ fluidBodyId: "harbor" });
+    const continuity = resolvedFluidFeatures.createContinuityEnvelope({ fluidBodyId: "harbor" });
     const bandContinuity = resolveFluidBandContinuity(continuity, bandSpec.band);
     const bandResolution =
       bandSpec.band === "near"
@@ -1801,10 +2553,28 @@ function buildWaterBands(state, fluidDetail, visuals) {
   return { fluidPlan, bandMeshes };
 }
 
-function createSceneState(options) {
+function createSceneState(options, featureAdapters) {
   const translate = options.translate;
-  const { governor, fluidDetail, clothDetail, lightingDetail } = createPerformanceGovernor();
-  const physicsProfile = defaultPhysicsWorkerProfile;
+  const { governor, fluidDetail, clothDetail, lightingDetail } = createPerformanceGovernor(
+    featureAdapters.performance
+  );
+  const physicsProfile = featureAdapters.physics.defaultProfile;
+  const createPhysicsSimulationPlan = assertRequiredFunction(
+    featureAdapters.physics,
+    "physics",
+    "createSimulationPlan"
+  );
+  const getPhysicsWorkerManifest = assertRequiredFunction(
+    featureAdapters.physics,
+    "physics",
+    "getManifest"
+  );
+  const createGpuDebugSession = assertRequiredFunction(
+    featureAdapters.debug,
+    "debug",
+    "createSession"
+  );
+
   const physicsPlan = createPhysicsSimulationPlan(physicsProfile);
   const physicsManifest = getPhysicsWorkerManifest(physicsProfile);
   const debugSession = createGpuDebugSession({
@@ -3048,12 +3818,24 @@ function renderWaterMotionEffects(ctx, effects, camera, viewport) {
   ctx.restore();
 }
 
-function renderScene(ctx, canvas, state, shipModel, dom) {
+function renderScene(
+  ctx,
+  canvas,
+  state,
+  shipModel,
+  dom,
+  lightingFeatures,
+  fluidFeatures,
+  clothFeatures
+) {
   const viewport = { width: canvas.width, height: canvas.height };
   const camera = buildCamera(state, canvas);
   state.camera.eye = camera.eye;
-  const lightingPlan = createLightingBandPlan({
-    profile: state.focus === "lighting" ? defaultLightingProfile : getLightingProfile(defaultLightingProfile).name,
+  const lightingPlan = lightingFeatures.createBandPlan({
+    profile:
+      state.focus === "lighting"
+        ? lightingFeatures.defaultProfile
+        : lightingFeatures.getProfile(lightingFeatures.defaultProfile).name,
     importance: state.focus === "lighting" ? "critical" : "high",
   });
   const nearLighting = lightingPlan.bands.find((entry) => entry.band === "near") ?? lightingPlan.bands[0];
@@ -3082,7 +3864,8 @@ function renderScene(ctx, canvas, state, shipModel, dom) {
   const water = buildWaterBands(
     state,
     state.fluidDetail.getSnapshot().currentLevel.config,
-    visuals
+    visuals,
+    fluidFeatures
   );
   for (const bandMesh of water.bandMeshes) {
     const bandAccent = bandMesh.band === "near" ? 0.06 : bandMesh.band === "mid" ? 0.04 : 0;
@@ -3123,7 +3906,8 @@ function renderScene(ctx, canvas, state, shipModel, dom) {
     state,
     state,
     state.clothDetail.getSnapshot().currentLevel.config,
-    visuals
+    visuals,
+    clothFeatures
   );
   for (let index = 0; index < cloth.indices.length; index += 3) {
     const a = cloth.positions[cloth.indices[index]];
@@ -3226,7 +4010,7 @@ function renderScene(ctx, canvas, state, shipModel, dom) {
     `mass split: ${state.ships.map((ship) => `${ship.id} ${(getShipMass(ship, resolveShipModel(state, ship, shipModel)) / 1000).toFixed(1)}t`).join(" · ")}`,
     `cloth band: ${cloth.band} -> ${cloth.representation.output}`,
     `fluid near band: ${water.bandMeshes[0].representation.output}`,
-    `lighting profile: ${lightingPlan.profile} (${lightingDistanceBands.length} bands)`,
+    `lighting profile: ${lightingPlan.profile} (${lightingFeatures.distanceBands.length} bands)`,
   ];
   const qualityMetrics = [
     `fluid detail: ${quality.fluid.currentLevel.id} (${quality.fluid.currentLevel.config.nearResolution} near cells)`,
@@ -3286,13 +4070,14 @@ function renderScene(ctx, canvas, state, shipModel, dom) {
             });
 }
 
-function updateSceneState(state, dt, shipModel) {
+function updateSceneState(state, dt, shipModel, featureAdapters) {
   updateShips(state, dt, shipModel);
   updateWaveImpulses(state, dt);
   updateSpray(state, dt);
   const clothPresentation = resolveClothPresentation(
     state,
-    state.clothDetail.getSnapshot().currentLevel.config
+    state.clothDetail.getSnapshot().currentLevel.config,
+    featureAdapters.cloth
   );
   const clothState = ensureShowcaseClothState(
     state,
@@ -3305,10 +4090,10 @@ function updateSceneState(state, dt, shipModel) {
     flagMotion: readVisualNumber(state.demoVisuals?.flagMotion, 0.92),
     waveInfluence: sampleWave(state, FLAG_LAYOUT.origin.x + FLAG_LAYOUT.width * 0.55, FLAG_LAYOUT.origin.z + FLAG_LAYOUT.width * 0.48, state.time),
   });
-  updatePhysicsSnapshot(state, shipModel);
+  updatePhysicsSnapshot(state, shipModel, featureAdapters.physics);
 }
 
-function syncTextState(state, shipModel) {
+function syncTextState(state, shipModel, featureAdapters) {
   const snapshot = {
     coordinateSystem: "right-handed world; +x right, +y up, +z forward from the shore",
     focus: state.focus,
@@ -3344,13 +4129,14 @@ function syncTextState(state, shipModel) {
     for (let index = 0; index < step; index += 1) {
       state.frame += 1;
       state.time += 1 / 60;
-      updateSceneState(state, 1 / 60, shipModel);
+      updateSceneState(state, 1 / 60, shipModel, featureAdapters);
       state.lastDecision = recordTelemetry(state, 16.67 + (state.stress ? 6.5 : 0));
     }
   };
 }
 
 export async function mountGpuShowcase(options = {}, featureFlags = null) {
+  const featureAdapters = await resolveShowcaseFeatureAdapters(options);
   injectStyles();
   const root = options.root ?? document.body;
   root.classList?.add?.(ROOT_CLASS);
@@ -3370,13 +4156,16 @@ export async function mountGpuShowcase(options = {}, featureFlags = null) {
     translate,
   });
   dom.focusMode.value = focus;
-  const state = createSceneState({
-    focus,
-    translate,
-    realisticModelsEnabled: isFeatureEnabled(featureFlags, GPU_SHOWCASE_REALISTIC_MODELS_FEATURE, true),
-    captureMode: captureSettings.captureMode,
-    renderScale: captureSettings.renderScale,
-  });
+  const state = createSceneState(
+    {
+      focus,
+      translate,
+      realisticModelsEnabled: isFeatureEnabled(featureFlags, GPU_SHOWCASE_REALISTIC_MODELS_FEATURE, true),
+      captureMode: captureSettings.captureMode,
+      renderScale: captureSettings.renderScale,
+    },
+    featureAdapters
+  );
   const assetCatalog = await (state.showcaseRealisticModelsEnabled
     ? loadShowcaseAssetCatalog()
     : createLegacyShowcaseAssetCatalog());
@@ -3386,10 +4175,10 @@ export async function mountGpuShowcase(options = {}, featureFlags = null) {
   state.shipModel = shipModel;
   state.packageState =
     typeof options.createState === "function" ? options.createState() : undefined;
-  updatePhysicsSnapshot(state, shipModel);
+  updatePhysicsSnapshot(state, shipModel, featureAdapters.physics);
   state.lastDecision = recordTelemetry(state, 16.4);
   state.demoDescription = resolveSceneDescription(state, options, shipModel).description;
-  syncTextState(state, shipModel);
+  syncTextState(state, shipModel, featureAdapters);
 
   const ctx = dom.canvas.getContext("2d");
   if (!ctx) {
@@ -3411,7 +4200,7 @@ export async function mountGpuShowcase(options = {}, featureFlags = null) {
       state.lastTimeMs = nowMs;
       state.time += dt;
       state.frame += 1;
-      updateSceneState(state, dt, shipModel);
+      updateSceneState(state, dt, shipModel, featureAdapters);
       updatePackageState(state, options, shipModel, dt);
       const syntheticFrame = 14.2 + state.sprays.length * 0.1 + (state.stress ? 6.4 : 0);
       state.lastDecision = recordTelemetry(state, syntheticFrame);
@@ -3419,8 +4208,17 @@ export async function mountGpuShowcase(options = {}, featureFlags = null) {
 
     state.demoDescription = resolveSceneDescription(state, options, shipModel).description;
     resizeCanvasToDisplaySize(dom.canvas, state);
-    renderScene(ctx, dom.canvas, state, shipModel, dom);
-    syncTextState(state, shipModel);
+    renderScene(
+      ctx,
+      dom.canvas,
+      state,
+      shipModel,
+      dom,
+      featureAdapters.lighting,
+      featureAdapters.fluid,
+      featureAdapters.cloth
+    );
+    syncTextState(state, shipModel, featureAdapters);
     animationFrameId = requestAnimationFrame(renderFrame);
   };
 
@@ -3486,7 +4284,12 @@ export async function mountGpuShowcase(options = {}, featureFlags = null) {
   };
 }
 
-function updatePhysicsSnapshot(state, shipModel) {
+function updatePhysicsSnapshot(state, shipModel, physicsFeatures) {
+  const createPhysicsWorldSnapshot = assertRequiredFunction(
+    physicsFeatures,
+    "physics",
+    "createWorldSnapshot"
+  );
   const rigidBodyShapes = Object.fromEntries(
     state.ships.map((ship) => [
       ship.id,

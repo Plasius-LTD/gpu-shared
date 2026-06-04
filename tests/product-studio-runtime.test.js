@@ -1,223 +1,224 @@
-import test from "node:test";
 import assert from "node:assert/strict";
-
+import test from "node:test";
 import {
   createProductStudioMeshes,
   mountGpuProductStudio,
-} from "../src/product-studio-runtime.js";
+} from "../src/index.js";
 
-function createProductModel() {
-  return Object.freeze({
-    name: "Eames_Lounge_Chair_Ottoman",
-    positions: Object.freeze([]),
-    indices: Object.freeze(Array.from({ length: 300 }, (_, index) => index)),
-    bounds: Object.freeze({
-      min: Object.freeze([-2, -0.4, -1]),
-      max: Object.freeze([2, 1.6, 1]),
-    }),
-    color: Object.freeze({ r: 0.4, g: 0.2, b: 0.1, a: 1 }),
-    physics: Object.freeze({}),
-    primitives: Object.freeze([
-      Object.freeze({
-        name: "wood-shell",
-        positions: Object.freeze([-1, 0, -0.5, 0, 0.4, -0.25, -0.4, 0.9, 0.5]),
-        indices: Object.freeze([0, 1, 2]),
-        normals: Object.freeze([0, 1, 0, 0, 1, 0, 0, 1, 0]),
+function createModelFixture() {
+  return {
+    name: "fixture-chair",
+    bounds: {
+      min: [-2, 0, -1],
+      max: [2, 2, 1],
+    },
+    color: { r: 0.5, g: 0.4, b: 0.3, a: 1 },
+    physics: {},
+    positions: [],
+    indices: [],
+    primitives: [
+      {
+        name: "shell",
+        positions: [
+          -2, 0, -1,
+          2, 0, -1,
+          -2, 2, -1,
+          2, 2, -1,
+          -1, 0.4, 1,
+          1, 0.4, 1,
+          -1, 1.6, 1,
+          1, 1.6, 1,
+        ],
+        indices: [0, 1, 2, 1, 3, 2, 4, 5, 6, 5, 7, 6],
+        normals: null,
         colors: null,
-        material: Object.freeze({
-          name: "Eames_Lounge_Chair_Ottoman_Wood_",
-          color: Object.freeze({ r: 0.56, g: 0.33, b: 0.22, a: 1 }),
-          roughness: 0.25,
-          metallic: 0,
-          emissive: Object.freeze({ r: 0, g: 0, b: 0 }),
-        }),
-        bounds: Object.freeze({
-          min: Object.freeze([-2, 0, -1]),
-          max: Object.freeze([0.2, 1.4, 0.8]),
-        }),
-      }),
-      Object.freeze({
-        name: "chrome-base",
-        positions: Object.freeze([0.1, -0.4, -0.2, 1.8, -0.3, 0.1, 1.2, 0.2, -0.1]),
-        indices: Object.freeze([0, 1, 2]),
-        normals: Object.freeze([0, 0, 1, 0, 0, 1, 0, 0, 1]),
+        bounds: {
+          min: [-2, 0, -1],
+          max: [2, 2, 1],
+        },
+        material: {
+          name: "wood",
+          color: { r: 0.42, g: 0.25, b: 0.12, a: 1 },
+          roughness: 0.5,
+          metallic: 0.1,
+          emissive: { r: 0, g: 0, b: 0 },
+        },
+      },
+      {
+        name: "metal",
+        positions: [
+          -1, 0, -0.5,
+          1, 0, -0.5,
+          -1, 0.2, 0.5,
+          1, 0.2, 0.5,
+        ],
+        indices: [0, 1, 2, 1, 3, 2],
+        normals: null,
         colors: null,
-        material: Object.freeze({
-          name: "Eames_Lounge_Chair_Ottoman_Chrome_",
-          color: Object.freeze({ r: 0.56, g: 0.55, b: 0.55, a: 1 }),
-          roughness: 0.03,
-          metallic: 0.8,
-          emissive: Object.freeze({ r: 0, g: 0, b: 0 }),
-        }),
-        bounds: Object.freeze({
-          min: Object.freeze([0.1, -0.4, -0.2]),
-          max: Object.freeze([2, 0.2, 0.2]),
-        }),
-      }),
-    ]),
-  });
+        bounds: {
+          min: [-1, 0, -0.5],
+          max: [1, 0.2, 0.5],
+        },
+        material: {
+          name: "chrome",
+          color: { r: 0.8, g: 0.82, b: 0.84, a: 1 },
+          roughness: 0.1,
+          metallic: 0.9,
+          emissive: { r: 0, g: 0, b: 0 },
+        },
+      },
+    ],
+  };
 }
 
-function installDomHarness() {
-  const originalDocument = globalThis.document;
-  const originalWindow = globalThis.window;
-  const classNames = new Set();
-  const styles = new Map();
-  const children = [];
-  const canvas = {
-    width: 0,
-    height: 0,
-    dataset: {},
-    getContext() {
-      return {};
+function createFakeDocument() {
+  const styleElements = new Map();
+  const head = {
+    appendChild(element) {
+      if (element.id) {
+        styleElements.set(element.id, element);
+      }
     },
   };
-  const status = { textContent: "" };
   const root = {
     innerHTML: "<p>previous</p>",
+    ownerDocument: null,
+    children: [],
     classList: {
+      values: new Set(),
       add(value) {
-        classNames.add(value);
+        this.values.add(value);
       },
       remove(value) {
-        classNames.delete(value);
+        this.values.delete(value);
       },
-    },
-    ownerDocument: null,
-    appendChild(node) {
-      children.push(node);
-      return node;
     },
     getBoundingClientRect() {
-      return { width: 640, height: 360 };
+      return { width: 960, height: 540 };
     },
-    querySelector(selector) {
-      if (selector === "#productStudioCanvas") {
-        return canvas;
-      }
-      if (selector === "#productStudioStatus") {
-        return status;
-      }
-      return null;
+    appendChild(element) {
+      this.children.push(element);
     },
   };
-  globalThis.document = {
+  const document = {
+    head,
     body: root,
-    head: {
-      appendChild(node) {
-        styles.set(node.id, node);
-      },
+    getElementById(id) {
+      return styleElements.get(id) ?? null;
     },
-    createElement(tag) {
-      if (tag === "canvas") {
-        return canvas;
-      }
+    createElement(name) {
       return {
-        tagName: String(tag).toUpperCase(),
+        nodeName: name.toUpperCase(),
         id: "",
+        style: {},
+        dataset: {},
         textContent: "",
       };
     },
-    getElementById(id) {
-      return styles.get(id) ?? null;
+    querySelector() {
+      return root;
     },
   };
-  globalThis.window = {};
-  return {
-    canvas,
-    children,
-    classNames,
-    root,
-    status,
-    restore() {
-      globalThis.document = originalDocument;
-      globalThis.window = originalWindow;
-    },
-  };
+  root.ownerDocument = document;
+  return { document, root };
 }
 
-test("product studio builds triangle mesh inputs for display-quality rendering", () => {
-  const meshes = createProductStudioMeshes(createProductModel());
+test("product studio meshes preserve GLTF primitive triangles for mesh BVH rendering", () => {
+  const meshes = createProductStudioMeshes(createModelFixture());
+  const modelMeshes = meshes.filter((mesh) => mesh.id >= 1000);
 
-  assert.equal(meshes.length, 6);
-  assert.equal(meshes[0].indices.length, 6);
-  assert.equal(meshes[3].materialKind, "emissive");
-  assert.equal(meshes[4].materialKind, "diffuse");
-  assert.equal(meshes[5].materialKind, "metal");
-  assert.deepEqual(meshes[4].color, [0.56, 0.33, 0.22, 1]);
-  assert.deepEqual(meshes[4].normals, [0, 1, 0, 0, 1, 0, 0, 1, 0]);
+  assert.equal(modelMeshes.length, 2);
+  assert.equal(modelMeshes[0].positions.length, 24);
+  assert.equal(modelMeshes[0].indices.length, 12);
+  assert.equal(modelMeshes[1].materialKind, "metal");
+  assert.equal(meshes.some((mesh) => mesh.materialKind === "emissive"), true);
+  assert.equal(meshes.every((mesh) => !Object.hasOwn(mesh, "bounds")), true);
+  assert.equal(meshes.every((mesh) => !Object.hasOwn(mesh, "type")), true);
 });
 
-test("product studio mounts the WebGPU wavefront renderer with model-derived meshes", async () => {
-  const harness = installDomHarness();
+test("mountGpuProductStudio loads the model and delegates mesh BVH renderer inputs", async () => {
+  const { document, root } = createFakeDocument();
   let rendererOptions = null;
   let destroyed = false;
-  try {
-    const result = await mountGpuProductStudio({
-      root: harness.root,
-      productAssetUrl: "/data/models/eames-lounge-chair-ottoman/Eames_Lounge_Chair_Ottoman.gltf",
-      width: 640,
-      height: 360,
-      maxDepth: 4,
-      samplesPerPixel: 4,
-      denoise: true,
-      __modelLoader: async (url) => {
-        assert.equal(
-          url,
-          "/data/models/eames-lounge-chair-ottoman/Eames_Lounge_Chair_Ottoman.gltf"
-        );
-        return createProductModel();
+  const result = await mountGpuProductStudio({
+    document,
+    root,
+    productAssetUrl: "/data/model.gltf",
+    lightingPreset: "product-studio",
+    lightingIntensity: 1.15,
+    __modelLoader: async (url) => {
+      assert.equal(url, "/data/model.gltf");
+      return createModelFixture();
+    },
+    __lightingLoader: async () => ({
+      createWavefrontEnvironmentLightingOptions(options) {
+        assert.deepEqual(options, {
+          preset: "product-studio",
+          intensity: 1.15,
+        });
+        return {
+          environmentColor: [0.4, 0.5, 0.6, 1],
+          ambientColor: [0.02, 0.03, 0.04, 1],
+          environmentLighting: {
+            horizonColor: [0.5, 0.6, 0.7, 1],
+            zenithColor: [0.08, 0.1, 0.14, 1],
+            sunDirection: [0, 1, 0],
+            sunColor: [3, 2.8, 2.4, 1],
+            intensity: 1.15,
+          },
+        };
       },
-      __rendererLoader: async () => ({
-        rendererWavefrontComputeMode: "webgpu-compute",
-          supportsWavefrontPathTracingCompute: () => true,
-        async createWavefrontPathTracingComputeRenderer(options) {
-          rendererOptions = options;
-          return {
-            renderOnce() {
-              return {
-                frame: 1,
-                triangleCount: 12,
-                primaryRays: 921600,
-              };
-            },
-            destroy() {
-              destroyed = true;
-            },
-          };
-        },
-      }),
-      __lightingLoader: async () => ({
-        createWavefrontEnvironmentLightingOptions() {
-          return {
-            environmentColor: [0.35, 0.43, 0.49, 1],
-            ambientColor: [0.02, 0.024, 0.028, 1],
-          };
-        },
-      }),
-    });
+    }),
+    __rendererLoader: async () => ({
+      async createWavefrontPathTracingComputeRenderer(options) {
+        rendererOptions = options;
+        return {
+          renderOnce() {
+            return {
+              frame: 1,
+              width: options.width,
+              height: options.height,
+              maxDepth: options.maxDepth,
+              samplesPerPixel: options.samplesPerPixel,
+              screenRays: options.width * options.height,
+              primaryRays: options.width * options.height * options.samplesPerPixel,
+            };
+          },
+          destroy() {
+            destroyed = true;
+          },
+        };
+      },
+    }),
+  });
 
-    assert.equal(rendererOptions.canvas, harness.canvas);
-    assert.equal(rendererOptions.width, 640);
-    assert.equal(rendererOptions.height, 360);
-    assert.equal(rendererOptions.maxDepth, 4);
-    assert.equal(rendererOptions.samplesPerPixel, 4);
-    assert.equal(rendererOptions.denoise, true);
-    assert.equal(rendererOptions.displayQuality, true);
-    assert.equal(rendererOptions.meshes.length, 6);
-    assert.equal(rendererOptions.sceneObjects, undefined);
-    assert.equal(result.productModel.name, "Eames_Lounge_Chair_Ottoman");
-    assert.equal(result.model.name, "Eames_Lounge_Chair_Ottoman");
-    assert.equal(result.meshes.length, 6);
-    assert.equal(result.state.geometryMode, "mesh-bvh-display-quality");
-    assert.equal(result.state.requiresMeshBvhForDisplayQuality, true);
-    assert.match(globalThis.window.render_game_to_text(), /"surface":"gpu-product-studio-wavefront"/);
+  assert.equal(result.state.modelName, "fixture-chair");
+  assert.equal(result.state.sourceTriangleCount, 6);
+  assert.equal(result.state.meshCount, result.meshes.length);
+  assert.equal(result.state.geometryMode, "mesh-bvh-display-quality");
+  assert.equal(result.state.requiresTriangleMeshRenderer, true);
+  assert.equal(result.state.displayQuality, true);
+  assert.equal(result.state.requiresMeshBvhForDisplayQuality, true);
+  assert.equal(result.canvas.nodeName, "CANVAS");
+  assert.equal(rendererOptions.width, 960);
+  assert.equal(rendererOptions.height, 540);
+  assert.equal(rendererOptions.displayQuality, true);
+  assert.equal(rendererOptions.meshes.length, result.meshes.length);
+  assert.equal(Object.hasOwn(rendererOptions, "sceneObjects"), false);
+  assert.equal(rendererOptions.maxDepth, 6);
+  assert.equal(rendererOptions.samplesPerPixel, 8);
+  assert.equal(result.state.rendererStats.samplesPerPixel, 8);
+  assert.equal(result.state.rendererStats.screenRays, 960 * 540);
+  assert.equal(result.state.rendererStats.primaryRays, 960 * 540 * 8);
+  assert.equal(result.productModel, result.model);
+  const styleText = document.getElementById("plasius-product-studio-wavefront-style").textContent;
+  assert.match(styleText, /aspect-ratio:\s*16 \/ 9/);
+  assert.match(styleText, /object-fit:\s*contain/);
+  assert.deepEqual(rendererOptions.environmentColor, [0.4, 0.5, 0.6, 1]);
+  assert.deepEqual(rendererOptions.ambientColor, [0.02, 0.03, 0.04, 1]);
+  assert.equal(rendererOptions.environmentLighting.intensity, 1.15);
 
-    result.destroy();
-    assert.equal(destroyed, true);
-    assert.equal(harness.root.innerHTML, "<p>previous</p>");
-    assert.equal(harness.classNames.has("plasius-product-studio-wavefront"), false);
-  } finally {
-    harness.restore();
-  }
+  result.destroy();
+  assert.equal(destroyed, true);
+  assert.equal(root.innerHTML, "<p>previous</p>");
 });

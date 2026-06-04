@@ -3,12 +3,13 @@ import assert from "node:assert/strict";
 import { createI18n } from "@plasius/translations";
 
 import {
+  GPU_SHOWCASE_PRODUCT_STUDIO_FEATURE,
+  GPU_SHOWCASE_REALISTIC_MODELS_FEATURE,
   createGpuSharedTranslator,
   createProductStudioMeshes,
   gpuSharedEnGbTranslations,
   gpuSharedTranslationKeys,
   gpuSharedTranslations,
-  GPU_SHOWCASE_PRODUCT_STUDIO_FEATURE,
   loadGltfModel,
   mountGpuProductStudio,
   mountGpuShowcase,
@@ -17,16 +18,22 @@ import {
   showcaseFocusModes,
   translateGpuSharedText,
 } from "../src/index.js";
+import * as gpuSharedPublicApi from "../src/index.js";
 
 test("public API exports the shared showcase entrypoints", () => {
   assert.equal(typeof mountGpuShowcase, "function");
   assert.equal(typeof mountGpuProductStudio, "function");
   assert.equal(typeof createProductStudioMeshes, "function");
+  assert.equal(Object.hasOwn(gpuSharedPublicApi, "createProductStudioSceneObjects"), false);
   assert.equal(typeof loadGltfModel, "function");
   assert.equal(typeof resolveShowcaseAssetUrl, "function");
   assert.equal(typeof translateGpuSharedText, "function");
   assert.equal(typeof createGpuSharedTranslator, "function");
-  assert.equal(GPU_SHOWCASE_PRODUCT_STUDIO_FEATURE, "gpu_showcase_product_studio_v1");
+  assert.equal(GPU_SHOWCASE_REALISTIC_MODELS_FEATURE, "gpu_showcase_realistic_models_v1");
+  assert.equal(
+    GPU_SHOWCASE_PRODUCT_STUDIO_FEATURE,
+    "gpu_showcase_product_studio_wavefront_v1"
+  );
 });
 
 test("showcase translation keys resolve through bundled en-GB defaults", () => {
@@ -74,43 +81,29 @@ test("showcase focus modes remain stable for family demos", () => {
     "performance",
     "debug",
   ]);
-});
-
-test("showcase demo modes include product studio", () => {
   assert.deepEqual(showcaseDemoModes, ["harbor", "product-studio"]);
 });
 
 test("mountGpuShowcase routes product studio mode to the product runtime loader", async () => {
   let receivedOptions = null;
-  let receivedFlags = null;
-  const destroy = () => undefined;
   const result = await mountGpuShowcase({
     demoMode: "product-studio",
-    productAssetUrl: "/data/models/eames-lounge-chair-ottoman/Eames_Lounge_Chair_Ottoman.gltf",
-    title: "Eames Product Studio",
-    __featureFlags: new Map([[GPU_SHOWCASE_PRODUCT_STUDIO_FEATURE, true]]),
-    __productStudioRuntimeLoader: async () => ({
+    productAssetUrl: "/data/eames.gltf",
+    __featureFlags: { enabled: true },
+    __productRuntimeLoader: async () => ({
       async mountGpuProductStudio(options, featureFlags) {
         receivedOptions = options;
-        receivedFlags = featureFlags;
-        return { state: { mode: "product-studio" }, productModel: {}, canvas: {}, destroy };
+        return {
+          state: { featureFlags },
+          destroy() {},
+        };
       },
     }),
   });
 
-  assert.deepEqual(result, {
-    state: { mode: "product-studio" },
-    productModel: {},
-    canvas: {},
-    destroy,
-  });
-  assert.equal(receivedOptions.demoMode, "product-studio");
-  assert.equal(
-    receivedOptions.productAssetUrl,
-    "/data/models/eames-lounge-chair-ottoman/Eames_Lounge_Chair_Ottoman.gltf"
-  );
-  assert.equal(receivedOptions.__productStudioRuntimeLoader, undefined);
-  assert.equal(receivedFlags.get(GPU_SHOWCASE_PRODUCT_STUDIO_FEATURE), true);
+  assert.equal(receivedOptions.productAssetUrl, "/data/eames.gltf");
+  assert.equal(receivedOptions.__productRuntimeLoader, undefined);
+  assert.deepEqual(result.state.featureFlags, { enabled: true });
 });
 
 test("showcase asset resolution targets the shared brigantine asset", () => {

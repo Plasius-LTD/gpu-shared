@@ -48,8 +48,6 @@ export type ShowcaseAssetName =
   | "lighthouse"
   | "harbor-dock";
 
-export type ShowcaseDemoMode = "harbor" | "product-studio";
-
 export type ShowcaseFocusMode =
   | "integrated"
   | "lighting"
@@ -59,29 +57,21 @@ export type ShowcaseFocusMode =
   | "performance"
   | "debug";
 
-export type ProductStudioMaterialKind =
-  | "diffuse"
-  | "metal"
-  | "transparent"
-  | "emissive";
+export type ShowcaseDemoMode = "harbor" | "product-studio" | "product" | "studio" | "eames";
 
 export interface ProductStudioMesh {
   readonly id: number;
   readonly positions: readonly number[];
   readonly indices: readonly number[];
-  readonly normals: readonly number[] | null;
+  readonly normals?: readonly number[] | null;
+  readonly uvs?: readonly number[] | null;
   readonly color: readonly number[];
-  readonly emission: readonly number[];
-  readonly materialKind: ProductStudioMaterialKind;
+  readonly emission?: readonly number[];
+  readonly materialKind: string | number;
   readonly materialRefId?: number;
-  readonly roughness: number;
-  readonly metallic: number;
-  readonly opacity: number;
-}
-
-export interface CreateProductStudioMeshesOptions {
-  readonly targetCenter?: readonly [number, number, number];
-  readonly targetSize?: number;
+  readonly roughness?: number;
+  readonly metallic?: number;
+  readonly opacity?: number;
 }
 
 export type GpuSharedTranslationValue =
@@ -164,27 +154,34 @@ export function createGpuSharedTranslator(
 ): (key: GpuSharedTranslationKey, args?: GpuSharedTranslationArgs) => string;
 
 export interface MountGpuShowcaseOptions {
+  __showcaseFeatureLoaders?: {
+    cloth?: () => Promise<unknown>;
+    fluid?: () => Promise<unknown>;
+    lighting?: () => Promise<unknown>;
+    performance?: () => Promise<unknown>;
+    debug?: () => Promise<unknown>;
+    physics?: () => Promise<unknown>;
+  };
   root?: HTMLElement;
+  demoMode?: ShowcaseDemoMode;
+  mode?: ShowcaseDemoMode;
   focus?: ShowcaseFocusMode | string;
-  mode?: ShowcaseDemoMode | "product" | "studio" | "eames" | string;
-  demoMode?: ShowcaseDemoMode | "product" | "studio" | "eames" | string;
-  productAssetUrl?: string | URL;
   packageName?: string;
   title?: string;
   subtitle?: string;
+  translate?: GpuSharedTranslate;
+  captureMode?: boolean;
+  renderScale?: number;
+  productAssetUrl?: string | URL;
+  assetUrl?: string | URL;
   width?: number;
   height?: number;
   maxDepth?: number;
   tileSize?: number;
   samplesPerPixel?: number;
   denoise?: boolean;
-  targetCenter?: readonly [number, number, number];
-  targetSize?: number;
   lightingPreset?: string;
   lightingIntensity?: number;
-  translate?: GpuSharedTranslate;
-  captureMode?: boolean;
-  renderScale?: number;
   createState?: () => unknown;
   updateState?: (state: unknown, scene: Record<string, unknown>, dt: number) => unknown;
   describeState?: (state: unknown, scene: Record<string, unknown>) => Record<string, unknown> | null;
@@ -199,19 +196,29 @@ export interface MountGpuShowcaseResult {
 }
 
 export interface MountGpuProductStudioResult {
-  readonly state: Record<string, unknown>;
+  readonly state: Readonly<{
+    featureFlags: unknown;
+    modelName: string;
+    sourceTriangleCount: number;
+    meshCount: number;
+    geometryMode: string;
+    requiresTriangleMeshRenderer: boolean;
+    displayQuality: boolean;
+    requiresMeshBvhForDisplayQuality: boolean;
+    rendererStats: Record<string, unknown>;
+  }>;
   readonly model: GltfModel;
   readonly productModel: GltfModel;
-  readonly meshes: readonly ProductStudioMesh[];
   readonly canvas: HTMLCanvasElement;
-  readonly renderer?: unknown;
+  readonly renderer: unknown;
+  readonly meshes: readonly ProductStudioMesh[];
   destroy(): void;
 }
 
 export const showcaseFocusModes: readonly ShowcaseFocusMode[];
 export const showcaseDemoModes: readonly ShowcaseDemoMode[];
 export const GPU_SHOWCASE_REALISTIC_MODELS_FEATURE: "gpu_showcase_realistic_models_v1";
-export const GPU_SHOWCASE_PRODUCT_STUDIO_FEATURE: "gpu_showcase_product_studio_v1";
+export const GPU_SHOWCASE_PRODUCT_STUDIO_FEATURE: "gpu_showcase_product_studio_wavefront_v1";
 
 export function resolveShowcaseAssetUrl(
   baseUrlOrAssetName?: string | URL | ShowcaseAssetName,
@@ -222,13 +229,16 @@ export function loadGltfModel(url: string | URL): Promise<GltfModel>;
 
 export function createProductStudioMeshes(
   model: GltfModel,
-  options?: CreateProductStudioMeshesOptions
+  options?: {
+    targetCenter?: readonly number[];
+    targetSize?: number;
+  }
 ): readonly ProductStudioMesh[];
-
-export function mountGpuShowcase(
-  options?: MountGpuShowcaseOptions
-): Promise<MountGpuShowcaseResult | MountGpuProductStudioResult>;
 
 export function mountGpuProductStudio(
   options?: MountGpuShowcaseOptions
 ): Promise<MountGpuProductStudioResult>;
+
+export function mountGpuShowcase(
+  options?: MountGpuShowcaseOptions
+): Promise<MountGpuShowcaseResult | MountGpuProductStudioResult>;
