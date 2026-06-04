@@ -4,6 +4,7 @@ import { createI18n } from "@plasius/translations";
 
 import {
   createGpuSharedTranslator,
+  createProductStudioMeshes,
   gpuSharedEnGbTranslations,
   gpuSharedTranslationKeys,
   gpuSharedTranslations,
@@ -20,6 +21,7 @@ import {
 test("public API exports the shared showcase entrypoints", () => {
   assert.equal(typeof mountGpuShowcase, "function");
   assert.equal(typeof mountGpuProductStudio, "function");
+  assert.equal(typeof createProductStudioMeshes, "function");
   assert.equal(typeof loadGltfModel, "function");
   assert.equal(typeof resolveShowcaseAssetUrl, "function");
   assert.equal(typeof translateGpuSharedText, "function");
@@ -212,6 +214,78 @@ test("loadGltfModel delegates through the shared loader", async () => {
     assert.equal(model.indices.length, 3);
     assert.equal(model.physics.shape, "box");
     assert.equal(model.primitives.length, 1);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("loadGltfModel aggregates large mesh primitives without spread-call overflow", async () => {
+  const originalFetch = globalThis.fetch;
+  const vertexCount = 70_000;
+  const positions = new Float32Array(vertexCount * 3);
+  for (let index = 0; index < vertexCount; index += 1) {
+    const offset = index * 3;
+    positions[offset] = index % 1024;
+    positions[offset + 1] = Math.floor(index / 1024);
+    positions[offset + 2] = index % 7;
+  }
+  const indices = new Uint32Array([0, 1, 2]);
+  const bytes = Buffer.concat([
+    Buffer.from(positions.buffer),
+    Buffer.from(indices.buffer),
+  ]);
+  const document = {
+    asset: { version: "2.0" },
+    buffers: [{ uri: `data:application/octet-stream;base64,${bytes.toString("base64")}` }],
+    bufferViews: [
+      { buffer: 0, byteOffset: 0, byteLength: positions.byteLength },
+      {
+        buffer: 0,
+        byteOffset: positions.byteLength,
+        byteLength: indices.byteLength,
+      },
+    ],
+    accessors: [
+      {
+        bufferView: 0,
+        componentType: 5126,
+        count: vertexCount,
+        type: "VEC3",
+      },
+      {
+        bufferView: 1,
+        componentType: 5125,
+        count: 3,
+        type: "SCALAR",
+      },
+    ],
+    meshes: [
+      {
+        primitives: [
+          {
+            attributes: { POSITION: 0 },
+            indices: 1,
+          },
+        ],
+      },
+    ],
+    nodes: [{ name: "large-mesh", mesh: 0 }],
+    scenes: [{ nodes: [0] }],
+    scene: 0,
+  };
+
+  globalThis.fetch = async () => ({
+    ok: true,
+    async json() {
+      return document;
+    },
+  });
+
+  try {
+    const model = await loadGltfModel("https://example.test/large.gltf");
+    assert.equal(model.name, "large-mesh");
+    assert.equal(model.positions.length, vertexCount * 3);
+    assert.equal(model.indices.length, 3);
   } finally {
     globalThis.fetch = originalFetch;
   }

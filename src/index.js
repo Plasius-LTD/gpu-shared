@@ -28,6 +28,8 @@ export async function loadGltfModel(url) {
   return module.loadGltfModel(url);
 }
 
+export { createProductStudioMeshes } from "./product-studio-runtime.js";
+
 function resolveShowcaseDemoMode(options = {}) {
   return String(options.demoMode ?? options.mode ?? "harbor").toLowerCase();
 }

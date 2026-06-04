@@ -33,6 +33,9 @@ npm install @plasius/gpu-shared
 - Ships a package-owned showcase asset catalog with distinct brigantine,
   cutter, lighthouse, and harbor-dock models instead of relying on one tiny
   hull mesh plus placeholder box geometry.
+- Converts Product Studio GLTF primitives into triangle mesh inputs for the
+  renderer-owned mesh-BVH wavefront path instead of customer-visible analytic
+  scene objects.
 
 ## Usage
 
@@ -97,6 +100,7 @@ viewer-private or workspace-private source file:
 
 ```js
 import {
+  createProductStudioMeshes,
   loadGltfModel,
   resolveShowcaseAssetUrl,
   showcaseFocusModes,
@@ -110,6 +114,9 @@ const lighthouseModel = await loadGltfModel(lighthouseUrl);
 console.log(showcaseFocusModes);
 console.log(shipModel.physics);
 console.log(shipModel.primitives.length, lighthouseModel.primitives.length);
+
+const productMeshes = createProductStudioMeshes(lighthouseModel);
+console.log(productMeshes.length);
 ```
 
 ## Demo
@@ -156,6 +163,14 @@ surface for these family demos.
     screenshots and video capture.
   - `renderScale` overrides the canvas backing scale when a capture workflow
     needs a specific quality/performance balance.
+- `mountGpuProductStudio(options)`
+  - Returns `{ state, model, productModel, meshes, canvas, renderer, destroy() }`
+  - Uses `@plasius/gpu-renderer` display-quality mesh BVH input and
+    `@plasius/gpu-lighting` environment options.
+- `createProductStudioMeshes(model, options)`
+  - Converts GLTF primitives plus the Product Studio environment into renderer
+    mesh records with positions, indices, normals, material kind, roughness,
+    metallic, opacity, and emission.
 - `loadGltfModel(url)`
 - `resolveShowcaseAssetUrl(baseUrlOrAssetName?, assetName?)`
 - `showcaseFocusModes`

@@ -11,6 +11,8 @@ All notable changes to this project will be documented in this file.
     including scene-only layout and bounded 1080p canvas scaling.
   - Bundled `en-GB` translation keys and dictionaries for shared showcase labels
     that can be consumed through `@plasius/translations`.
+  - Public `createProductStudioMeshes(...)` helper for converting Product
+    Studio GLTF primitives into renderer-owned triangle mesh inputs.
 
 - **Changed**
   - Routed showcase chrome and debug allocation labels through package-owned
@@ -22,9 +24,15 @@ All notable changes to this project will be documented in this file.
     harbor structures instead of one tiny hull mesh plus placeholder boxes.
   - Showcase lighting now adds local lantern response, a lighthouse beam pass,
     and a subtle atmospheric grade for more realistic recorded frames.
+  - Product Studio source now mounts the `@plasius/gpu-renderer` mesh-BVH
+    wavefront renderer with triangle meshes, denoise, samples-per-pixel, and
+    `@plasius/gpu-lighting` environment options instead of analytic
+    scene-object boxes.
 
 - **Fixed**
   - Restored the package CD workflow so protected `main` releases are prepared by PR and published without direct branch pushes.
+  - GLTF model aggregation now appends large primitive arrays iteratively so
+    real-world Product Studio meshes do not overflow the JavaScript call stack.
   - The shared showcase now propagates the realistic-model feature flag into
     scene state and initializes its DOM scaffold before canvas setup, allowing
     the local realistic asset catalog to mount in browser demos.

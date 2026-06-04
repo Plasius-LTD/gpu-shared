@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  buildProductStudioSceneObjects,
+  createProductStudioMeshes,
   mountGpuProductStudio,
 } from "../src/product-studio-runtime.js";
 
@@ -20,9 +20,9 @@ function createProductModel() {
     primitives: Object.freeze([
       Object.freeze({
         name: "wood-shell",
-        positions: Object.freeze([]),
+        positions: Object.freeze([-1, 0, -0.5, 0, 0.4, -0.25, -0.4, 0.9, 0.5]),
         indices: Object.freeze([0, 1, 2]),
-        normals: null,
+        normals: Object.freeze([0, 1, 0, 0, 1, 0, 0, 1, 0]),
         colors: null,
         material: Object.freeze({
           name: "Eames_Lounge_Chair_Ottoman_Wood_",
@@ -38,9 +38,9 @@ function createProductModel() {
       }),
       Object.freeze({
         name: "chrome-base",
-        positions: Object.freeze([]),
+        positions: Object.freeze([0.1, -0.4, -0.2, 1.8, -0.3, 0.1, 1.2, 0.2, -0.1]),
         indices: Object.freeze([0, 1, 2]),
-        normals: null,
+        normals: Object.freeze([0, 0, 1, 0, 0, 1, 0, 0, 1]),
         colors: null,
         material: Object.freeze({
           name: "Eames_Lounge_Chair_Ottoman_Chrome_",
@@ -63,9 +63,11 @@ function installDomHarness() {
   const originalWindow = globalThis.window;
   const classNames = new Set();
   const styles = new Map();
+  const children = [];
   const canvas = {
     width: 0,
     height: 0,
+    dataset: {},
     getContext() {
       return {};
     },
@@ -80,6 +82,14 @@ function installDomHarness() {
       remove(value) {
         classNames.delete(value);
       },
+    },
+    ownerDocument: null,
+    appendChild(node) {
+      children.push(node);
+      return node;
+    },
+    getBoundingClientRect() {
+      return { width: 640, height: 360 };
     },
     querySelector(selector) {
       if (selector === "#productStudioCanvas") {
@@ -99,6 +109,9 @@ function installDomHarness() {
       },
     },
     createElement(tag) {
+      if (tag === "canvas") {
+        return canvas;
+      }
       return {
         tagName: String(tag).toUpperCase(),
         id: "",
@@ -112,6 +125,7 @@ function installDomHarness() {
   globalThis.window = {};
   return {
     canvas,
+    children,
     classNames,
     root,
     status,
@@ -122,19 +136,19 @@ function installDomHarness() {
   };
 }
 
-test("product studio builds a renderer scene from model primitive bounds", () => {
-  const sceneObjects = buildProductStudioSceneObjects(createProductModel());
+test("product studio builds triangle mesh inputs for display-quality rendering", () => {
+  const meshes = createProductStudioMeshes(createProductModel());
 
-  assert.equal(sceneObjects.length, 5);
-  assert.equal(sceneObjects[0].kind, "box");
-  assert.equal(sceneObjects[2].kind, "sphere");
-  assert.equal(sceneObjects[2].materialKind, 5);
-  assert.equal(sceneObjects[3].materialKind, 1);
-  assert.equal(sceneObjects[4].materialKind, 2);
-  assert.deepEqual(sceneObjects[3].color, [0.44, 0.24, 0.12, 1]);
+  assert.equal(meshes.length, 6);
+  assert.equal(meshes[0].indices.length, 6);
+  assert.equal(meshes[3].materialKind, "emissive");
+  assert.equal(meshes[4].materialKind, "diffuse");
+  assert.equal(meshes[5].materialKind, "metal");
+  assert.deepEqual(meshes[4].color, [0.56, 0.33, 0.22, 1]);
+  assert.deepEqual(meshes[4].normals, [0, 1, 0, 0, 1, 0, 0, 1, 0]);
 });
 
-test("product studio mounts the WebGPU wavefront renderer with model-derived objects", async () => {
+test("product studio mounts the WebGPU wavefront renderer with model-derived meshes", async () => {
   const harness = installDomHarness();
   let rendererOptions = null;
   let destroyed = false;
@@ -145,6 +159,8 @@ test("product studio mounts the WebGPU wavefront renderer with model-derived obj
       width: 640,
       height: 360,
       maxDepth: 4,
+      samplesPerPixel: 4,
+      denoise: true,
       __modelLoader: async (url) => {
         assert.equal(
           url,
@@ -154,20 +170,28 @@ test("product studio mounts the WebGPU wavefront renderer with model-derived obj
       },
       __rendererLoader: async () => ({
         rendererWavefrontComputeMode: "webgpu-compute",
-        supportsWavefrontPathTracingCompute: () => true,
+          supportsWavefrontPathTracingCompute: () => true,
         async createWavefrontPathTracingComputeRenderer(options) {
           rendererOptions = options;
           return {
-            async renderFrame() {
+            renderOnce() {
               return {
-                outputProbe: { nonZeroSamples: 7, sampledPixels: 9, maxChannel: 255 },
-                bounces: [],
-                termination: { emissive: 1, environment: 0, ambientFallback: 0, maxDepth: 0 },
+                frame: 1,
+                triangleCount: 12,
+                primaryRays: 921600,
               };
             },
             destroy() {
               destroyed = true;
             },
+          };
+        },
+      }),
+      __lightingLoader: async () => ({
+        createWavefrontEnvironmentLightingOptions() {
+          return {
+            environmentColor: [0.35, 0.43, 0.49, 1],
+            ambientColor: [0.02, 0.024, 0.028, 1],
           };
         },
       }),
@@ -177,16 +201,22 @@ test("product studio mounts the WebGPU wavefront renderer with model-derived obj
     assert.equal(rendererOptions.width, 640);
     assert.equal(rendererOptions.height, 360);
     assert.equal(rendererOptions.maxDepth, 4);
-    assert.equal(rendererOptions.sceneObjects.length, 5);
+    assert.equal(rendererOptions.samplesPerPixel, 4);
+    assert.equal(rendererOptions.denoise, true);
+    assert.equal(rendererOptions.displayQuality, true);
+    assert.equal(rendererOptions.meshes.length, 6);
+    assert.equal(rendererOptions.sceneObjects, undefined);
     assert.equal(result.productModel.name, "Eames_Lounge_Chair_Ottoman");
-    assert.equal(result.state.rendererMode, "webgpu-compute");
-    assert.match(harness.status.textContent, /5 trace objects/);
-    assert.match(globalThis.window.render_game_to_text(), /"mode":"product-studio"/);
+    assert.equal(result.model.name, "Eames_Lounge_Chair_Ottoman");
+    assert.equal(result.meshes.length, 6);
+    assert.equal(result.state.geometryMode, "mesh-bvh-display-quality");
+    assert.equal(result.state.requiresMeshBvhForDisplayQuality, true);
+    assert.match(globalThis.window.render_game_to_text(), /"surface":"gpu-product-studio-wavefront"/);
 
     result.destroy();
     assert.equal(destroyed, true);
     assert.equal(harness.root.innerHTML, "<p>previous</p>");
-    assert.equal(harness.classNames.has("plasius-product-studio-root"), false);
+    assert.equal(harness.classNames.has("plasius-product-studio-wavefront"), false);
   } finally {
     harness.restore();
   }

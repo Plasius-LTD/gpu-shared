@@ -59,6 +59,31 @@ export type ShowcaseFocusMode =
   | "performance"
   | "debug";
 
+export type ProductStudioMaterialKind =
+  | "diffuse"
+  | "metal"
+  | "transparent"
+  | "emissive";
+
+export interface ProductStudioMesh {
+  readonly id: number;
+  readonly positions: readonly number[];
+  readonly indices: readonly number[];
+  readonly normals: readonly number[] | null;
+  readonly color: readonly number[];
+  readonly emission: readonly number[];
+  readonly materialKind: ProductStudioMaterialKind;
+  readonly materialRefId?: number;
+  readonly roughness: number;
+  readonly metallic: number;
+  readonly opacity: number;
+}
+
+export interface CreateProductStudioMeshesOptions {
+  readonly targetCenter?: readonly [number, number, number];
+  readonly targetSize?: number;
+}
+
 export type GpuSharedTranslationValue =
   | string
   | number
@@ -150,6 +175,13 @@ export interface MountGpuShowcaseOptions {
   width?: number;
   height?: number;
   maxDepth?: number;
+  tileSize?: number;
+  samplesPerPixel?: number;
+  denoise?: boolean;
+  targetCenter?: readonly [number, number, number];
+  targetSize?: number;
+  lightingPreset?: string;
+  lightingIntensity?: number;
   translate?: GpuSharedTranslate;
   captureMode?: boolean;
   renderScale?: number;
@@ -168,7 +200,9 @@ export interface MountGpuShowcaseResult {
 
 export interface MountGpuProductStudioResult {
   readonly state: Record<string, unknown>;
+  readonly model: GltfModel;
   readonly productModel: GltfModel;
+  readonly meshes: readonly ProductStudioMesh[];
   readonly canvas: HTMLCanvasElement;
   readonly renderer?: unknown;
   destroy(): void;
@@ -185,6 +219,11 @@ export function resolveShowcaseAssetUrl(
 ): URL;
 
 export function loadGltfModel(url: string | URL): Promise<GltfModel>;
+
+export function createProductStudioMeshes(
+  model: GltfModel,
+  options?: CreateProductStudioMeshesOptions
+): readonly ProductStudioMesh[];
 
 export function mountGpuShowcase(
   options?: MountGpuShowcaseOptions
