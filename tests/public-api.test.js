@@ -86,10 +86,15 @@ test("showcase focus modes remain stable for family demos", () => {
 
 test("mountGpuShowcase routes product studio mode to the product runtime loader", async () => {
   let receivedOptions = null;
+  const featureFlags = {
+    enabled: {
+      [GPU_SHOWCASE_PRODUCT_STUDIO_FEATURE]: true,
+    },
+  };
   const result = await mountGpuShowcase({
     demoMode: "product-studio",
     productAssetUrl: "/data/eames.gltf",
-    __featureFlags: { enabled: true },
+    __featureFlags: featureFlags,
     __productRuntimeLoader: async () => ({
       async mountGpuProductStudio(options, featureFlags) {
         receivedOptions = options;
@@ -103,7 +108,28 @@ test("mountGpuShowcase routes product studio mode to the product runtime loader"
 
   assert.equal(receivedOptions.productAssetUrl, "/data/eames.gltf");
   assert.equal(receivedOptions.__productRuntimeLoader, undefined);
-  assert.deepEqual(result.state.featureFlags, { enabled: true });
+  assert.equal(result.state.featureFlags, featureFlags);
+});
+
+test("mountGpuShowcase fails closed when product studio feature flag is disabled", async () => {
+  let productRuntimeLoaded = false;
+  await assert.rejects(
+    () =>
+      mountGpuShowcase({
+        demoMode: "product-studio",
+        __featureFlags: {
+          enabled: {
+            [GPU_SHOWCASE_PRODUCT_STUDIO_FEATURE]: false,
+          },
+        },
+        __productRuntimeLoader: async () => {
+          productRuntimeLoaded = true;
+          return {};
+        },
+      }),
+    /gpu_showcase_product_studio_wavefront_v1 must be enabled/u
+  );
+  assert.equal(productRuntimeLoaded, false);
 });
 
 test("showcase asset resolution targets the shared brigantine asset", () => {
