@@ -70,6 +70,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@plasius/gpu-lighting": "^0.1.19",
     "@plasius/translations": "^1.0.17",
     "c8": "^11.0.0",
     "eslint": "^10.3.0",
