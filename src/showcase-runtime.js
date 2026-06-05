@@ -1320,6 +1320,75 @@ function tintPrimitiveColor(material, colorOverride) {
   return mixColor(material.color, multiplyColor(material.color, colorOverride), tintAmount);
 }
 
+function getColorStride(colors, vertexCount) {
+  if (!Array.isArray(colors) || colors.length === 0 || vertexCount <= 0) {
+    return 0;
+  }
+
+  const stride = colors.length / vertexCount;
+  if (stride < 3 || stride > 4) {
+    return 0;
+  }
+
+  return Number.isInteger(stride) ? stride : 0;
+}
+
+function sampleVertexColor(colors, stride, vertexIndex) {
+  const baseIndex = vertexIndex * stride;
+  const red = colors[baseIndex];
+  const green = colors[baseIndex + 1];
+  const blue = colors[baseIndex + 2];
+
+  if (!Number.isFinite(red) || !Number.isFinite(green) || !Number.isFinite(blue)) {
+    return null;
+  }
+
+  const alpha =
+    stride >= 4 && Number.isFinite(colors[baseIndex + 3]) ? colors[baseIndex + 3] : 1;
+
+  return {
+    r: red,
+    g: green,
+    b: blue,
+    a: alpha,
+  };
+}
+
+function resolveTriangleVertexColor(primitive, vertexA, vertexB, vertexC) {
+  const vertexCount = Number.isInteger(primitive.positions.length / 3)
+    ? primitive.positions.length / 3
+    : 0;
+  const stride = getColorStride(primitive.colors, vertexCount);
+
+  if (stride === 0) {
+    return null;
+  }
+
+  const aColor = sampleVertexColor(primitive.colors, stride, vertexA);
+  const bColor = sampleVertexColor(primitive.colors, stride, vertexB);
+  const cColor = sampleVertexColor(primitive.colors, stride, vertexC);
+
+  if (!aColor || !bColor || !cColor) {
+    return null;
+  }
+
+  return {
+    r: (aColor.r + bColor.r + cColor.r) / 3,
+    g: (aColor.g + bColor.g + cColor.g) / 3,
+    b: (aColor.b + bColor.b + cColor.b) / 3,
+    a: (aColor.a + bColor.a + cColor.a) / 3,
+  };
+}
+
+function resolveTriangleColor(materialColor, primitive, positionA, positionB, positionC) {
+  const vertexA = Math.floor(positionA / 3);
+  const vertexB = Math.floor(positionB / 3);
+  const vertexC = Math.floor(positionC / 3);
+  const vertexColor = resolveTriangleVertexColor(primitive, vertexA, vertexB, vertexC);
+
+  return vertexColor ? multiplyColor(materialColor, vertexColor) : materialColor;
+}
+
 function projectShadowPoint(point, lightDir, planeY) {
   const shadowDir = scaleVec3(lightDir, -1);
   if (Math.abs(shadowDir.y) < 0.0001) {
@@ -1443,6 +1512,13 @@ function buildTrianglesFromMesh(
       const aIndex = primitive.indices[index] * 3;
       const bIndex = primitive.indices[index + 1] * 3;
       const cIndex = primitive.indices[index + 2] * 3;
+      const materialColor = resolveTriangleColor(
+        resolvedColor,
+        primitive,
+        aIndex,
+        bIndex,
+        cIndex
+      );
 
       const a = transformPoint(
         vec3(
@@ -1522,7 +1598,7 @@ function buildTrianglesFromMesh(
         depth: (projected[0].depth + projected[1].depth + projected[2].depth) / 3,
         worldCenter: scaleVec3(addVec3(addVec3(a, b), c), 1 / 3),
         normal,
-        baseColor: resolvedColor,
+        baseColor: materialColor,
         accent: options.accent ?? 0,
         material: primitive.material,
         reflection: options.reflection ?? 0,
@@ -4324,4 +4400,5 @@ export {
   buildWaterMotionEffects as __testOnlyBuildWaterMotionEffects,
   collectSceneLightSources as __testOnlyCollectSceneLightSources,
   createShowcaseClothSimulationState as __testOnlyCreateShowcaseClothSimulationState,
+  resolveTriangleColor as __testOnlyResolveTriangleColor,
 };

@@ -7,6 +7,7 @@ import {
   __testOnlyBuildWaterMotionEffects,
   __testOnlyCollectSceneLightSources,
   __testOnlyCreateShowcaseClothSimulationState,
+  __testOnlyResolveTriangleColor,
 } from "../src/showcase-runtime.js";
 
 function distanceBetween(a, b) {
@@ -223,4 +224,41 @@ test("scene lighting separates water reflections from direct glow sources", () =
   });
   assert.ok(noReflections.directLights.length > 0);
   assert.equal(noReflections.reflectionLights.length, 0);
+});
+
+test("triangle color resolves averaged COLOR_0 into triangle material tint", () => {
+  const primitive = {
+    positions: [
+      0, 0, 0,
+      1, 0, 0,
+      0, 1, 0,
+    ],
+    colors: [
+      1, 0, 0,
+      0, 1, 0,
+      0, 0, 1,
+    ],
+  };
+  const materialColor = { r: 0.6, g: 0.4, b: 0.8, a: 1 };
+  const resolved = __testOnlyResolveTriangleColor(materialColor, primitive, 0, 3, 6);
+
+  assert.ok(Math.abs(resolved.r - 0.2) < 0.000001);
+  assert.ok(Math.abs(resolved.g - 0.13333333333333333) < 0.000001);
+  assert.ok(Math.abs(resolved.b - 0.266666) < 0.000001);
+  assert.equal(resolved.a, 1);
+});
+
+test("triangle color falls back to material color when vertex colors are absent", () => {
+  const primitive = {
+    positions: [
+      0, 0, 0,
+      1, 0, 0,
+      0, 1, 0,
+    ],
+    colors: null,
+  };
+  const materialColor = { r: 0.12, g: 0.34, b: 0.56, a: 0.78 };
+  const resolved = __testOnlyResolveTriangleColor(materialColor, primitive, 0, 3, 6);
+
+  assert.equal(resolved, materialColor);
 });

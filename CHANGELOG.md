@@ -71,6 +71,8 @@ All notable changes to this project will be documented in this file.
   - Low-lying ship triangles no longer pick up the water reflection term just
     because they are near the shoreline plane, so hulls stop reading like
     reflective water surfaces.
+  - Realistic showcase shading now applies `COLOR_0` vertex colors when present
+    so richer GLTF exports retain color transitions and paint details.
 
 - **Security**
   - (placeholder)
