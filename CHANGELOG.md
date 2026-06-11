@@ -16,6 +16,9 @@ All notable changes to this project will be documented in this file.
     delegation to the `@plasius/gpu-renderer` WebGPU wavefront renderer.
 
 - **Changed**
+  - Updated the optional `@plasius/gpu-renderer` peer range to the 0.2 line so
+    Product Studio and demo consumers can use the released realtime wavefront
+    camera update API without npm peer conflicts.
   - Documented that project-wide display-quality path tracing requires renderer
     mesh BVH intersections and triangle normals; bounded model proxies are now
     disabled rather than exposed as a debug bridge.
