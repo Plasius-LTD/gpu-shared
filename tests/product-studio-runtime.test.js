@@ -42,7 +42,31 @@ function createModelFixture() {
           roughness: 0.5,
           metallic: 0.1,
           emissive: { r: 0, g: 0, b: 0 },
+          baseColorTexture: {
+            width: 2,
+            height: 2,
+            texCoord: 0,
+            data: new Uint8ClampedArray([
+              64, 32, 16, 255,
+              96, 48, 24, 255,
+              128, 64, 32, 255,
+              160, 80, 40, 255,
+            ]),
+          },
+          normalTexture: {
+            width: 2,
+            height: 2,
+            texCoord: 0,
+            scale: 0.7,
+            data: new Uint8ClampedArray([
+              128, 128, 255, 255,
+              128, 128, 255, 255,
+              128, 128, 255, 255,
+              128, 128, 255, 255,
+            ]),
+          },
         },
+        uvs: [0, 0, 1, 0, 0, 1, 1, 1, 0.1, 0.2, 0.9, 0.2, 0.1, 0.8, 0.9, 0.8],
       },
       {
         name: "metal",
@@ -130,6 +154,10 @@ test("product studio meshes preserve GLTF primitive triangles for mesh BVH rende
   assert.equal(modelMeshes.length, 2);
   assert.equal(modelMeshes[0].positions.length, 24);
   assert.equal(modelMeshes[0].indices.length, 12);
+  assert.deepEqual(modelMeshes[0].uvs, createModelFixture().primitives[0].uvs);
+  assert.equal(modelMeshes[0].baseColorTexture.width, 2);
+  assert.equal(modelMeshes[0].normalTexture.scale, 0.7);
+  assert.equal(modelMeshes[0].material.baseColorTexture.height, 2);
   assert.equal(modelMeshes[1].materialKind, "metal");
   assert.equal(meshes.some((mesh) => mesh.materialKind === "emissive"), true);
   assert.equal(meshes.every((mesh) => !Object.hasOwn(mesh, "bounds")), true);

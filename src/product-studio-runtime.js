@@ -223,12 +223,15 @@ function createProductStudioMeshFromPrimitive(primitive, primitiveIndex, transfo
       : Array.from({ length: positions.length / 3 }, (_, index) => index);
   const material = primitive.material ?? {};
   const color = readMaterialColor(material);
+  const uvs = Array.isArray(primitive.uvs) ? [...primitive.uvs] : null;
 
   return Object.freeze({
     id: 1000 + primitiveIndex,
     positions: Object.freeze(positions),
     indices: Object.freeze(indices),
     normals: Array.isArray(primitive.normals) ? Object.freeze([...primitive.normals]) : null,
+    uvs: uvs ? Object.freeze(uvs) : null,
+    material: Object.freeze({ ...material }),
     color: Object.freeze(color),
     emission: Object.freeze(readEmission(material)),
     materialKind: readMaterialKind(material),
@@ -236,6 +239,56 @@ function createProductStudioMeshFromPrimitive(primitive, primitiveIndex, transfo
     roughness: Number.isFinite(material.roughness) ? material.roughness : 0.72,
     metallic: Number.isFinite(material.metallic) ? material.metallic : 0,
     opacity: color[3],
+    baseColorTexture: material.baseColorTexture ?? null,
+    metallicRoughnessTexture: material.metallicRoughnessTexture ?? null,
+    normalTexture: material.normalTexture ?? null,
+    occlusionTexture: material.occlusionTexture ?? null,
+    emissiveTexture: material.emissiveTexture ?? null,
+    specular: Number.isFinite(material.specular) ? material.specular : 1,
+    specularColor: Array.isArray(material.specularColor)
+      ? Object.freeze([...material.specularColor])
+      : undefined,
+    specularTexture: material.specularTexture ?? null,
+    specularColorTexture: material.specularColorTexture ?? null,
+    transmission: Number.isFinite(material.transmission) ? material.transmission : 0,
+    transmissionTexture: material.transmissionTexture ?? null,
+    ior: Number.isFinite(material.ior) ? material.ior : undefined,
+    thickness: Number.isFinite(material.thickness) ? material.thickness : undefined,
+    thicknessTexture: material.thicknessTexture ?? null,
+    attenuationDistance:
+      Number.isFinite(material.attenuationDistance) ? material.attenuationDistance : null,
+    attenuationColor: Array.isArray(material.attenuationColor)
+      ? Object.freeze([...material.attenuationColor])
+      : undefined,
+    clearcoat: Number.isFinite(material.clearcoat) ? material.clearcoat : undefined,
+    clearcoatTexture: material.clearcoatTexture ?? null,
+    clearcoatRoughness: Number.isFinite(material.clearcoatRoughness)
+      ? material.clearcoatRoughness
+      : undefined,
+    clearcoatRoughnessTexture: material.clearcoatRoughnessTexture ?? null,
+    clearcoatNormalTexture: material.clearcoatNormalTexture ?? null,
+    sheenColor: Array.isArray(material.sheenColor)
+      ? Object.freeze([...material.sheenColor])
+      : undefined,
+    sheenColorTexture: material.sheenColorTexture ?? null,
+    sheenRoughness: Number.isFinite(material.sheenRoughness) ? material.sheenRoughness : undefined,
+    sheenRoughnessTexture: material.sheenRoughnessTexture ?? null,
+    iridescence: Number.isFinite(material.iridescence) ? material.iridescence : undefined,
+    iridescenceTexture: material.iridescenceTexture ?? null,
+    iridescenceIor: Number.isFinite(material.iridescenceIor) ? material.iridescenceIor : undefined,
+    iridescenceThicknessMinimum: Number.isFinite(material.iridescenceThicknessMinimum)
+      ? material.iridescenceThicknessMinimum
+      : undefined,
+    iridescenceThicknessMaximum: Number.isFinite(material.iridescenceThicknessMaximum)
+      ? material.iridescenceThicknessMaximum
+      : undefined,
+    iridescenceThicknessTexture: material.iridescenceThicknessTexture ?? null,
+    anisotropy: Number.isFinite(material.anisotropy) ? material.anisotropy : undefined,
+    anisotropyRotation: Number.isFinite(material.anisotropyRotation)
+      ? material.anisotropyRotation
+      : undefined,
+    anisotropyTexture: material.anisotropyTexture ?? null,
+    dispersion: Number.isFinite(material.dispersion) ? material.dispersion : undefined,
   });
 }
 

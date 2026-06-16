@@ -238,6 +238,183 @@ test("loadGltfModel delegates through the shared loader", async () => {
   }
 });
 
+test("loadGltfModel preserves UVs and material textures for product-studio assets", async () => {
+  const positions = new Float32Array([
+    -1, 0, 0,
+    1, 0, 0,
+    0, 1, 0,
+  ]);
+  const normals = new Float32Array([
+    0, 0, 1,
+    0, 0, 1,
+    0, 0, 1,
+  ]);
+  const uvs = new Float32Array([
+    0, 0,
+    1, 0,
+    0.5, 1,
+  ]);
+  const indices = new Uint32Array([0, 1, 2]);
+  const buffer = Buffer.concat([
+    Buffer.from(positions.buffer),
+    Buffer.from(normals.buffer),
+    Buffer.from(uvs.buffer),
+    Buffer.from(indices.buffer),
+  ]);
+  const document = {
+    asset: { version: "2.0" },
+    scene: 0,
+    scenes: [{ nodes: [0] }],
+    nodes: [{ name: "chair", mesh: 0 }],
+    meshes: [
+      {
+        primitives: [
+          {
+            attributes: { POSITION: 0, NORMAL: 1, TEXCOORD_0: 2 },
+            indices: 3,
+            material: 0,
+          },
+        ],
+      },
+    ],
+    materials: [
+      {
+        name: "Leather",
+        pbrMetallicRoughness: {
+          baseColorFactor: [0.25, 0.2, 0.18, 1],
+          metallicFactor: 0.1,
+          roughnessFactor: 0.61,
+          baseColorTexture: {
+            index: 0,
+            texCoord: 0,
+            extensions: {
+              KHR_texture_transform: {
+                offset: [0.25, 0.25],
+                scale: [0.5, 0.5],
+                texCoord: 0,
+              },
+            },
+          },
+          metallicRoughnessTexture: { index: 1, texCoord: 0 },
+        },
+        normalTexture: { index: 2, texCoord: 0, scale: 0.75 },
+      },
+    ],
+    textures: [{ source: 0 }, { source: 1 }, { source: 2 }],
+    images: [
+      { uri: "leather-base.png" },
+      { uri: "leather-orm.png" },
+      { uri: "leather-normal.png" },
+    ],
+    buffers: [{ uri: "mesh.bin", byteLength: buffer.byteLength }],
+    bufferViews: [
+      { buffer: 0, byteOffset: 0, byteLength: positions.byteLength },
+      { buffer: 0, byteOffset: positions.byteLength, byteLength: normals.byteLength },
+      {
+        buffer: 0,
+        byteOffset: positions.byteLength + normals.byteLength,
+        byteLength: uvs.byteLength,
+      },
+      {
+        buffer: 0,
+        byteOffset: positions.byteLength + normals.byteLength + uvs.byteLength,
+        byteLength: indices.byteLength,
+      },
+    ],
+    accessors: [
+      { bufferView: 0, componentType: 5126, count: 3, type: "VEC3" },
+      { bufferView: 1, componentType: 5126, count: 3, type: "VEC3" },
+      { bufferView: 2, componentType: 5126, count: 3, type: "VEC2" },
+      { bufferView: 3, componentType: 5125, count: 3, type: "SCALAR" },
+    ],
+  };
+
+  const originalFetch = globalThis.fetch;
+  const originalCreateImageBitmap = globalThis.createImageBitmap;
+  const originalOffscreenCanvas = globalThis.OffscreenCanvas;
+  globalThis.fetch = async (input) => {
+    const href = input instanceof URL ? input.href : String(input);
+    if (href === "https://example.test/chair.gltf") {
+      return {
+        ok: true,
+        url: href,
+        async json() {
+          return document;
+        },
+      };
+    }
+    if (href === "https://example.test/mesh.bin") {
+      return {
+        ok: true,
+        url: href,
+        async arrayBuffer() {
+          return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
+        },
+      };
+    }
+    if (
+      href === "https://example.test/leather-base.png" ||
+      href === "https://example.test/leather-orm.png" ||
+      href === "https://example.test/leather-normal.png"
+    ) {
+      return {
+        ok: true,
+        url: href,
+        async blob() {
+          return new Blob([new Uint8Array([1, 2, 3, 4])], { type: "image/png" });
+        },
+      };
+    }
+    throw new Error(`Unexpected fetch: ${href}`);
+  };
+  globalThis.createImageBitmap = async () => ({
+    width: 2,
+    height: 2,
+    close() {},
+  });
+  globalThis.OffscreenCanvas = class OffscreenCanvasMock {
+    constructor(width, height) {
+      this.width = width;
+      this.height = height;
+    }
+
+    getContext() {
+      return {
+        drawImage() {},
+        getImageData: () => ({
+          data: new Uint8ClampedArray([
+            255, 128, 64, 255,
+            192, 160, 96, 255,
+            128, 96, 64, 255,
+            32, 16, 8, 255,
+          ]),
+        }),
+      };
+    }
+  };
+
+  try {
+    const model = await loadGltfModel("https://example.test/chair.gltf");
+    const primitive = model.primitives[0];
+    assert.deepEqual(primitive.uvs, [0, 0, 1, 0, 0.5, 1]);
+    assert.equal(primitive.material.name, "Leather");
+    assert.equal(primitive.material.baseColorTexture.width, 2);
+    assert.equal(primitive.material.metallicRoughnessTexture.height, 2);
+    assert.equal(primitive.material.normalTexture.scale, 0.75);
+    assert.equal(primitive.material.baseColorTexture.data.length, 16);
+    assert.deepEqual([...primitive.material.baseColorTexture.data], [
+      205, 121, 66, 255,
+      170, 123, 72, 255,
+      138, 91, 56, 255,
+      94, 65, 38, 255,
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+    globalThis.createImageBitmap = originalCreateImageBitmap;
+    globalThis.OffscreenCanvas = originalOffscreenCanvas;
+  }
+});
+
 test("loadGltfModel aggregates large mesh primitives without spread-call overflow", async () => {
   const originalFetch = globalThis.fetch;
   const vertexCount = 70_000;

@@ -35,6 +35,9 @@ npm install @plasius/gpu-shared
 - Converts Product Studio GLTF primitives into triangle mesh inputs for the
   renderer-owned mesh-BVH wavefront path instead of customer-visible analytic
   scene objects.
+- Preserves Product Studio UVs, decoded glTF material textures, and core
+  `KHR_materials_*` factors so renderer-owned leather, wood, chrome, and
+  transmissive surface response can be driven from the source asset.
 
 ## Usage
 
