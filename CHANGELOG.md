@@ -52,6 +52,12 @@ All notable changes to this project will be documented in this file.
   - Restored the package CD workflow so protected `main` releases are prepared by PR and published without direct branch pushes.
   - GLTF model aggregation now appends large primitive arrays iteratively so
     real-world Product Studio meshes do not overflow the JavaScript call stack.
+  - Product Studio GLTF loading now preserves UVs, decoded material textures,
+    and stride-safe accessor reads so wood, leather, and other textured mesh
+    surfaces reach the renderer intact instead of falling back to flat factors.
+  - Product Studio GLTF texture-transform baking now resamples with bilinear
+    filtering instead of nearest-neighbor lookups, reducing blocky localized
+    distortion on transformed leather and wood texture regions.
   - Product Studio showcase routing now honors the rollout feature flag before
     loading the renderer or replacing the host DOM.
   - The shared showcase now propagates the realistic-model feature flag into

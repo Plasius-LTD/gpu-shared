@@ -55,6 +55,35 @@ function getTypeSize(type) {
   }
 }
 
+function getComponentByteSize(componentType) {
+  switch (componentType) {
+    case 5121:
+      return 1;
+    case 5123:
+      return 2;
+    case 5125:
+    case 5126:
+      return 4;
+    default:
+      throw new Error(`Unsupported glTF componentType: ${componentType}`);
+  }
+}
+
+function readComponentValue(view, componentType, byteOffset) {
+  switch (componentType) {
+    case 5121:
+      return view.getUint8(byteOffset);
+    case 5123:
+      return view.getUint16(byteOffset, true);
+    case 5125:
+      return view.getUint32(byteOffset, true);
+    case 5126:
+      return view.getFloat32(byteOffset, true);
+    default:
+      throw new Error(`Unsupported glTF componentType: ${componentType}`);
+  }
+}
+
 function readAccessor(document, accessorIndex, buffers) {
   const accessor = document.accessors?.[accessorIndex];
   if (!accessor) {
@@ -69,10 +98,30 @@ function readAccessor(document, accessorIndex, buffers) {
   const buffer = buffers[bufferView.buffer];
   const componentCount = getTypeSize(accessor.type);
   const byteOffset = (bufferView.byteOffset ?? 0) + (accessor.byteOffset ?? 0);
-  const valueCount = accessor.count * componentCount;
-  const values = Array.from(
-    getComponentArray(accessor.componentType, buffer, byteOffset, valueCount)
-  );
+  const componentByteSize = getComponentByteSize(accessor.componentType);
+  const packedElementByteLength = componentCount * componentByteSize;
+  const byteStride = Math.max(bufferView.byteStride ?? packedElementByteLength, packedElementByteLength);
+  let values;
+
+  if (byteStride === packedElementByteLength) {
+    const valueCount = accessor.count * componentCount;
+    values = Array.from(
+      getComponentArray(accessor.componentType, buffer, byteOffset, valueCount)
+    );
+  } else {
+    const view = new DataView(buffer, byteOffset);
+    values = new Array(accessor.count * componentCount);
+    for (let index = 0; index < accessor.count; index += 1) {
+      const elementOffset = index * byteStride;
+      for (let componentIndex = 0; componentIndex < componentCount; componentIndex += 1) {
+        values[index * componentCount + componentIndex] = readComponentValue(
+          view,
+          accessor.componentType,
+          elementOffset + componentIndex * componentByteSize
+        );
+      }
+    }
+  }
 
   if (accessor.normalized) {
     const scale = getNormalizationScale(accessor.componentType);
@@ -82,11 +131,258 @@ function readAccessor(document, accessorIndex, buffers) {
   return values;
 }
 
-function getMaterialInfo(document, primitive) {
+async function decodeImagePixels(blob, urlLabel = "glTF texture") {
+  if (typeof createImageBitmap === "function") {
+    const bitmap = await createImageBitmap(blob);
+    try {
+      const canvas =
+        typeof OffscreenCanvas === "function"
+          ? new OffscreenCanvas(bitmap.width, bitmap.height)
+          : typeof document !== "undefined"
+            ? Object.assign(document.createElement("canvas"), {
+                width: bitmap.width,
+                height: bitmap.height,
+              })
+            : null;
+      const context = canvas?.getContext?.("2d", { willReadFrequently: true });
+      if (!context) {
+        throw new Error("Unable to create 2D context for glTF texture decode.");
+      }
+      context.drawImage(bitmap, 0, 0);
+      const imageData = context.getImageData(0, 0, bitmap.width, bitmap.height);
+      return Object.freeze({
+        width: bitmap.width,
+        height: bitmap.height,
+        data: imageData.data,
+      });
+    } finally {
+      bitmap.close?.();
+    }
+  }
+
+  if (typeof document === "undefined") {
+    throw new Error(`Unable to decode ${urlLabel}: browser image decode APIs are unavailable.`);
+  }
+
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    const image = await new Promise((resolve, reject) => {
+      const element = new Image();
+      element.onload = () => resolve(element);
+      element.onerror = () => reject(new Error(`Failed to decode ${urlLabel}.`));
+      element.src = objectUrl;
+    });
+    const canvas = Object.assign(document.createElement("canvas"), {
+      width: image.naturalWidth || image.width,
+      height: image.naturalHeight || image.height,
+    });
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+    if (!context) {
+      throw new Error("Unable to create 2D context for glTF texture decode.");
+    }
+    context.drawImage(image, 0, 0);
+    const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+    return Object.freeze({
+      width: canvas.width,
+      height: canvas.height,
+      data: imageData.data,
+    });
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
+function sliceBufferView(document, bufferViewIndex, buffers) {
+  const bufferView = document.bufferViews?.[bufferViewIndex];
+  if (!bufferView) {
+    throw new Error(`glTF bufferView ${bufferViewIndex} is missing.`);
+  }
+  const buffer = buffers[bufferView.buffer];
+  if (!buffer) {
+    throw new Error(`glTF buffer ${bufferView.buffer} is missing.`);
+  }
+  const start = bufferView.byteOffset ?? 0;
+  const end = start + (bufferView.byteLength ?? 0);
+  return buffer.slice(start, end);
+}
+
+async function loadImageResource(document, image, index, buffers, baseUrl) {
+  if (typeof image?.uri === "string") {
+    const response = await fetch(new URL(image.uri, baseUrl));
+    if (!response.ok) {
+      throw new Error(`Failed to load glTF texture: ${response.status} ${response.statusText}`);
+    }
+    return decodeImagePixels(
+      await response.blob(),
+      `glTF texture ${index}${image.uri ? ` (${image.uri})` : ""}`
+    );
+  }
+
+  if (typeof image?.bufferView === "number") {
+    const bytes = sliceBufferView(document, image.bufferView, buffers);
+    return decodeImagePixels(
+      new Blob([bytes], { type: image.mimeType ?? "application/octet-stream" }),
+      `glTF texture ${index}`
+    );
+  }
+
+  return null;
+}
+
+function normalizeTextureTransformPair(value, fallback) {
+  if (!Array.isArray(value) || value.length < 2) {
+    return fallback;
+  }
+  return [
+    Number.isFinite(value[0]) ? Number(value[0]) : fallback[0],
+    Number.isFinite(value[1]) ? Number(value[1]) : fallback[1],
+  ];
+}
+
+function readTextureTransform(textureRef) {
+  const transformExtension = textureRef?.extensions?.KHR_texture_transform ?? null;
+  return {
+    texCoord:
+      typeof transformExtension?.texCoord === "number"
+        ? transformExtension.texCoord
+        : textureRef?.texCoord ?? 0,
+    offset: normalizeTextureTransformPair(transformExtension?.offset, [0, 0]),
+    scale: normalizeTextureTransformPair(transformExtension?.scale, [1, 1]),
+    rotation: Number.isFinite(transformExtension?.rotation) ? Number(transformExtension.rotation) : 0,
+  };
+}
+
+function wrapTextureCoordinate(value) {
+  return ((value % 1) + 1) % 1;
+}
+
+function transformTextureCoordinate(uv, transform) {
+  const scaledU = uv[0] * transform.scale[0];
+  const scaledV = uv[1] * transform.scale[1];
+  const cosine = Math.cos(transform.rotation);
+  const sine = Math.sin(transform.rotation);
+  return [
+    scaledU * cosine - scaledV * sine + transform.offset[0],
+    scaledU * sine + scaledV * cosine + transform.offset[1],
+  ];
+}
+
+function readTexturePixel(data, width, height, x, y) {
+  const clampedX = Math.min(width - 1, Math.max(0, x));
+  const clampedY = Math.min(height - 1, Math.max(0, y));
+  const offset = (clampedY * width + clampedX) * 4;
+  return [
+    data[offset] ?? 0,
+    data[offset + 1] ?? 0,
+    data[offset + 2] ?? 0,
+    data[offset + 3] ?? 255,
+  ];
+}
+
+function mixChannel(a, b, weight) {
+  return a + (b - a) * weight;
+}
+
+function sampleTexturePixel(data, width, height, uv) {
+  const u = wrapTextureCoordinate(uv[0]);
+  const v = wrapTextureCoordinate(uv[1]);
+  const sourceX = u * Math.max(width - 1, 0);
+  const sourceY = (1 - v) * Math.max(height - 1, 0);
+  const x0 = Math.floor(sourceX);
+  const y0 = Math.floor(sourceY);
+  const x1 = Math.min(width - 1, x0 + 1);
+  const y1 = Math.min(height - 1, y0 + 1);
+  const tx = sourceX - x0;
+  const ty = sourceY - y0;
+  const topLeft = readTexturePixel(data, width, height, x0, y0);
+  const topRight = readTexturePixel(data, width, height, x1, y0);
+  const bottomLeft = readTexturePixel(data, width, height, x0, y1);
+  const bottomRight = readTexturePixel(data, width, height, x1, y1);
+  return [0, 1, 2, 3].map((channelIndex) => {
+    const top = mixChannel(topLeft[channelIndex], topRight[channelIndex], tx);
+    const bottom = mixChannel(bottomLeft[channelIndex], bottomRight[channelIndex], tx);
+    return mixChannel(top, bottom, ty);
+  });
+}
+
+function applyTextureTransformToPixels(pixels, transform) {
+  const isIdentityTransform =
+    transform.offset[0] === 0 &&
+    transform.offset[1] === 0 &&
+    transform.scale[0] === 1 &&
+    transform.scale[1] === 1 &&
+    transform.rotation === 0;
+  if (isIdentityTransform) {
+    return pixels;
+  }
+
+  const transformedData = new Uint8ClampedArray(pixels.data.length);
+  for (let y = 0; y < pixels.height; y += 1) {
+    const outputV = pixels.height > 1 ? 1 - y / (pixels.height - 1) : 0;
+    for (let x = 0; x < pixels.width; x += 1) {
+      const outputU = pixels.width > 1 ? x / (pixels.width - 1) : 0;
+      const sourcePixel = sampleTexturePixel(
+        pixels.data,
+        pixels.width,
+        pixels.height,
+        transformTextureCoordinate([outputU, outputV], transform)
+      );
+      const offset = (y * pixels.width + x) * 4;
+      transformedData[offset] = sourcePixel[0];
+      transformedData[offset + 1] = sourcePixel[1];
+      transformedData[offset + 2] = sourcePixel[2];
+      transformedData[offset + 3] = sourcePixel[3];
+    }
+  }
+
+  return Object.freeze({
+    width: pixels.width,
+    height: pixels.height,
+    data: transformedData,
+  });
+}
+
+function getMaterialTexture(document, textureRef, imageResources) {
+  if (!textureRef || typeof textureRef.index !== "number") {
+    return null;
+  }
+  const texture = document.textures?.[textureRef.index] ?? null;
+  const sourceIndex = texture?.source;
+  if (typeof sourceIndex !== "number") {
+    return null;
+  }
+  const pixels = imageResources.get(sourceIndex) ?? null;
+  if (!pixels) {
+    return null;
+  }
+
+  const transform = readTextureTransform(textureRef);
+  const transformedPixels = applyTextureTransformToPixels(pixels, transform);
+  return Object.freeze({
+    texCoord: transform.texCoord,
+    scale: textureRef.scale,
+    strength: textureRef.strength,
+    width: transformedPixels.width,
+    height: transformedPixels.height,
+    data: transformedPixels.data,
+  });
+}
+
+function getMaterialInfo(document, primitive, imageResources) {
   const material = document.materials?.[primitive.material] ?? null;
-  const factor =
-    material?.pbrMetallicRoughness?.baseColorFactor ?? [0.56, 0.33, 0.22, 1];
-  const emissive = material?.emissiveFactor ?? [0, 0, 0];
+  const pbr = material?.pbrMetallicRoughness ?? null;
+  const factor = pbr?.baseColorFactor ?? [0.56, 0.33, 0.22, 1];
+  const emissive = Array.isArray(material?.emissiveFactor) ? material.emissiveFactor : [0, 0, 0];
+  const extensions = material?.extensions ?? {};
+  const specular = extensions.KHR_materials_specular ?? null;
+  const transmission = extensions.KHR_materials_transmission ?? null;
+  const ior = extensions.KHR_materials_ior ?? null;
+  const clearcoat = extensions.KHR_materials_clearcoat ?? null;
+  const sheen = extensions.KHR_materials_sheen ?? null;
+  const volume = extensions.KHR_materials_volume ?? null;
+  const iridescence = extensions.KHR_materials_iridescence ?? null;
+  const anisotropy = extensions.KHR_materials_anisotropy ?? null;
+  const dispersion = extensions.KHR_materials_dispersion ?? null;
 
   return Object.freeze({
     name: material?.name ?? "default-material",
@@ -97,18 +393,139 @@ function getMaterialInfo(document, primitive) {
       a: factor[3] ?? 1,
     }),
     roughness:
-      typeof material?.pbrMetallicRoughness?.roughnessFactor === "number"
-        ? material.pbrMetallicRoughness.roughnessFactor
+      typeof pbr?.roughnessFactor === "number"
+        ? pbr.roughnessFactor
         : 0.92,
     metallic:
-      typeof material?.pbrMetallicRoughness?.metallicFactor === "number"
-        ? material.pbrMetallicRoughness.metallicFactor
+      typeof pbr?.metallicFactor === "number"
+        ? pbr.metallicFactor
         : 0.08,
+    opacity: factor[3] ?? 1,
     emissive: Object.freeze({
       r: emissive[0] ?? 0,
       g: emissive[1] ?? 0,
       b: emissive[2] ?? 0,
+      a: 1,
     }),
+    baseColorTexture: getMaterialTexture(document, pbr?.baseColorTexture, imageResources),
+    metallicRoughnessTexture: getMaterialTexture(
+      document,
+      pbr?.metallicRoughnessTexture,
+      imageResources
+    ),
+    normalTexture: getMaterialTexture(document, material?.normalTexture, imageResources),
+    occlusionTexture: getMaterialTexture(document, material?.occlusionTexture, imageResources),
+    emissiveTexture: getMaterialTexture(document, material?.emissiveTexture, imageResources),
+    specular:
+      typeof specular?.specularFactor === "number"
+        ? specular.specularFactor
+        : 1,
+    specularColor: Object.freeze(
+      Array.isArray(specular?.specularColorFactor)
+        ? [...specular.specularColorFactor]
+        : [1, 1, 1]
+    ),
+    specularTexture: getMaterialTexture(document, specular?.specularTexture, imageResources),
+    specularColorTexture: getMaterialTexture(
+      document,
+      specular?.specularColorTexture,
+      imageResources
+    ),
+    transmission:
+      typeof transmission?.transmissionFactor === "number"
+        ? transmission.transmissionFactor
+        : 0,
+    transmissionTexture: getMaterialTexture(
+      document,
+      transmission?.transmissionTexture,
+      imageResources
+    ),
+    ior: typeof ior?.ior === "number" ? ior.ior : 1.45,
+    attenuationDistance:
+      typeof volume?.attenuationDistance === "number"
+        ? volume.attenuationDistance
+        : null,
+    attenuationColor: Object.freeze(
+      Array.isArray(volume?.attenuationColor)
+        ? [...volume.attenuationColor]
+        : [1, 1, 1]
+    ),
+    thickness:
+      typeof volume?.thicknessFactor === "number"
+        ? volume.thicknessFactor
+        : 0,
+    thicknessTexture: getMaterialTexture(document, volume?.thicknessTexture, imageResources),
+    clearcoat:
+      typeof clearcoat?.clearcoatFactor === "number"
+        ? clearcoat.clearcoatFactor
+        : 0,
+    clearcoatTexture: getMaterialTexture(document, clearcoat?.clearcoatTexture, imageResources),
+    clearcoatRoughness:
+      typeof clearcoat?.clearcoatRoughnessFactor === "number"
+        ? clearcoat.clearcoatRoughnessFactor
+        : 0.08,
+    clearcoatRoughnessTexture: getMaterialTexture(
+      document,
+      clearcoat?.clearcoatRoughnessTexture,
+      imageResources
+    ),
+    clearcoatNormalTexture: getMaterialTexture(
+      document,
+      clearcoat?.clearcoatNormalTexture,
+      imageResources
+    ),
+    sheenColor: Object.freeze(
+      Array.isArray(sheen?.sheenColorFactor) ? [...sheen.sheenColorFactor] : [0, 0, 0]
+    ),
+    sheenColorTexture: getMaterialTexture(document, sheen?.sheenColorTexture, imageResources),
+    sheenRoughness:
+      typeof sheen?.sheenRoughnessFactor === "number"
+        ? sheen.sheenRoughnessFactor
+        : 0,
+    sheenRoughnessTexture: getMaterialTexture(
+      document,
+      sheen?.sheenRoughnessTexture,
+      imageResources
+    ),
+    iridescence:
+      typeof iridescence?.iridescenceFactor === "number"
+        ? iridescence.iridescenceFactor
+        : 0,
+    iridescenceTexture: getMaterialTexture(
+      document,
+      iridescence?.iridescenceTexture,
+      imageResources
+    ),
+    iridescenceIor:
+      typeof iridescence?.iridescenceIor === "number"
+        ? iridescence.iridescenceIor
+        : 1.3,
+    iridescenceThicknessMinimum:
+      typeof iridescence?.iridescenceThicknessMinimum === "number"
+        ? iridescence.iridescenceThicknessMinimum
+        : 100,
+    iridescenceThicknessMaximum:
+      typeof iridescence?.iridescenceThicknessMaximum === "number"
+        ? iridescence.iridescenceThicknessMaximum
+        : 400,
+    iridescenceThicknessTexture: getMaterialTexture(
+      document,
+      iridescence?.iridescenceThicknessTexture,
+      imageResources
+    ),
+    anisotropy:
+      typeof anisotropy?.anisotropyStrength === "number"
+        ? anisotropy.anisotropyStrength
+        : 0,
+    anisotropyRotation:
+      typeof anisotropy?.anisotropyRotation === "number"
+        ? anisotropy.anisotropyRotation
+        : 0,
+    anisotropyTexture: getMaterialTexture(document, anisotropy?.anisotropyTexture, imageResources),
+    dispersion:
+      typeof dispersion?.dispersion === "number"
+        ? dispersion.dispersion
+        : 0,
   });
 }
 
@@ -269,7 +686,7 @@ function transformNormal(normal, matrix) {
   return [transformed[0] / length, transformed[1] / length, transformed[2] / length];
 }
 
-function collectScenePrimitives(document, buffers) {
+function collectScenePrimitives(document, buffers, imageResources) {
   const scene = document.scenes?.[document.scene ?? 0];
   if (!scene || !Array.isArray(scene.nodes) || scene.nodes.length === 0) {
     throw new Error("glTF demo asset must expose a default scene with at least one node.");
@@ -312,6 +729,10 @@ function collectScenePrimitives(document, buffers) {
           typeof primitive.attributes.COLOR_0 === "number"
             ? readAccessor(document, primitive.attributes.COLOR_0, buffers)
             : null;
+        const uvs =
+          typeof primitive.attributes.TEXCOORD_0 === "number"
+            ? readAccessor(document, primitive.attributes.TEXCOORD_0, buffers)
+            : null;
         const transformedPositions = [];
         const transformedNormals = [];
 
@@ -335,7 +756,7 @@ function collectScenePrimitives(document, buffers) {
           typeof primitive.indices === "number"
             ? readAccessor(document, primitive.indices, buffers).map((value) => Number(value))
             : Array.from({ length: transformedPositions.length / 3 }, (_, index) => index);
-        const material = getMaterialInfo(document, primitive);
+        const material = getMaterialInfo(document, primitive, imageResources);
         const primitiveName =
           `${node.name ?? mesh.name ?? "mesh"}-${primitiveIndex}`;
 
@@ -348,6 +769,7 @@ function collectScenePrimitives(document, buffers) {
               transformedNormals.length > 0
                 ? Object.freeze(transformedNormals)
                 : null,
+            uvs: uvs ? Object.freeze(uvs) : null,
             colors: colors ? Object.freeze(colors) : null,
             material,
             bounds: computeBounds(transformedPositions),
@@ -412,7 +834,17 @@ async function buildGltfModel(document, baseUrl) {
     })
   );
 
-  const scene = collectScenePrimitives(document, buffers);
+  const imageResources = new Map();
+  await Promise.all(
+    (document.images ?? []).map(async (image, index) => {
+      const pixels = await loadImageResource(document, image, index, buffers, baseUrl);
+      if (pixels) {
+        imageResources.set(index, pixels);
+      }
+    })
+  );
+
+  const scene = collectScenePrimitives(document, buffers, imageResources);
   const aggregatePositions = [];
   const aggregateIndices = [];
 

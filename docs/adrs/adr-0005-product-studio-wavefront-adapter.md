@@ -11,6 +11,10 @@ runtime. The new renderer execution path belongs in `@plasius/gpu-renderer`,
 while Product Studio still needs a shared browser-safe adapter that loads the
 model and submits renderable data through a package API.
 
+This package work inherits the parent site rollout control
+`gpu-demo.scene-fidelity.enabled`, which remains the remotely controlled source
+of truth for live exposure and rollback in `plasius-ltd-site`.
+
 ## Decision
 
 `@plasius/gpu-shared` owns Product Studio mode routing and GLTF loading. It:
@@ -18,6 +22,9 @@ model and submits renderable data through a package API.
 - routes `mountGpuShowcase({ demoMode: "product-studio" })` to
   `mountGpuProductStudio(...)`;
 - loads the Product Studio GLTF through the existing shared GLTF loader;
+- preserves Product Studio UVs, decoded glTF material textures, and
+  `KHR_materials_*` factors so renderer material tables can be populated from
+  the source asset instead of falling back to flat material factors;
 - submits source triangle mesh data to the renderer mesh BVH wavefront path;
 - disables bounded analytic scene-object proxies rather than exposing them as a
   customer-visible fallback;
@@ -42,7 +49,5 @@ model and submits renderable data through a package API.
 
 ## Follow-On Work
 
-- Add Product Studio material-texture bindings once renderer material tables are
-  available.
 - Add progressive accumulation controls once the renderer exposes a full-frame
   accumulation history suitable for interactive convergence.

@@ -15,11 +15,57 @@ export interface GltfModelMaterial {
   readonly color: GltfModelColor;
   readonly roughness: number;
   readonly metallic: number;
+  readonly opacity?: number;
   readonly emissive: Readonly<{
     r: number;
     g: number;
     b: number;
+    a?: number;
   }>;
+  readonly baseColorTexture?: GltfModelTextureInfo | null;
+  readonly metallicRoughnessTexture?: GltfModelTextureInfo | null;
+  readonly normalTexture?: GltfModelTextureInfo | null;
+  readonly occlusionTexture?: GltfModelTextureInfo | null;
+  readonly emissiveTexture?: GltfModelTextureInfo | null;
+  readonly specular?: number;
+  readonly specularColor?: readonly number[];
+  readonly specularTexture?: GltfModelTextureInfo | null;
+  readonly specularColorTexture?: GltfModelTextureInfo | null;
+  readonly transmission?: number;
+  readonly transmissionTexture?: GltfModelTextureInfo | null;
+  readonly ior?: number;
+  readonly attenuationDistance?: number | null;
+  readonly attenuationColor?: readonly number[];
+  readonly thickness?: number;
+  readonly thicknessTexture?: GltfModelTextureInfo | null;
+  readonly clearcoat?: number;
+  readonly clearcoatTexture?: GltfModelTextureInfo | null;
+  readonly clearcoatRoughness?: number;
+  readonly clearcoatRoughnessTexture?: GltfModelTextureInfo | null;
+  readonly clearcoatNormalTexture?: GltfModelTextureInfo | null;
+  readonly sheenColor?: readonly number[];
+  readonly sheenColorTexture?: GltfModelTextureInfo | null;
+  readonly sheenRoughness?: number;
+  readonly sheenRoughnessTexture?: GltfModelTextureInfo | null;
+  readonly iridescence?: number;
+  readonly iridescenceTexture?: GltfModelTextureInfo | null;
+  readonly iridescenceIor?: number;
+  readonly iridescenceThicknessMinimum?: number;
+  readonly iridescenceThicknessMaximum?: number;
+  readonly iridescenceThicknessTexture?: GltfModelTextureInfo | null;
+  readonly anisotropy?: number;
+  readonly anisotropyRotation?: number;
+  readonly anisotropyTexture?: GltfModelTextureInfo | null;
+  readonly dispersion?: number;
+}
+
+export interface GltfModelTextureInfo {
+  readonly width: number;
+  readonly height: number;
+  readonly data: Uint8ClampedArray;
+  readonly texCoord?: number;
+  readonly scale?: number;
+  readonly strength?: number;
 }
 
 export interface GltfModelPrimitive {
@@ -27,6 +73,7 @@ export interface GltfModelPrimitive {
   readonly positions: readonly number[];
   readonly indices: readonly number[];
   readonly normals: readonly number[] | null;
+  readonly uvs?: readonly number[] | null;
   readonly colors: readonly number[] | null;
   readonly material: GltfModelMaterial;
   readonly bounds: GltfModelBounds;
@@ -65,6 +112,7 @@ export interface ProductStudioMesh {
   readonly indices: readonly number[];
   readonly normals?: readonly number[] | null;
   readonly uvs?: readonly number[] | null;
+  readonly material?: GltfModelMaterial;
   readonly color: readonly number[];
   readonly emission?: readonly number[];
   readonly materialKind: string | number;
@@ -72,6 +120,41 @@ export interface ProductStudioMesh {
   readonly roughness?: number;
   readonly metallic?: number;
   readonly opacity?: number;
+  readonly baseColorTexture?: GltfModelTextureInfo | null;
+  readonly metallicRoughnessTexture?: GltfModelTextureInfo | null;
+  readonly normalTexture?: GltfModelTextureInfo | null;
+  readonly occlusionTexture?: GltfModelTextureInfo | null;
+  readonly emissiveTexture?: GltfModelTextureInfo | null;
+  readonly specular?: number;
+  readonly specularColor?: readonly number[];
+  readonly specularTexture?: GltfModelTextureInfo | null;
+  readonly specularColorTexture?: GltfModelTextureInfo | null;
+  readonly transmission?: number;
+  readonly transmissionTexture?: GltfModelTextureInfo | null;
+  readonly ior?: number;
+  readonly attenuationDistance?: number | null;
+  readonly attenuationColor?: readonly number[];
+  readonly thickness?: number;
+  readonly thicknessTexture?: GltfModelTextureInfo | null;
+  readonly clearcoat?: number;
+  readonly clearcoatTexture?: GltfModelTextureInfo | null;
+  readonly clearcoatRoughness?: number;
+  readonly clearcoatRoughnessTexture?: GltfModelTextureInfo | null;
+  readonly clearcoatNormalTexture?: GltfModelTextureInfo | null;
+  readonly sheenColor?: readonly number[];
+  readonly sheenColorTexture?: GltfModelTextureInfo | null;
+  readonly sheenRoughness?: number;
+  readonly sheenRoughnessTexture?: GltfModelTextureInfo | null;
+  readonly iridescence?: number;
+  readonly iridescenceTexture?: GltfModelTextureInfo | null;
+  readonly iridescenceIor?: number;
+  readonly iridescenceThicknessMinimum?: number;
+  readonly iridescenceThicknessMaximum?: number;
+  readonly iridescenceThicknessTexture?: GltfModelTextureInfo | null;
+  readonly anisotropy?: number;
+  readonly anisotropyRotation?: number;
+  readonly anisotropyTexture?: GltfModelTextureInfo | null;
+  readonly dispersion?: number;
 }
 
 export type GpuSharedTranslationValue =
