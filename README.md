@@ -214,6 +214,9 @@ surface for these family demos.
 
 - `mountGpuShowcase(options)`
   - Returns `{ state, shipModel, canvas, destroy() }`
+  - Product Studio mode defaults to a host-safe `640x360` wavefront render at
+    `maxDepth: 2`; callers can raise `width`, `height`, or `maxDepth`
+    deliberately for capture or high-end review hardware.
   - `captureMode: true` enables fullscreen scene-only presentation for local
     screenshots and video capture.
   - `renderScale` overrides the canvas backing scale when a capture workflow

@@ -13,3 +13,6 @@ the family-owned 3D harbor/showcase runtime.
   performance, debug, and browser-safe physics planning.
 - Callers can specialize titles, subtitles, roots, and focus mode without
   cloning runtime files.
+- Product Studio mode starts from a host-safe wavefront render budget and
+  requires callers to opt into higher `width`, `height`, or `maxDepth` values
+  deliberately.

@@ -5,10 +5,9 @@ const DEFAULT_PRODUCT_ASSET_URL =
   "/data/models/eames-lounge-chair-ottoman/Eames_Lounge_Chair_Ottoman.gltf";
 const DEFAULT_TARGET_CENTER = Object.freeze([0, 0.74, 0]);
 const DEFAULT_TARGET_SIZE = 2.25;
-
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
-}
+const DEFAULT_RENDER_WIDTH = 640;
+const DEFAULT_RENDER_HEIGHT = 360;
+const DEFAULT_RENDER_MAX_DEPTH = 2;
 
 function isFiniteVector(value) {
   return (
@@ -359,27 +358,10 @@ function resolveRoot(options) {
   return root;
 }
 
-function resolveRenderSize(root, options) {
-  const rect = root.getBoundingClientRect?.() ?? { width: 1280, height: 720 };
-  const devicePixelRatio =
-    Number.isFinite(options.devicePixelRatio)
-      ? options.devicePixelRatio
-      : Number.isFinite(globalThis.window?.devicePixelRatio)
-        ? globalThis.window.devicePixelRatio
-        : 1;
-  const cssWidth = Number.isFinite(rect.width) && rect.width > 0 ? rect.width : 1280;
-  const cssHeight =
-    Number.isFinite(rect.height) && rect.height > 0 ? rect.height : cssWidth * (9 / 16);
-  const width = Number.isFinite(options.width)
-    ? Math.trunc(options.width)
-    : clamp(Math.round(cssWidth * devicePixelRatio), 640, 1920);
-  const height = Number.isFinite(options.height)
-    ? Math.trunc(options.height)
-    : clamp(Math.round(cssHeight * devicePixelRatio), 360, 1080);
-
+function resolveRenderSize(options) {
   return {
-    width,
-    height,
+    width: Number.isFinite(options.width) ? Math.trunc(options.width) : DEFAULT_RENDER_WIDTH,
+    height: Number.isFinite(options.height) ? Math.trunc(options.height) : DEFAULT_RENDER_HEIGHT,
   };
 }
 
@@ -468,13 +450,13 @@ export async function mountGpuProductStudio(options = {}, featureFlags = null) {
     throw new Error("Product Studio renderer loader must provide createWavefrontPathTracingComputeRenderer.");
   }
 
-  const size = resolveRenderSize(root, options);
+  const size = resolveRenderSize(options);
   const lightingOptions = await resolveWavefrontLightingOptions(options);
   const renderer = await rendererModule.createWavefrontPathTracingComputeRenderer({
     canvas,
     width: size.width,
     height: size.height,
-    maxDepth: Number.isFinite(options.maxDepth) ? options.maxDepth : 6,
+    maxDepth: Number.isFinite(options.maxDepth) ? options.maxDepth : DEFAULT_RENDER_MAX_DEPTH,
     tileSize: Number.isFinite(options.tileSize) ? options.tileSize : 128,
     samplesPerPixel: Number.isFinite(options.samplesPerPixel) ? options.samplesPerPixel : 8,
     denoise: options.denoise !== false,
