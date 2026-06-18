@@ -16,6 +16,9 @@ All notable changes to this project will be documented in this file.
     delegation to the `@plasius/gpu-renderer` WebGPU wavefront renderer.
 
 - **Changed**
+  - Lowered Product Studio wavefront renderer defaults to a host-safe `640x360`
+    frame at `maxDepth: 2` so browser demos do not start with a heavy 720p
+    depth-6 GPU workload.
   - Updated the optional `@plasius/gpu-renderer` peer range to the 0.2 line so
     Product Studio and demo consumers can use the released realtime wavefront
     camera update API without npm peer conflicts.
