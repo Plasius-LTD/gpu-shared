@@ -16,6 +16,20 @@ All notable changes to this project will be documented in this file.
 - **Security**
   - (placeholder)
 
+## [0.1.20] - 2026-06-22
+
+- **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
 ## [0.1.19] - 2026-06-22
 
 - **Added**
@@ -291,3 +305,4 @@ All notable changes to this project will be documented in this file.
 [0.1.10]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v0.1.10
 [0.1.11]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v0.1.11
 [0.1.19]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v0.1.19
+[0.1.20]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v0.1.20
