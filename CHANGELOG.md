@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [0.1.19] - 2026-06-22
+
+- **Added**
   - Deterministic showcase asset generation for a richer shared brigantine,
     cutter, lighthouse, and harbor-dock catalog.
   - Fullscreen capture mode for slide-deck screenshots and video recording,
@@ -276,3 +290,4 @@ All notable changes to this project will be documented in this file.
 [0.1.9]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v0.1.9
 [0.1.10]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v0.1.10
 [0.1.11]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v0.1.11
+[0.1.19]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v0.1.19
