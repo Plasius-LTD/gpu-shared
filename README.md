@@ -30,8 +30,8 @@ npm install @plasius/gpu-shared
 - Preserves one shared fix point for cloth motion, visible water continuity, and
   occluded harbor-light reflections across GPU demo consumers.
 - Ships a package-owned showcase asset catalog with distinct brigantine,
-  cutter, lighthouse, and harbor-dock models instead of relying on one tiny
-  hull mesh plus placeholder box geometry.
+  cutter, lighthouse, harbor-dock, and shoreline models instead of relying on
+  one tiny hull mesh plus placeholder box geometry.
 - Converts Product Studio GLTF primitives into triangle mesh inputs for the
   renderer-owned mesh-BVH wavefront path instead of customer-visible analytic
   scene objects.
@@ -132,7 +132,10 @@ await mountGpuShowcase({
 The legacy analytic proxy scene-object path is disabled and is not a customer
 visible fallback. Stale callers must move to `createProductStudioMeshes(...)`
 or `mountGpuShowcase({ demoMode: "product-studio" })`, both of which use mesh
-inputs for renderer-owned BVH construction.
+inputs for renderer-owned BVH construction. For compatibility with older demo
+pages and validation harnesses, the package also re-exports
+`buildProductStudioSceneObjects(...)` as an alias of
+`createProductStudioMeshes(...)`.
 
 Install `@plasius/gpu-renderer` alongside `@plasius/gpu-shared` when Product
 Studio mode is used. Harbor-only consumers do not need the renderer peer.
@@ -185,17 +188,26 @@ Then open `http://localhost:8000/gpu-shared/demo/`.
 This package demo mounts the integrated harbor showcase so the shared runtime
 can be validated independently of `gpu-demo-viewer`.
 
-The integrated scene now includes a persistent flag cloth state, visible ship
-wakes and collision ripples, and water reflections that are occluded by later
+The harbor showcase uses a render-first canvas layout with compact pause,
+stress, and focus controls plus a collapsed runtime diagnostics drawer. The
+older always-visible hero, status, metrics, notes, and validation footer panels
+are no longer part of the default viewport, so consumers can embed the runtime
+inside production showcase pages without debug copy occupying the render area.
+
+The integrated scene now includes a persistent flag cloth state, subdued ship
+wakes and waterline ripples, and water reflections that are occluded by later
 ship geometry instead of being painted through hulls. The harbor surface reads
 the banded `@plasius/gpu-fluid` continuity envelope directly, so the default
 camera keeps finite, visibly animated near-band water motion instead of
-flattening or dropping the shared water mesh.
+flattening or dropping the shared water mesh. The near shoreline band now
+includes denser water geometry, broken foam segments tied to modeled rocks, and
+lower-contrast ripple highlights, while the flag cloth carries subtle material
+cues for weave, folds, and pinned-edge continuity.
 
 The default showcase asset set now uses a multi-primitive brigantine, a
-distinct cutter profile, a modeled lighthouse, and a modeled dock/warehouse
-scene so the harbor reads closer to a believable coastal night view on high-end
-machines.
+distinct cutter profile, a modeled lighthouse, a dock/warehouse scene, and a
+generated rocky shoreline/breakwater so the harbor reads closer to a believable
+coastal night view on high-end machines.
 
 For slide-deck screenshots or video capture, open the route with
 `?capture=1&renderScale=1`. Capture mode hides the validation chrome, fills the
@@ -233,10 +245,11 @@ surface for these family demos.
 - `resolveShowcaseAssetUrl(baseUrlOrAssetName?, assetName?)`
 - `showcaseFocusModes`
 
-`resolveShowcaseAssetUrl()` keeps consumers on the package-owned brigantine
-asset URL. If a host cannot actually serve that asset, `loadGltfModel()`
-lazily activates the built-in inline fallback instead of eagerly parsing that
-payload in the top-level package entrypoint.
+`resolveShowcaseAssetUrl()` keeps consumers on package-owned showcase asset
+URLs and still defaults to the brigantine for backward compatibility. If a host
+cannot actually serve that asset, `loadGltfModel()` lazily activates the
+built-in inline fallback instead of eagerly parsing that payload in the
+top-level package entrypoint.
 
 ## Development
 

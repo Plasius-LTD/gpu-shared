@@ -63,6 +63,9 @@ function createCanvasContext() {
     lineTo(...args) {
       push("lineTo", ...args);
     },
+    quadraticCurveTo(...args) {
+      push("quadraticCurveTo", ...args);
+    },
     closePath() {
       push("closePath");
     },
@@ -433,6 +436,7 @@ test("mountGpuShowcase renders live frames, package hooks, and physics telemetry
     assert.deepEqual(Object.keys(showcase.state.assetCatalog.environment).sort(), [
       "harbor-dock",
       "lighthouse",
+      "shoreline",
     ]);
 
     animationFrames.shift().callback(16.4);
@@ -444,12 +448,13 @@ test("mountGpuShowcase renders live frames, package hooks, and physics telemetry
     assert.match(harness.elements["#qualityMetrics"].innerHTML, /quality metric/);
     assert.match(harness.elements["#debugMetrics"].innerHTML, /debug metric/);
     assert.match(harness.elements["#sceneNotes"].innerHTML, /custom note/);
+    assert.match(harness.root.innerHTML, /plasius-demo__diagnostics/);
     assert.equal(showcase.state.demoVisuals.moonCore, "rgba(255, 250, 240, 0.97)");
     assert.deepEqual(showcase.state.demoVisuals.waveDirection, { x: 1, z: 0.25 });
     assert.deepEqual(showcase.state.demoVisuals.waterNear, {
       r: 0.12,
-      g: 0.23,
-      b: 0.33,
+      g: 0.2,
+      b: 0.3,
     });
 
     showcase.state.ships[0].position.x = 13.5;

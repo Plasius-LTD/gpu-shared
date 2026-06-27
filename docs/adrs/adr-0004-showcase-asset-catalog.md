@@ -24,8 +24,8 @@ material-aware models while still returning the legacy aggregate mesh fields.
 ## Consequences
 
 - The shared runtime can render distinct ships plus modeled harbor structures
-  without introducing a renderer-specific dependency or a new consumer-only
-  asset path.
+  and a generated shoreline/breakwater without introducing a renderer-specific
+  dependency or a new consumer-only asset path.
 - Existing consumers that only read `positions`, `indices`, `bounds`, `color`,
   and `physics` keep working.
 - Newer consumers can use `model.primitives` and material metadata to drive

@@ -845,6 +845,13 @@ const LEGACY_HARBOR_LAYOUT = Object.freeze([
 
 const SHOWCASE_ENVIRONMENT_LAYOUT = Object.freeze([
   Object.freeze({
+    assetKey: "shoreline",
+    position: Object.freeze({ x: 1.8, y: -0.04, z: 0.48 }),
+    rotationY: -0.03,
+    scale: 1.02,
+    accent: 0.03,
+  }),
+  Object.freeze({
     assetKey: "harbor-dock",
     position: Object.freeze({ x: -4.6, y: 0.16, z: 0.7 }),
     rotationY: -0.08,
@@ -875,6 +882,18 @@ const HARBOR_TORCHES = Object.freeze([
   Object.freeze({ x: -5.2, y: 1.25, z: 1.36, glow: 1.1 }),
   Object.freeze({ x: -8.6, y: 2.48, z: -0.72, glow: 1 }),
   Object.freeze({ x: -10.4, y: 1.28, z: 0.82, glow: 0.92 }),
+]);
+const SHORELINE_FOAM_ANCHORS = Object.freeze([
+  Object.freeze({ x: -7.8, z: 3.0, length: 1.25, angle: -0.12 }),
+  Object.freeze({ x: -6.3, z: 2.72, length: 0.92, angle: 0.08 }),
+  Object.freeze({ x: -4.9, z: 3.16, length: 1.08, angle: -0.2 }),
+  Object.freeze({ x: -3.2, z: 2.42, length: 0.76, angle: 0.16 }),
+  Object.freeze({ x: -1.4, z: 2.82, length: 1.18, angle: -0.04 }),
+  Object.freeze({ x: 0.4, z: 3.08, length: 0.88, angle: 0.14 }),
+  Object.freeze({ x: 2.1, z: 2.56, length: 1.34, angle: -0.18 }),
+  Object.freeze({ x: 3.8, z: 3.0, length: 0.94, angle: 0.1 }),
+  Object.freeze({ x: 5.5, z: 2.72, length: 1.12, angle: -0.08 }),
+  Object.freeze({ x: 7.0, z: 3.22, length: 0.72, angle: 0.18 }),
 ]);
 const FLAG_LAYOUT = Object.freeze({
   origin: Object.freeze({ x: -3.5, y: 5.9, z: 2.4 }),
@@ -918,31 +937,31 @@ function injectStyles() {
       box-sizing: border-box;
     }
     .plasius-demo {
-      width: min(1560px, calc(100vw - 32px));
-      margin: 0 auto;
-      padding: 28px 0 40px;
-      display: grid;
-      gap: 20px;
-    }
-    .plasius-demo__hero,
-    .plasius-demo__layout {
-      display: grid;
-      gap: 20px;
-    }
-    .plasius-demo__hero {
-      grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.85fr);
-      align-items: start;
+      position: relative;
+      width: 100%;
+      min-height: 100dvh;
+      overflow: hidden;
     }
     .plasius-panel {
       border: 1px solid var(--plasius-border);
-      border-radius: 24px;
+      border-radius: 8px;
       background: var(--plasius-panel);
       box-shadow: var(--plasius-shadow);
       backdrop-filter: blur(12px);
     }
     .plasius-demo__hero-card,
     .plasius-demo__status {
-      padding: 20px 22px;
+      position: absolute;
+      z-index: 3;
+      padding: 10px 12px;
+    }
+    .plasius-demo__hero-card {
+      display: none;
+    }
+    .plasius-demo__status {
+      left: 16px;
+      bottom: 84px;
+      max-width: min(360px, calc(100vw - 32px));
     }
     .plasius-demo__eyebrow {
       margin: 0 0 8px;
@@ -965,31 +984,36 @@ function injectStyles() {
     .plasius-demo__status-badge {
       width: fit-content;
       margin: 0;
-      padding: 8px 12px;
-      border-radius: 999px;
+      padding: 6px 9px;
+      border-radius: 6px;
       background: rgba(243, 177, 106, 0.14);
       color: var(--plasius-accent);
       font-weight: 700;
+      font-size: 12px;
     }
     .plasius-demo__status-text {
       margin: 10px 0 0;
       color: var(--plasius-muted);
-      line-height: 1.6;
-    }
-    .plasius-demo__layout {
-      grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.68fr);
-      align-items: start;
+      font-size: 12px;
+      line-height: 1.45;
     }
     .plasius-demo__canvas-panel {
-      padding: 18px;
-      position: relative;
+      position: absolute;
+      inset: 0;
+      padding: 0;
+      border: 0;
+      border-radius: 0;
+      background: transparent;
+      box-shadow: none;
+      backdrop-filter: none;
     }
     .plasius-demo__canvas {
       width: 100%;
-      aspect-ratio: 16 / 9;
+      height: 100%;
+      min-height: 100dvh;
       display: block;
-      border-radius: 20px;
-      border: 1px solid rgba(159, 185, 223, 0.12);
+      border: 0;
+      border-radius: 0;
       background: linear-gradient(180deg, #071220 0%, #132440 42%, #10344b 42%, #05111d 100%);
     }
     .${CAPTURE_CLASS} .plasius-demo {
@@ -1002,6 +1026,8 @@ function injectStyles() {
     .${CAPTURE_CLASS} .plasius-demo__toolbar,
     .${CAPTURE_CLASS} .plasius-demo__legend,
     .${CAPTURE_CLASS} .plasius-demo__sidebar,
+    .${CAPTURE_CLASS} .plasius-demo__diagnostics,
+    .${CAPTURE_CLASS} .plasius-demo__status,
     .${CAPTURE_CLASS} .plasius-demo__footer {
       display: none;
     }
@@ -1028,12 +1054,14 @@ function injectStyles() {
     }
     .plasius-demo__toolbar {
       position: absolute;
-      top: 26px;
-      left: 26px;
+      top: 84px;
+      left: 16px;
+      z-index: 4;
       display: flex;
-      gap: 12px;
+      gap: 8px;
       flex-wrap: wrap;
       align-items: center;
+      max-width: min(560px, calc(100vw - 32px));
     }
     .plasius-demo button,
     .plasius-demo label,
@@ -1045,22 +1073,63 @@ function injectStyles() {
     .plasius-demo .plasius-toggle,
     .plasius-demo select {
       border: 1px solid rgba(159, 185, 223, 0.18);
-      border-radius: 999px;
+      border-radius: 6px;
       background: rgba(9, 20, 34, 0.84);
       color: var(--plasius-ink);
-      padding: 10px 14px;
+      padding: 8px 10px;
     }
     .plasius-toggle {
       display: inline-flex;
       align-items: center;
       gap: 8px;
     }
+    .plasius-demo__diagnostics {
+      position: absolute;
+      right: 16px;
+      bottom: 84px;
+      z-index: 4;
+      max-width: min(420px, calc(100vw - 32px));
+      color: var(--plasius-ink);
+      font-family: "JetBrains Mono", monospace;
+      font-size: 12px;
+    }
+    .plasius-demo__diagnostics summary {
+      width: fit-content;
+      margin-left: auto;
+      border: 1px solid rgba(159, 185, 223, 0.18);
+      border-radius: 6px;
+      padding: 8px 10px;
+      background: rgba(9, 20, 34, 0.84);
+      cursor: pointer;
+      list-style: none;
+    }
+    .plasius-demo__diagnostics summary::-webkit-details-marker {
+      display: none;
+    }
+    .plasius-demo__diagnostics[open] {
+      width: min(420px, calc(100vw - 32px));
+    }
+    .plasius-demo__diagnostics[open] summary {
+      margin-bottom: 8px;
+      background: rgba(243, 177, 106, 0.14);
+      color: var(--plasius-accent);
+    }
     .plasius-demo__sidebar {
       display: grid;
-      gap: 18px;
+      gap: 8px;
+      max-height: min(58vh, 520px);
+      overflow: auto;
     }
     .plasius-demo__card {
-      padding: 18px;
+      padding: 10px;
+    }
+    .plasius-demo__card h2 {
+      margin: 0;
+      color: rgba(226, 236, 255, 0.72);
+      font-family: "JetBrains Mono", monospace;
+      font-size: 11px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
     }
     .plasius-demo__metrics,
     .plasius-demo__metrics li {
@@ -1069,27 +1138,19 @@ function injectStyles() {
       list-style: none;
     }
     .plasius-demo__metrics {
-      margin-top: 12px;
+      margin-top: 8px;
       display: grid;
-      gap: 8px;
+      gap: 5px;
       color: var(--plasius-muted);
-      line-height: 1.55;
+      font-size: 12px;
+      line-height: 1.35;
     }
     .plasius-demo__metrics li {
       border-top: 1px solid rgba(21, 32, 40, 0.08);
-      padding-top: 8px;
+      padding-top: 5px;
     }
     .plasius-demo__legend {
-      position: absolute;
-      right: 24px;
-      bottom: 24px;
-      padding: 10px 14px;
-      border-radius: 16px;
-      background: rgba(9, 20, 34, 0.82);
-      border: 1px solid rgba(159, 185, 223, 0.16);
-      color: var(--plasius-muted);
-      font-size: 12px;
-      line-height: 1.45;
+      display: none;
     }
     .plasius-demo__legend strong {
       display: block;
@@ -1097,15 +1158,62 @@ function injectStyles() {
       margin-bottom: 4px;
     }
     .plasius-demo__footer {
-      margin-top: 4px;
-      color: rgba(226, 236, 255, 0.68);
-      font-size: 13px;
-      line-height: 1.6;
+      display: none;
     }
     @media (max-width: 1200px) {
-      .plasius-demo__hero,
-      .plasius-demo__layout {
-        grid-template-columns: 1fr;
+      .plasius-demo__toolbar {
+        top: 92px;
+      }
+    }
+    @media (max-width: 640px) {
+      .plasius-demo__status {
+        left: 10px;
+        bottom: 10px;
+        max-width: calc(100vw - 126px);
+        padding: 6px 8px;
+      }
+      .plasius-demo__status-text {
+        display: none;
+      }
+      .plasius-demo__status-badge {
+        max-width: calc(100vw - 142px);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .plasius-demo__toolbar {
+        top: 10px;
+        left: 10px;
+        right: 10px;
+        max-width: calc(100vw - 20px);
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        padding-bottom: 4px;
+        scrollbar-width: none;
+      }
+      .plasius-demo__toolbar::-webkit-scrollbar {
+        display: none;
+      }
+      .plasius-demo button,
+      .plasius-demo .plasius-toggle,
+      .plasius-demo select {
+        padding: 7px 8px;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+      .plasius-demo__diagnostics {
+        right: 10px;
+        bottom: 10px;
+      }
+      .plasius-demo__diagnostics[open] {
+        bottom: 56px;
+        left: 10px;
+        right: 10px;
+        width: auto;
+        max-width: none;
+      }
+      .plasius-demo__diagnostics[open] .plasius-demo__sidebar {
+        max-height: min(42vh, 340px);
       }
     }
   `;
@@ -1533,11 +1641,12 @@ function buildTrianglesFromMesh(
 }
 
 async function loadShowcaseAssetCatalog() {
-  const [brigantine, cutter, lighthouse, harborDock] = await Promise.all([
+  const [brigantine, cutter, lighthouse, harborDock, shoreline] = await Promise.all([
     loadGltfModel(resolveShowcaseAssetUrl("brigantine")),
     loadGltfModel(resolveShowcaseAssetUrl("cutter")),
     loadGltfModel(resolveShowcaseAssetUrl("lighthouse")),
     loadGltfModel(resolveShowcaseAssetUrl("harbor-dock")),
+    loadGltfModel(resolveShowcaseAssetUrl("shoreline")),
   ]);
 
   return Object.freeze({
@@ -1549,6 +1658,7 @@ async function loadShowcaseAssetCatalog() {
     environment: Object.freeze({
       lighthouse,
       "harbor-dock": harborDock,
+      shoreline,
     }),
   });
 }
@@ -1690,24 +1800,27 @@ function buildDemoDom(root, options) {
             ${t(gpuSharedTranslationKeys.legendCollisions)}
           </div>
         </section>
-        <aside class="plasius-demo__sidebar">
-          <section class="plasius-panel plasius-demo__card">
-            <h2>${t(gpuSharedTranslationKeys.sceneState)}</h2>
-            <ul id="sceneMetrics" class="plasius-demo__metrics"></ul>
-          </section>
-          <section class="plasius-panel plasius-demo__card">
-            <h2>${t(gpuSharedTranslationKeys.qualityBudgets)}</h2>
-            <ul id="qualityMetrics" class="plasius-demo__metrics"></ul>
-          </section>
-          <section class="plasius-panel plasius-demo__card">
-            <h2>${t(gpuSharedTranslationKeys.debugTelemetry)}</h2>
-            <ul id="debugMetrics" class="plasius-demo__metrics"></ul>
-          </section>
-          <section class="plasius-panel plasius-demo__card">
-            <h2>${t(gpuSharedTranslationKeys.notes)}</h2>
-            <ul id="sceneNotes" class="plasius-demo__metrics"></ul>
-          </section>
-        </aside>
+        <details class="plasius-demo__diagnostics">
+          <summary>${t(gpuSharedTranslationKeys.debugTelemetry)}</summary>
+          <aside class="plasius-demo__sidebar">
+            <section class="plasius-panel plasius-demo__card">
+              <h2>${t(gpuSharedTranslationKeys.sceneState)}</h2>
+              <ul id="sceneMetrics" class="plasius-demo__metrics"></ul>
+            </section>
+            <section class="plasius-panel plasius-demo__card">
+              <h2>${t(gpuSharedTranslationKeys.qualityBudgets)}</h2>
+              <ul id="qualityMetrics" class="plasius-demo__metrics"></ul>
+            </section>
+            <section class="plasius-panel plasius-demo__card">
+              <h2>${t(gpuSharedTranslationKeys.debugTelemetry)}</h2>
+              <ul id="debugMetrics" class="plasius-demo__metrics"></ul>
+            </section>
+            <section class="plasius-panel plasius-demo__card">
+              <h2>${t(gpuSharedTranslationKeys.notes)}</h2>
+              <ul id="sceneNotes" class="plasius-demo__metrics"></ul>
+            </section>
+          </aside>
+        </details>
       </section>
       <p class="plasius-demo__footer">
         This visual example is shared across the GPU packages to keep manual validation fast and consistent.
@@ -2125,13 +2238,13 @@ function advanceShowcaseClothSimulationState(clothState, options = {}) {
       )
     );
     const windStrength =
-      (1.6 + broadMotion * 1.25 + wrinkleLayers * 0.12) *
+      (0.94 + broadMotion * 0.82 + wrinkleLayers * 0.08) *
       flagMotion *
-      (0.44 + u * 1.14);
+      (0.36 + u * 0.92);
     const wrinkleForce = vec3(
-      Math.sin(wrinklePhase) * 0.22 * wrinkleMotion * flagMotion,
-      Math.cos(wrinklePhase * 0.7) * 0.08 * wrinkleMotion,
-      Math.cos(wrinklePhase) * 0.14 * broadMotion * flagMotion
+      Math.sin(wrinklePhase) * 0.12 * wrinkleMotion * flagMotion,
+      Math.cos(wrinklePhase * 0.7) * 0.045 * wrinkleMotion,
+      Math.cos(wrinklePhase) * 0.08 * broadMotion * flagMotion
     );
     const acceleration = addVec3(
       vec3(0, -0.48 - u * 0.08, 0),
@@ -2197,25 +2310,25 @@ function resolveVisualConfig(nearLighting, lightingSnapshot, customVisuals = {})
     ambientMist: "rgba(41, 63, 97, 0.16)",
     reflectionStrength: lightingSnapshot.currentLevel.config.reflectionStrength,
     shadowAccent: lightingSnapshot.currentLevel.config.shadowStrength,
-    waveAmplitude: 0.94,
+    waveAmplitude: 0.82,
     waveDirection: { x: 0.88, z: 0.28 },
-    wavePhaseSpeed: 0.88,
-    wakeStrength: 0.31,
-    wakeLength: 18,
-    collisionRippleStrength: 0.42,
-    waterNear: { r: 0.08, g: 0.23, b: 0.33 },
-    waterFar: { r: 0.18, g: 0.35, b: 0.49 },
+    wavePhaseSpeed: 0.74,
+    wakeStrength: 0.24,
+    wakeLength: 17,
+    collisionRippleStrength: 0.22,
+    waterNear: { r: 0.05, g: 0.2, b: 0.3 },
+    waterFar: { r: 0.13, g: 0.31, b: 0.45 },
     harborWall: { r: 0.26, g: 0.24, b: 0.28 },
     harborDeck: { r: 0.33, g: 0.22, b: 0.16 },
     harborTower: { r: 0.23, g: 0.24, b: 0.29 },
-    flagColor: { r: 0.66, g: 0.16, b: 0.13 },
-    flagMotion: 0.92,
+    flagColor: { r: 0.54, g: 0.13, b: 0.11 },
+    flagMotion: 0.58,
     lanternCore: { r: 0.98, g: 0.8, b: 0.48 },
     lanternGlow: { r: 1, g: 0.56, b: 0.2 },
     lanternReflectionStrength: 0.42,
     torchCore: { r: 0.99, g: 0.72, b: 0.36 },
     torchGlow: { r: 0.98, g: 0.38, b: 0.15 },
-    collisionFlash: "rgba(255, 212, 168, 0.16)",
+    collisionFlash: "rgba(255, 212, 168, 0.08)",
   };
 
   return {
@@ -2299,6 +2412,11 @@ function buildClothSurface(model, state, meshDetail, visuals, clothFeatures) {
     representation: clothPresentation.representation,
     continuity: clothPresentation.continuity,
     color: visuals.flagColor,
+    material: Object.freeze({
+      weaveAlpha: clothPresentation.band === "near" ? 0.22 : 0.12,
+      foldAlpha: clothPresentation.band === "near" ? 0.3 : 0.18,
+      edgeHighlightAlpha: clothPresentation.band === "near" ? 0.42 : 0.28,
+    }),
     positions: clothState.positions.map((point) => vec3(point.x, point.y, point.z)),
     indices: clothState.indices,
     grid: { rows: clothState.rows, cols: clothState.cols },
@@ -2412,7 +2530,7 @@ function buildWaterMotionEffects(state) {
         impulse.z
       ),
       radius,
-      opacity: clamp(impulse.life * 0.28, 0.08, 0.3),
+      opacity: clamp(impulse.life * 0.13, 0.035, 0.15),
     });
   });
 
@@ -2427,7 +2545,7 @@ function buildWaterMotionEffects(state) {
     const lateral = vec3(-direction.z, 0, direction.x);
     const points = [];
     for (let sampleIndex = 0; sampleIndex < 6; sampleIndex += 1) {
-      const along = 1 + sampleIndex * 1.45;
+      const along = 1 + sampleIndex * 1.55;
       const lateralOffset =
         Math.sin(state.time * 1.2 + sampleIndex * 0.8 + readVisualNumber(ship.wanderPhase, 0)) * 0.12;
       const worldPoint = addVec3(
@@ -2441,13 +2559,14 @@ function buildWaterMotionEffects(state) {
             sampleWave(state, worldPoint.x, worldPoint.z, state.time) * 0.24 + 0.04,
             worldPoint.z
           ),
-          width: 0.34 + sampleIndex * 0.13,
+          width: 0.3 + sampleIndex * 0.11,
+          foam: clamp(0.28 - sampleIndex * 0.028 + speed * 0.025, 0.1, 0.34),
         })
       );
     }
     wakeTrails.push(
       Object.freeze({
-        opacity: clamp(0.18 + speed * 0.09, 0.22, 0.46),
+        opacity: clamp(0.1 + speed * 0.048, 0.12, 0.24),
         points: Object.freeze(points),
       })
     );
@@ -2457,6 +2576,28 @@ function buildWaterMotionEffects(state) {
     wakeTrails: Object.freeze(wakeTrails),
     rippleRings: Object.freeze(rippleRings),
   });
+}
+
+function buildShorelineFoamSegments(state) {
+  return Object.freeze(
+    SHORELINE_FOAM_ANCHORS.map((anchor, index) => {
+      const pulse = 0.5 + Math.sin(state.time * 0.84 + index * 1.17) * 0.5;
+      const drift = Math.sin(state.time * 0.38 + index * 0.61) * 0.1;
+      const direction = normalizeVec3(vec3(Math.cos(anchor.angle), 0, Math.sin(anchor.angle)));
+      const center = vec3(
+        anchor.x + direction.x * drift,
+        sampleWave(state, anchor.x, anchor.z, state.time) * 0.12 - 0.02,
+        anchor.z + direction.z * drift
+      );
+      return Object.freeze({
+        center,
+        direction,
+        length: anchor.length * (0.78 + pulse * 0.34),
+        width: 0.16 + pulse * 0.12,
+        opacity: 0.07 + pulse * 0.12,
+      });
+    })
+  );
 }
 
 function buildWaterBands(state, fluidDetail, visuals, fluidFeatures) {
@@ -2487,14 +2628,14 @@ function buildWaterBands(state, fluidDetail, visuals, fluidFeatures) {
     const bandContinuity = resolveFluidBandContinuity(continuity, bandSpec.band);
     const bandResolution =
       bandSpec.band === "near"
-        ? fluidDetail.nearResolution
+        ? Math.ceil(fluidDetail.nearResolution * 1.28)
         : bandSpec.band === "mid"
-          ? fluidDetail.midResolution
+          ? Math.ceil(fluidDetail.midResolution * 1.2)
           : bandSpec.band === "far"
             ? 5
             : 3;
-    const cols = Math.max(4, bandResolution * 2);
-    const rows = Math.max(4, bandResolution + 2);
+    const cols = Math.max(4, bandResolution * (bandSpec.band === "near" ? 3 : 2));
+    const rows = Math.max(4, bandResolution + (bandSpec.band === "near" ? 5 : 2));
     const positions = [];
     const indices = [];
     const originX = -bandSpec.width * 0.5;
@@ -2505,11 +2646,16 @@ function buildWaterBands(state, fluidDetail, visuals, fluidFeatures) {
         const v = row / (rows - 1);
         const x = originX + bandSpec.width * u;
         const z = originZ + bandSpec.depth * v;
-        const y =
+        const baseHeight =
           bandSpec.y +
           sampleWave(state, x, z, state.time) *
             bandContinuity.amplitudeFloor *
             (bandSpec.band === "near" ? 0.9 : bandSpec.band === "mid" ? 0.55 : 0.3);
+        const detailHeight =
+          bandSpec.band === "near"
+            ? Math.sin(x * 1.25 + z * 0.42 - state.time * 2.4) * 0.035
+            : 0;
+        const y = baseHeight + detailHeight;
         positions.push(vec3(x, y, z));
       }
     }
@@ -2546,7 +2692,12 @@ function buildWaterBands(state, fluidDetail, visuals, fluidFeatures) {
                   r: mix(visuals.waterFar.r, 0.76, 0.2),
                   g: mix(visuals.waterFar.g, 0.78, 0.2),
                   b: mix(visuals.waterFar.b, 0.82, 0.2),
-                },
+	                },
+      material: Object.freeze({
+        highlightAlpha: bandSpec.band === "near" ? 0.2 : bandSpec.band === "mid" ? 0.13 : 0.07,
+        foamAlpha: bandSpec.band === "near" ? 0.28 : bandSpec.band === "mid" ? 0.14 : 0.05,
+        microRippleScale: bandSpec.band === "near" ? 1 : bandSpec.band === "mid" ? 0.58 : 0.28,
+      }),
     });
   }
 
@@ -2626,15 +2777,15 @@ function createSceneState(options, featureAdapters) {
       {
         id: "northwind",
         modelKey: "brigantine",
-        position: vec3(-5.2, 0, 7.2),
-        velocity: vec3(2.35, 0, -1.08),
-        rotationY: 0.58,
-        angularVelocity: 0.09,
+        position: vec3(-7.8, 0, 11.2),
+        velocity: vec3(1.08, 0, -0.18),
+        rotationY: 1.38,
+        angularVelocity: 0.025,
         tint: { r: 0.62, g: 0.39, b: 0.23 },
         massScale: 1.42,
-        cruiseSpeed: 2.25,
-        throttleResponse: 0.46,
-        rudderResponse: 0.54,
+        cruiseSpeed: 1.22,
+        throttleResponse: 0.36,
+        rudderResponse: 0.4,
         wanderPhase: 0.35,
         lanterns: CUTTER_LANTERNS,
         lanternStrength: 1.06,
@@ -2643,15 +2794,15 @@ function createSceneState(options, featureAdapters) {
       {
         id: "tidecaller",
         modelKey: "cutter",
-        position: vec3(4.8, 0, 4.4),
-        velocity: vec3(-2.15, 0, 1.74),
-        rotationY: -2.48,
-        angularVelocity: -0.2,
+        position: vec3(6.8, 0, 5.4),
+        velocity: vec3(-0.82, 0, 0.14),
+        rotationY: -1.34,
+        angularVelocity: -0.035,
         tint: { r: 0.58, g: 0.24, b: 0.16 },
         massScale: 0.84,
-        cruiseSpeed: 2.68,
-        throttleResponse: 0.7,
-        rudderResponse: 0.78,
+        cruiseSpeed: 1.36,
+        throttleResponse: 0.52,
+        rudderResponse: 0.58,
         wanderPhase: 1.6,
         lanterns: SHIP_LANTERNS,
         lanternStrength: 1.18,
@@ -2995,17 +3146,44 @@ function renderShipRigging(ctx, ship, camera, viewport) {
 
 function renderClothAccent(ctx, cloth, camera, viewport) {
   const projected = cloth.positions.map((point) => projectPoint(point, camera, viewport));
-  ctx.strokeStyle = "rgba(255, 241, 226, 0.92)";
-  ctx.lineWidth = 1.7;
+  const material = cloth.material ?? {};
+  ctx.strokeStyle = `rgba(255, 241, 226, ${material.foldAlpha ?? 0.32})`;
+  ctx.lineWidth = 1.8;
 
   for (
     let row = 0;
     row < cloth.grid.rows;
-    row += Math.max(1, Math.floor(cloth.grid.rows / 5))
+    row += Math.max(1, Math.floor(cloth.grid.rows / 6))
   ) {
     ctx.beginPath();
     let started = false;
     for (let column = 0; column < cloth.grid.cols; column += 1) {
+      const point = projected[row * cloth.grid.cols + column];
+      if (!point) {
+        continue;
+      }
+      if (!started) {
+        ctx.moveTo(point.x, point.y);
+        started = true;
+      } else {
+        ctx.lineTo(point.x, point.y);
+      }
+    }
+    if (started) {
+      ctx.stroke();
+    }
+  }
+
+  ctx.strokeStyle = `rgba(255, 228, 204, ${material.weaveAlpha ?? 0.22})`;
+  ctx.lineWidth = 0.85;
+  for (
+    let column = 1;
+    column < cloth.grid.cols - 1;
+    column += Math.max(1, Math.floor(cloth.grid.cols / 8))
+  ) {
+    ctx.beginPath();
+    let started = false;
+    for (let row = 0; row < cloth.grid.rows; row += 1) {
       const point = projected[row * cloth.grid.cols + column];
       if (!point) {
         continue;
@@ -3029,6 +3207,26 @@ function renderClothAccent(ctx, cloth, camera, viewport) {
     (cloth.grid.rows - 1) * cloth.grid.cols,
   ];
   ctx.fillStyle = colorToRgba(cloth.color, 0.95);
+  ctx.strokeStyle = `rgba(255, 246, 236, ${material.edgeHighlightAlpha ?? 0.5})`;
+  ctx.lineWidth = 1.4;
+  ctx.beginPath();
+  let borderStarted = false;
+  for (let column = 0; column < cloth.grid.cols; column += 1) {
+    const point = projected[column];
+    if (!point) {
+      continue;
+    }
+    if (!borderStarted) {
+      ctx.moveTo(point.x, point.y);
+      borderStarted = true;
+    } else {
+      ctx.lineTo(point.x, point.y);
+    }
+  }
+  if (borderStarted) {
+    ctx.stroke();
+  }
+
   for (const index of borderIndices) {
     const point = projected[index];
     if (!point) {
@@ -3045,14 +3243,22 @@ function renderWaterHighlights(ctx, waterBands, camera, viewport) {
     if (band.band === "horizon") {
       continue;
     }
-    const interval = band.band === "near" ? 2 : 3;
-    const alpha = band.band === "near" ? 0.22 : 0.14;
+    const interval = band.band === "near" ? 4 : 5;
+    const alpha = band.material?.highlightAlpha ?? (band.band === "near" ? 0.22 : 0.14);
     ctx.strokeStyle = `rgba(232, 247, 255, ${alpha})`;
-    ctx.lineWidth = band.band === "near" ? 1.3 : 0.9;
+    ctx.lineWidth = band.band === "near" ? 0.9 : 0.65;
     for (let row = interval; row < band.rows - 1; row += interval) {
-      ctx.beginPath();
       let started = false;
-      for (let column = 0; column < band.cols; column += 1) {
+      ctx.beginPath();
+      for (let column = 0; column < band.cols; column += band.band === "near" ? 2 : 3) {
+        if (pseudoRandom(row * 47 + column * 13) < 0.18) {
+          if (started) {
+            ctx.stroke();
+            ctx.beginPath();
+            started = false;
+          }
+          continue;
+        }
         const point = projectPoint(
           band.positions[row * band.cols + column],
           camera,
@@ -3072,7 +3278,61 @@ function renderWaterHighlights(ctx, waterBands, camera, viewport) {
         ctx.stroke();
       }
     }
+
+    if (band.band === "near") {
+      ctx.fillStyle = `rgba(236, 249, 255, ${(band.material?.foamAlpha ?? 0.28) * 0.72})`;
+      for (let column = 3; column < band.cols - 3; column += 10) {
+        const point = projectPoint(
+          band.positions[Math.floor(band.rows * 0.42) * band.cols + column],
+          camera,
+          viewport
+        );
+        if (!point) {
+          continue;
+        }
+        ctx.beginPath();
+        ctx.ellipse(point.x, point.y, 1.8, 0.75, -0.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
   }
+}
+
+function renderShorelineFoamSegments(ctx, segments, camera, viewport) {
+  ctx.save();
+  ctx.globalCompositeOperation = "screen";
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+
+  for (const segment of segments) {
+    const half = scaleVec3(segment.direction, segment.length * 0.5);
+    const start = projectPoint(subVec3(segment.center, half), camera, viewport);
+    const end = projectPoint(addVec3(segment.center, half), camera, viewport);
+    const center = projectPoint(segment.center, camera, viewport);
+    if (!start || !end || !center) {
+      continue;
+    }
+
+    const depthScale = clamp(140 / Math.max(12, center.depth), 3, 10);
+    ctx.strokeStyle = `rgba(232, 242, 238, ${segment.opacity})`;
+    ctx.lineWidth = clamp(segment.width * depthScale, 0.8, 2.8);
+    ctx.beginPath();
+    ctx.moveTo(start.x, start.y);
+    ctx.quadraticCurveTo(
+      center.x,
+      center.y + Math.sin(segment.center.x * 1.7) * 2.4,
+      end.x,
+      end.y
+    );
+    ctx.stroke();
+
+    ctx.fillStyle = `rgba(248, 251, 246, ${segment.opacity * 0.68})`;
+    ctx.beginPath();
+    ctx.ellipse(center.x, center.y, depthScale * 0.18, depthScale * 0.08, -0.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
 }
 
 function readPhysicsNumber(physics, key, fallback) {
@@ -3113,14 +3373,17 @@ function getShipInverseInertia(ship, shipModel) {
 }
 
 function spawnSpray(state, point, intensity) {
-  const count = state.fluidDetail.getSnapshot().currentLevel.config.splashCount;
+  const count = Math.max(
+    3,
+    Math.ceil(state.fluidDetail.getSnapshot().currentLevel.config.splashCount * 0.32)
+  );
   for (let index = 0; index < count; index += 1) {
     const angle = (index / count) * Math.PI * 2;
-    const speed = 0.9 + Math.random() * intensity * 0.45;
+    const speed = 0.46 + Math.random() * intensity * 0.24;
     state.sprays.push({
       position: vec3(point.x, point.y, point.z),
-      velocity: vec3(Math.cos(angle) * speed * 0.35, 1.1 + Math.random() * 0.8, Math.sin(angle) * speed * 0.25),
-      life: 1.2 + Math.random() * 0.4,
+      velocity: vec3(Math.cos(angle) * speed * 0.24, 0.46 + Math.random() * 0.34, Math.sin(angle) * speed * 0.18),
+      life: 0.72 + Math.random() * 0.22,
     });
   }
 }
@@ -3140,8 +3403,8 @@ function resolveShipRoute(ship, state, radius) {
   const crossCurrent = Math.cos(state.time * 0.31 + readVisualNumber(ship.wanderPhase, 0));
   const laneCenter =
     ship.id === "northwind"
-      ? 10.2 + wander * 2.1 + crossCurrent * 0.6
-      : 7 + wander * 3.3 - crossCurrent * 1.1;
+      ? 11.6 + wander * 0.82 + crossCurrent * 0.24
+      : 5.4 + wander * 0.94 - crossCurrent * 0.32;
   const targetX =
     ship.routeDirection > 0
       ? HARBOR_BOUNDS.maxX - radius * 1.7
@@ -3158,7 +3421,7 @@ function updateShipMotion(state, ship, dt, shipModel) {
   const angularDamping = readPhysicsNumber(physics, "angularDamping", 0.08);
   const throttleResponse = readVisualNumber(ship.throttleResponse, 0.58);
   const rudderResponse = readVisualNumber(ship.rudderResponse, 0.62);
-  const cruiseSpeed = readVisualNumber(ship.cruiseSpeed, 2.4);
+  const cruiseSpeed = readVisualNumber(ship.cruiseSpeed, 1.25);
 
   ship.collisionCooldown = Math.max(0, readVisualNumber(ship.collisionCooldown, 0) - dt);
 
@@ -3272,7 +3535,7 @@ function resolveShipCollision(state, a, b, shipModelA, shipModelB) {
     ((readPhysicsNumber(shipModelA.physics, "restitution", 0.22) +
       readPhysicsNumber(shipModelB.physics, "restitution", 0.22)) /
       2) *
-    0.88;
+    0.42;
   if (velocityAlongNormal < 0) {
     const impulseMagnitude =
       (-(1 + restitution) * velocityAlongNormal) / Math.max(0.0001, invMassSum);
@@ -3299,7 +3562,7 @@ function resolveShipCollision(state, a, b, shipModelA, shipModelB) {
 
     const impactSpeed = Math.abs(velocityAlongNormal);
     if (
-      impactSpeed > 0.18 &&
+      impactSpeed > 0.36 &&
       Math.max(readVisualNumber(a.collisionCooldown, 0), readVisualNumber(b.collisionCooldown, 0)) <= 0
     ) {
       const contactPoint = vec3(
@@ -3307,21 +3570,21 @@ function resolveShipCollision(state, a, b, shipModelA, shipModelB) {
         (a.position.y + b.position.y) * 0.5 + 0.14,
         (a.position.z + b.position.z) * 0.5
       );
-      spawnSpray(state, contactPoint, impactSpeed * 2.4 + penetration * 8);
+      spawnSpray(state, contactPoint, impactSpeed * 0.9 + penetration * 2.4);
       state.waveImpulses.push({
         x: contactPoint.x,
         z: contactPoint.z,
-        strength: clamp(0.24 + impactSpeed * 0.46 + penetration * 0.9, 0.2, 1.7),
-        radius: 0.9 + penetration * 1.4,
+        strength: clamp(0.1 + impactSpeed * 0.18 + penetration * 0.28, 0.08, 0.52),
+        radius: 0.72 + penetration * 0.72,
         life: 1,
       });
       state.collisionCount += 1;
       state.collisionFlash = Math.max(
         state.collisionFlash,
-        clamp(impactSpeed * 0.55 + penetration * 1.8, 0.16, 1)
+        clamp(impactSpeed * 0.14 + penetration * 0.32, 0.04, 0.24)
       );
-      a.collisionCooldown = 0.2;
-      b.collisionCooldown = 0.2;
+      a.collisionCooldown = 0.72;
+      b.collisionCooldown = 0.72;
     }
   }
 
@@ -3352,8 +3615,8 @@ function updateShips(state, dt, shipModel) {
   }
 
   state.collisionFlash = collided
-    ? Math.max(0.12, state.collisionFlash)
-    : Math.max(0, state.collisionFlash - dt * 1.3);
+    ? Math.max(0.04, state.collisionFlash)
+    : Math.max(0, state.collisionFlash - dt * 1.7);
 }
 
 function updateWaveImpulses(state, dt) {
@@ -3749,6 +4012,7 @@ function renderWaterMotionEffects(ctx, effects, camera, viewport) {
       .map((point) => ({
         projected: projectPoint(point.center, camera, viewport),
         width: point.width,
+        foam: point.foam,
       }))
       .filter((entry) => entry.projected);
     if (projected.length < 2) {
@@ -3760,8 +4024,8 @@ function renderWaterMotionEffects(ctx, effects, camera, viewport) {
     const averageWidth =
       projected.reduce((total, entry) => total + entry.width, 0) / projected.length;
     const baseWidth = clamp((averageWidth / Math.max(0.25, averageDepth)) * 180, 1.6, 5.4);
-    ctx.strokeStyle = `rgba(146, 194, 236, ${wake.opacity * 0.52})`;
-    ctx.lineWidth = baseWidth * 1.9;
+    ctx.strokeStyle = `rgba(146, 194, 236, ${wake.opacity * 0.34})`;
+    ctx.lineWidth = baseWidth * 1.45;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.beginPath();
@@ -3771,8 +4035,8 @@ function renderWaterMotionEffects(ctx, effects, camera, viewport) {
     }
     ctx.stroke();
 
-    ctx.strokeStyle = `rgba(234, 247, 255, ${wake.opacity})`;
-    ctx.lineWidth = baseWidth;
+    ctx.strokeStyle = `rgba(234, 247, 255, ${wake.opacity * 0.72})`;
+    ctx.lineWidth = baseWidth * 0.72;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.beginPath();
@@ -3783,13 +4047,14 @@ function renderWaterMotionEffects(ctx, effects, camera, viewport) {
     ctx.stroke();
 
     for (const entry of projected.slice(1, 5)) {
-      ctx.fillStyle = `rgba(239, 248, 255, ${wake.opacity * 0.76})`;
+      const foam = entry.foam ?? 0.3;
+      ctx.fillStyle = `rgba(239, 248, 255, ${wake.opacity * foam * 0.92})`;
       ctx.beginPath();
       ctx.ellipse(
         entry.projected.x,
         entry.projected.y,
-        baseWidth * 0.72,
-        baseWidth * 0.44,
+        baseWidth * 0.54,
+        baseWidth * 0.28,
         0,
         0,
         Math.PI * 2
@@ -3809,13 +4074,23 @@ function renderWaterMotionEffects(ctx, effects, camera, viewport) {
     const radiusX = Math.hypot(xAxis.x - center.x, xAxis.y - center.y);
     const radiusY = Math.hypot(zAxis.x - center.x, zAxis.y - center.y);
     ctx.strokeStyle = `rgba(216, 235, 255, ${ring.opacity})`;
-    ctx.lineWidth = clamp((radiusX + radiusY) * 0.02, 1, 3.1);
-    ctx.beginPath();
-    ctx.ellipse(center.x, center.y, radiusX, radiusY, 0, 0, Math.PI * 2);
-    ctx.stroke();
+    ctx.lineWidth = clamp((radiusX + radiusY) * 0.014, 0.65, 1.8);
+    for (let segment = 0; segment < 5; segment += 1) {
+      if (pseudoRandom(segment * 31 + radiusX * 0.7 + radiusY * 0.3) < 0.32) {
+        continue;
+      }
+      const startAngle = segment * 1.22 + stateTimePhase(center.x, center.y) * 0.04;
+      ctx.beginPath();
+      ctx.ellipse(center.x, center.y, radiusX, radiusY, 0, startAngle, startAngle + 0.48);
+      ctx.stroke();
+    }
   }
 
   ctx.restore();
+}
+
+function stateTimePhase(x, y) {
+  return Math.sin(x * 0.013 + y * 0.017);
 }
 
 function renderScene(
@@ -3899,6 +4174,7 @@ function renderScene(
   }
 
   const waterMotionEffects = buildWaterMotionEffects(state);
+  const shorelineFoamSegments = buildShorelineFoamSegments(state);
   const lightSources = collectSceneLightSources(state, visuals);
 
   pushHarborGeometry(camera, viewport, sceneTriangles, state);
@@ -3973,6 +4249,7 @@ function renderScene(
   }
   renderWaterMotionEffects(ctx, waterMotionEffects, camera, viewport);
   renderWaterHighlights(ctx, water.bandMeshes, camera, viewport);
+  renderShorelineFoamSegments(ctx, shorelineFoamSegments, camera, viewport);
   drawTriangles(
     ctx,
     sceneTriangles,
@@ -4087,7 +4364,7 @@ function updateSceneState(state, dt, shipModel, featureAdapters) {
   advanceShowcaseClothSimulationState(clothState, {
     dt,
     time: state.time,
-    flagMotion: readVisualNumber(state.demoVisuals?.flagMotion, 0.92),
+    flagMotion: readVisualNumber(state.demoVisuals?.flagMotion, 0.58),
     waveInfluence: sampleWave(state, FLAG_LAYOUT.origin.x + FLAG_LAYOUT.width * 0.55, FLAG_LAYOUT.origin.z + FLAG_LAYOUT.width * 0.48, state.time),
   });
   updatePhysicsSnapshot(state, shipModel, featureAdapters.physics);
@@ -4320,6 +4597,8 @@ function updatePhysicsSnapshot(state, shipModel, physicsFeatures) {
 
 export {
   advanceShowcaseClothSimulationState as __testOnlyAdvanceShowcaseClothSimulationState,
+  buildClothSurface as __testOnlyBuildClothSurface,
+  buildShorelineFoamSegments as __testOnlyBuildShorelineFoamSegments,
   buildWaterBands as __testOnlyBuildWaterBands,
   buildWaterMotionEffects as __testOnlyBuildWaterMotionEffects,
   collectSceneLightSources as __testOnlyCollectSceneLightSources,

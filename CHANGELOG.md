@@ -34,7 +34,7 @@ All notable changes to this project will be documented in this file.
 
 - **Added**
   - Deterministic showcase asset generation for a richer shared brigantine,
-    cutter, lighthouse, and harbor-dock catalog.
+    cutter, lighthouse, harbor-dock, and shoreline catalog.
   - Fullscreen capture mode for slide-deck screenshots and video recording,
     including scene-only layout and bounded 1080p canvas scaling.
   - Bundled `en-GB` translation keys and dictionaries for shared showcase labels
@@ -44,6 +44,16 @@ All notable changes to this project will be documented in this file.
     delegation to the `@plasius/gpu-renderer` WebGPU wavefront renderer.
 
 - **Changed**
+  - Reworked the shared harbor showcase chrome into a render-first canvas with
+    compact controls and a collapsed runtime diagnostics drawer instead of
+    always-visible hero, status, sidebar, and footer panels.
+  - Improved the shared harbor shoreline presentation with a denser near-band
+    water mesh, generated shoreline/breakwater geometry, broken waterline foam,
+    subtler wake/ripple metadata, calmer ship traffic, and less exaggerated
+    cloth material cues.
+  - Re-exported `buildProductStudioSceneObjects(...)` as a compatibility alias
+    of `createProductStudioMeshes(...)` so browser validation pages and runtime
+    scene loaders can consume one stable Product Studio scene-builder contract.
   - Lowered Product Studio wavefront renderer defaults to a host-safe `640x360`
     frame at `maxDepth: 2` so browser demos do not start with a heavy 720p
     depth-6 GPU workload.

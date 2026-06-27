@@ -99,6 +99,31 @@ const MATERIAL_LIBRARY = Object.freeze({
     metallicFactor: 0.02,
     roughnessFactor: 0.92,
   },
+  "shore-sand": {
+    baseColorFactor: [0.45, 0.42, 0.34, 1],
+    metallicFactor: 0,
+    roughnessFactor: 0.98,
+  },
+  "wet-rock": {
+    baseColorFactor: [0.2, 0.22, 0.22, 1],
+    metallicFactor: 0.02,
+    roughnessFactor: 0.9,
+  },
+  seaweed: {
+    baseColorFactor: [0.07, 0.16, 0.1, 1],
+    metallicFactor: 0,
+    roughnessFactor: 0.96,
+  },
+  driftwood: {
+    baseColorFactor: [0.31, 0.25, 0.18, 1],
+    metallicFactor: 0.02,
+    roughnessFactor: 0.94,
+  },
+  "foam-stain": {
+    baseColorFactor: [0.78, 0.82, 0.78, 0.68],
+    metallicFactor: 0,
+    roughnessFactor: 0.99,
+  },
 });
 
 function vec3(x, y, z) {
@@ -128,6 +153,11 @@ function crossVec3(a, b) {
 function normalizeVec3(a) {
   const length = Math.hypot(a[0], a[1], a[2]) || 1;
   return [a[0] / length, a[1] / length, a[2] / length];
+}
+
+function pseudoRandom(seed) {
+  const sine = Math.sin(seed * 12.9898) * 43758.5453;
+  return sine - Math.floor(sine);
 }
 
 function rotateY(point, radians) {
@@ -397,6 +427,69 @@ function addHull(builder, deckBuilder, stations) {
     stern.chineLowerPort,
     stern.chineUpperPort,
   ]);
+}
+
+function addTerrainStrip(builder, sections) {
+  for (let index = 0; index < sections.length - 1; index += 1) {
+    const current = sections[index];
+    const next = sections[index + 1];
+    builder.addQuad(
+      vec3(current.leftX, current.y, current.z),
+      vec3(current.rightX, current.y + current.camber, current.z),
+      vec3(next.rightX, next.y + next.camber, next.z),
+      vec3(next.leftX, next.y, next.z)
+    );
+  }
+}
+
+function addIrregularRock(builder, options) {
+  const {
+    center,
+    radius = 0.8,
+    height = 0.7,
+    radialSegments = 8,
+    seed = 1,
+  } = options;
+  const topRing = [];
+  const midRing = [];
+  const bottomRing = [];
+
+  for (let index = 0; index < radialSegments; index += 1) {
+    const angle = (index / radialSegments) * Math.PI * 2;
+    const variance = 0.76 + pseudoRandom(seed * 17 + index * 13) * 0.38;
+    const topVariance = 0.46 + pseudoRandom(seed * 23 + index * 19) * 0.2;
+    const cosine = Math.cos(angle);
+    const sine = Math.sin(angle);
+    bottomRing.push(
+      vec3(
+        center[0] + cosine * radius * variance,
+        center[1],
+        center[2] + sine * radius * (0.74 + variance * 0.22)
+      )
+    );
+    midRing.push(
+      vec3(
+        center[0] + cosine * radius * variance * 0.92,
+        center[1] + height * (0.44 + pseudoRandom(seed * 29 + index) * 0.12),
+        center[2] + sine * radius * variance * 0.72
+      )
+    );
+    topRing.push(
+      vec3(
+        center[0] + cosine * radius * topVariance,
+        center[1] + height * (0.86 + pseudoRandom(seed * 31 + index * 5) * 0.22),
+        center[2] + sine * radius * topVariance * 0.76
+      )
+    );
+  }
+
+  for (let index = 0; index < radialSegments; index += 1) {
+    const next = (index + 1) % radialSegments;
+    builder.addQuad(bottomRing[index], midRing[index], midRing[next], bottomRing[next]);
+    builder.addQuad(midRing[index], topRing[index], topRing[next], midRing[next]);
+  }
+  builder.addPolygon([...topRing].reverse());
+  builder.addPolygon(bottomRing);
 }
 
 function createBrigantineAsset() {
@@ -712,6 +805,105 @@ function createHarborDockAsset() {
   };
 }
 
+function createShorelineAsset() {
+  const parts = createPrimitiveMap([
+    "shore-sand",
+    "wet-rock",
+    "stone",
+    "seaweed",
+    "driftwood",
+    "foam-stain",
+  ]);
+
+  addTerrainStrip(parts["shore-sand"], [
+    { leftX: -9.8, rightX: 8.8, y: -0.42, camber: 0.04, z: 4.1 },
+    { leftX: -10.4, rightX: 8.2, y: -0.18, camber: 0.08, z: 2.7 },
+    { leftX: -9.3, rightX: 7.6, y: 0.14, camber: 0.12, z: 1.0 },
+    { leftX: -8.4, rightX: 6.4, y: 0.48, camber: 0.18, z: -0.92 },
+    { leftX: -7.1, rightX: 4.9, y: 0.82, camber: 0.2, z: -2.7 },
+  ]);
+
+  addTerrainStrip(parts["foam-stain"], [
+    { leftX: -9.2, rightX: 7.8, y: -0.3, camber: 0.02, z: 3.4 },
+    { leftX: -8.7, rightX: 7.4, y: -0.2, camber: 0.03, z: 2.84 },
+    { leftX: -7.6, rightX: 6.2, y: -0.08, camber: 0.04, z: 2.22 },
+  ]);
+
+  addBox(parts.stone, vec3(-9.5, 0.28, -2.92), vec3(5.8, 1.12, -2.28));
+  addBox(parts.stone, vec3(-9.2, 0.08, -2.22), vec3(5.45, 0.54, -1.78));
+  addBox(parts.stone, vec3(-8.88, -0.1, -1.72), vec3(5.1, 0.18, -1.38));
+
+  const rockSpecs = [
+    { center: [-8.4, -0.32, 2.5], radius: 0.78, height: 0.68, seed: 4 },
+    { center: [-7.2, -0.2, 1.64], radius: 0.54, height: 0.58, seed: 8 },
+    { center: [-5.8, -0.22, 2.95], radius: 0.62, height: 0.62, seed: 12 },
+    { center: [-4.2, 0.02, 0.42], radius: 0.96, height: 0.88, seed: 16 },
+    { center: [-2.7, -0.34, 2.1], radius: 0.48, height: 0.48, seed: 20 },
+    { center: [-1.2, -0.1, 1.18], radius: 0.74, height: 0.7, seed: 24 },
+    { center: [0.8, -0.28, 2.74], radius: 0.66, height: 0.54, seed: 28 },
+    { center: [2.4, -0.06, 0.92], radius: 0.86, height: 0.78, seed: 32 },
+    { center: [4.5, -0.24, 2.36], radius: 0.58, height: 0.54, seed: 36 },
+    { center: [6.4, -0.36, 2.92], radius: 0.48, height: 0.42, seed: 40 },
+  ];
+  for (const rock of rockSpecs) {
+    addIrregularRock(parts["wet-rock"], {
+      center: vec3(...rock.center),
+      radius: rock.radius,
+      height: rock.height,
+      radialSegments: 9,
+      seed: rock.seed,
+    });
+  }
+
+  for (const [x, z, length, rotation] of [
+    [-6.8, 2.04, 1.18, -0.24],
+    [-3.6, 2.52, 0.88, 0.18],
+    [1.4, 2.16, 1.06, -0.08],
+    [5.2, 2.64, 0.82, 0.26],
+  ]) {
+    const halfLength = length * 0.5;
+    const cosine = Math.cos(rotation);
+    const sine = Math.sin(rotation);
+    const dx = cosine * halfLength;
+    const dz = sine * halfLength;
+    const widthX = -sine * 0.045;
+    const widthZ = cosine * 0.045;
+    parts.seaweed.addQuad(
+      vec3(x - dx - widthX, -0.26, z - dz - widthZ),
+      vec3(x + dx - widthX, -0.25, z + dz - widthZ),
+      vec3(x + dx + widthX, -0.22, z + dz + widthZ),
+      vec3(x - dx + widthX, -0.23, z - dz + widthZ)
+    );
+  }
+
+  addCylinder(parts.driftwood, {
+    center: vec3(-2.2, 0.1, 1.72),
+    height: 1.72,
+    radiusTop: 0.08,
+    radiusBottom: 0.12,
+    radialSegments: 10,
+  });
+  addBox(parts.driftwood, vec3(-2.96, 0.34, 1.57), vec3(-1.52, 0.48, 1.78));
+  addCylinder(parts.driftwood, {
+    center: vec3(3.84, 0.04, 1.9),
+    height: 1.16,
+    radiusTop: 0.06,
+    radiusBottom: 0.1,
+    radialSegments: 10,
+  });
+
+  return {
+    name: "shoreline",
+    physics: null,
+    children: [
+      { name: "shoreline-beach", primitives: [parts["shore-sand"], parts["foam-stain"], parts.seaweed] },
+      { name: "shoreline-rocks", primitives: [parts["wet-rock"]] },
+      { name: "shoreline-breakwater", primitives: [parts.stone] },
+      { name: "shoreline-detail", primitives: [parts.driftwood] },
+    ],
+  };
+}
+
 function chunkBuffer(buffer, chunks) {
   const alignedLength = Math.ceil(buffer.length / 4) * 4;
   const chunk = Buffer.alloc(alignedLength);
@@ -909,6 +1101,7 @@ const assets = [
   ["cutter.gltf", compileAsset(createCutterAsset())],
   ["lighthouse.gltf", compileAsset(createLighthouseAsset())],
   ["harbor-dock.gltf", compileAsset(createHarborDockAsset())],
+  ["shoreline.gltf", compileAsset(createShorelineAsset())],
 ];
 
 for (const [fileName, contents] of assets) {

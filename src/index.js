@@ -16,6 +16,7 @@ export {
   GPU_SHOWCASE_REALISTIC_MODELS_FEATURE,
 };
 export {
+  buildProductStudioSceneObjects,
   createProductStudioMeshes,
   mountGpuProductStudio,
 } from "./product-studio-runtime.js";

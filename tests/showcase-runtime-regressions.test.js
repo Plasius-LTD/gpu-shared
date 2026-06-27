@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 
 import {
   __testOnlyAdvanceShowcaseClothSimulationState,
+  __testOnlyBuildClothSurface,
+  __testOnlyBuildShorelineFoamSegments,
   __testOnlyBuildWaterBands,
   __testOnlyBuildWaterMotionEffects,
   __testOnlyCollectSceneLightSources,
@@ -105,8 +107,8 @@ test("cloth simulation keeps the pole edge pinned while the free edge moves", ()
     )
   );
   assert.ok(
-    maxFreeEdgeDisplacement > 0.12,
-    `expected free edge to move, saw max displacement ${maxFreeEdgeDisplacement}`
+    maxFreeEdgeDisplacement > 0.06 && maxFreeEdgeDisplacement < 0.5,
+    `expected controlled free edge movement, saw max displacement ${maxFreeEdgeDisplacement}`
   );
 });
 
@@ -141,7 +143,19 @@ test("water motion effects expose wakes for moving ships and expanding ripple ri
   const effects = __testOnlyBuildWaterMotionEffects(state);
   assert.equal(effects.wakeTrails.length, 1);
   assert.ok(effects.wakeTrails[0].points.length >= 5);
+  assert.ok(
+    effects.wakeTrails[0].points.some((point) => point.foam > 0.18),
+    "expected moving ship wakes to carry visible foam metadata"
+  );
+  assert.ok(
+    effects.wakeTrails[0].opacity <= 0.24,
+    `expected non-cartoon wake opacity, saw ${effects.wakeTrails[0].opacity}`
+  );
   assert.ok(effects.rippleRings[0].radius > state.waveImpulses[0].radius);
+  assert.ok(
+    effects.rippleRings[0].opacity <= 0.15,
+    `expected subtle ripple rings, saw ${effects.rippleRings[0].opacity}`
+  );
   assert.equal(Number.isFinite(effects.wakeTrails[0].points[0].center.y), true);
 });
 
@@ -185,6 +199,52 @@ test("water bands keep finite heights and show material near-band motion between
     averageDisplacement > 0.01,
     `expected broad near-band motion, saw average displacement ${averageDisplacement}`
   );
+  assert.ok(
+    nearAfter.cols >= WATER_TEST_DETAIL.nearResolution * 3,
+    `expected denser near-band shoreline mesh, saw ${nearAfter.cols} columns`
+  );
+  assert.ok(
+    nearAfter.material.foamAlpha >= 0.24 && nearAfter.material.foamAlpha <= 0.32,
+    `expected subtle near-band foam material metadata, saw ${nearAfter.material.foamAlpha}`
+  );
+});
+
+test("shoreline foam segments stay tied to the waterline", () => {
+  const segments = __testOnlyBuildShorelineFoamSegments(createWaterTestState(1.25));
+
+  assert.ok(segments.length >= 8);
+  assert.ok(
+    segments.every((segment) => segment.opacity >= 0.07 && segment.opacity <= 0.2),
+    "expected shoreline foam to stay subtle instead of high-contrast"
+  );
+  assert.ok(
+    segments.every((segment) => segment.center.z >= 2.3 && segment.center.z <= 3.3),
+    "expected shoreline foam to follow the generated shoreline edge"
+  );
+});
+
+test("cloth surface exposes subtle material cues for weave, folds, and edge highlights", () => {
+  const cloth = __testOnlyBuildClothSurface(
+    null,
+    {
+      focus: "cloth",
+      camera: {
+        target: { x: -8.4, y: 5.3, z: -1.5 },
+        yaw: -1.1,
+        pitch: 0.25,
+        distance: 15,
+      },
+    },
+    { rows: 12, cols: 18 },
+    {
+      flagColor: { r: 0.66, g: 0.16, b: 0.13 },
+    }
+  );
+
+  assert.ok(cloth.material.weaveAlpha > 0.18 && cloth.material.weaveAlpha <= 0.24);
+  assert.ok(cloth.material.foldAlpha > 0.24 && cloth.material.foldAlpha <= 0.34);
+  assert.ok(cloth.material.edgeHighlightAlpha > 0.34 && cloth.material.edgeHighlightAlpha <= 0.46);
+  assert.equal(cloth.positions.length, 12 * 18);
 });
 
 test("scene lighting separates water reflections from direct glow sources", () => {
