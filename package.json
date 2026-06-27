@@ -26,6 +26,7 @@
     "./assets/cutter.gltf": "./assets/cutter.gltf",
     "./assets/lighthouse.gltf": "./assets/lighthouse.gltf",
     "./assets/harbor-dock.gltf": "./assets/harbor-dock.gltf",
+    "./assets/shoreline.gltf": "./assets/shoreline.gltf",
     "./package.json": "./package.json"
   },
   "scripts": {

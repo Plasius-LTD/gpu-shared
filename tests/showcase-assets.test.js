@@ -10,6 +10,7 @@ const assetNames = [
   "cutter.gltf",
   "lighthouse.gltf",
   "harbor-dock.gltf",
+  "shoreline.gltf",
 ];
 
 const accessorTypeSizes = Object.freeze({
@@ -235,5 +236,27 @@ test("lighthouse cylindrical bands expose smooth radial side normals", () => {
 
     assert.ok(checkedSides > 0, `${materialName} should expose cylindrical side faces`);
     assert.ok(smoothSides > 0, `${materialName} should use per-vertex side normals`);
+  }
+});
+
+test("shoreline asset includes beach, wet rock, breakwater, and detail materials", () => {
+  const document = loadAssetDocument("shoreline.gltf");
+  const meshNames = new Set(document.meshes.map((mesh) => mesh.name));
+  const materialNames = new Set(document.materials.map((material) => material.name));
+
+  assert.ok(meshNames.has("shoreline-beach"));
+  assert.ok(meshNames.has("shoreline-rocks"));
+  assert.ok(meshNames.has("shoreline-breakwater"));
+  assert.ok(meshNames.has("shoreline-detail"));
+
+  for (const materialName of [
+    "shore-sand",
+    "wet-rock",
+    "stone",
+    "seaweed",
+    "driftwood",
+    "foam-stain",
+  ]) {
+    assert.ok(materialNames.has(materialName), `shoreline should include ${materialName}`);
   }
 });

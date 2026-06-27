@@ -93,7 +93,8 @@ export type ShowcaseAssetName =
   | "brigantine"
   | "cutter"
   | "lighthouse"
-  | "harbor-dock";
+  | "harbor-dock"
+  | "shoreline";
 
 export type ShowcaseFocusMode =
   | "integrated"
@@ -311,6 +312,14 @@ export function resolveShowcaseAssetUrl(
 export function loadGltfModel(url: string | URL): Promise<GltfModel>;
 
 export function createProductStudioMeshes(
+  model: GltfModel,
+  options?: {
+    targetCenter?: readonly number[];
+    targetSize?: number;
+  }
+): readonly ProductStudioMesh[];
+
+export function buildProductStudioSceneObjects(
   model: GltfModel,
   options?: {
     targetCenter?: readonly number[];

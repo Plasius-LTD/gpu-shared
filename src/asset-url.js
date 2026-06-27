@@ -5,6 +5,7 @@ const SHOWCASE_ASSET_FILES = Object.freeze({
   cutter: "cutter.gltf",
   lighthouse: "lighthouse.gltf",
   "harbor-dock": "harbor-dock.gltf",
+  shoreline: "shoreline.gltf",
 });
 
 function createInlineShowcaseAssetUrl(assetName) {

@@ -315,6 +315,10 @@ export function createProductStudioMeshes(model, options = {}) {
   return Object.freeze([...createProductStudioEnvironmentMeshes(), ...modelMeshes]);
 }
 
+export function buildProductStudioSceneObjects(model, options = {}) {
+  return createProductStudioMeshes(model, options);
+}
+
 function ensureStyles(documentRef) {
   if (documentRef.getElementById?.(STYLE_ID)) {
     return;

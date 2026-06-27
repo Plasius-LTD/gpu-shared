@@ -17,5 +17,6 @@ asset catalog used by the family harbor scene.
   - `cutter.gltf`
   - `lighthouse.gltf`
   - `harbor-dock.gltf`
+  - `shoreline.gltf`
 - The assets are package-owned, versioned, and available in published
   artifacts.

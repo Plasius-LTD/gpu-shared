@@ -5,6 +5,7 @@ import { createI18n } from "@plasius/translations";
 import {
   GPU_SHOWCASE_PRODUCT_STUDIO_FEATURE,
   GPU_SHOWCASE_REALISTIC_MODELS_FEATURE,
+  buildProductStudioSceneObjects,
   createGpuSharedTranslator,
   createProductStudioMeshes,
   gpuSharedEnGbTranslations,
@@ -24,7 +25,8 @@ test("public API exports the shared showcase entrypoints", () => {
   assert.equal(typeof mountGpuShowcase, "function");
   assert.equal(typeof mountGpuProductStudio, "function");
   assert.equal(typeof createProductStudioMeshes, "function");
-  assert.equal(Object.hasOwn(gpuSharedPublicApi, "createProductStudioSceneObjects"), false);
+  assert.equal(typeof buildProductStudioSceneObjects, "function");
+  assert.equal(Object.hasOwn(gpuSharedPublicApi, "buildProductStudioSceneObjects"), true);
   assert.equal(typeof loadGltfModel, "function");
   assert.equal(typeof resolveShowcaseAssetUrl, "function");
   assert.equal(typeof translateGpuSharedText, "function");
@@ -33,6 +35,27 @@ test("public API exports the shared showcase entrypoints", () => {
   assert.equal(
     GPU_SHOWCASE_PRODUCT_STUDIO_FEATURE,
     "gpu_showcase_product_studio_wavefront_v1"
+  );
+});
+
+test("buildProductStudioSceneObjects remains an alias of createProductStudioMeshes", () => {
+  const model = {
+    bounds: {
+      min: [-1, -1, -1],
+      max: [1, 1, 1],
+    },
+    primitives: [
+      {
+        positions: [-1, 0, 0, 1, 0, 0, 0, 1, 0],
+        indices: [0, 1, 2],
+        normals: [0, 1, 0, 0, 1, 0, 0, 1, 0],
+        material: {},
+      },
+    ],
+  };
+  assert.deepEqual(
+    buildProductStudioSceneObjects(model),
+    createProductStudioMeshes(model)
   );
 });
 
@@ -140,8 +163,10 @@ test("showcase asset resolution targets the shared brigantine asset", () => {
 test("showcase asset resolution can target the richer shared asset catalog", () => {
   const url = resolveShowcaseAssetUrl("file:///tmp/dist/index.js", "lighthouse");
   const cutterUrl = resolveShowcaseAssetUrl("cutter");
+  const shorelineUrl = resolveShowcaseAssetUrl("shoreline");
   assert.equal(url.href, "file:///tmp/assets/lighthouse.gltf");
   assert.match(cutterUrl.href, /cutter\.gltf$/);
+  assert.match(shorelineUrl.href, /shoreline\.gltf$/);
 });
 
 test("showcase asset resolution falls back to an inline asset when the base URL is invalid", () => {
