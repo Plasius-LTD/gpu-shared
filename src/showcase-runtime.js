@@ -1640,40 +1640,74 @@ function buildTrianglesFromMesh(
   }
 }
 
-async function loadShowcaseAssetCatalog() {
-  const [brigantine, cutter, lighthouse, harborDock, shoreline] = await Promise.all([
+function createShowcaseAssetCatalog({
+  mode,
+  ships,
+  environment,
+  primaryShipKey = "brigantine",
+  fallbackReason = null,
+}) {
+  return Object.freeze({
+    mode,
+    primaryShipKey,
+    ships: Object.freeze(ships),
+    environment: Object.freeze(environment),
+    fallbackReason,
+  });
+}
+
+function normalizeAssetCatalogFailureReason(error) {
+  if (typeof error?.message === "string" && error.message.trim().length > 0) {
+    return error.message;
+  }
+
+  return "showcase asset loading failed";
+}
+
+async function loadShowcaseAssetCatalog({ includeSecondaryShip = true } = {}) {
+  const [brigantine, lighthouse, harborDock, shoreline] = await Promise.all([
     loadGltfModel(resolveShowcaseAssetUrl("brigantine")),
-    loadGltfModel(resolveShowcaseAssetUrl("cutter")),
     loadGltfModel(resolveShowcaseAssetUrl("lighthouse")),
     loadGltfModel(resolveShowcaseAssetUrl("harbor-dock")),
     loadGltfModel(resolveShowcaseAssetUrl("shoreline")),
   ]);
+  const ships = {
+    brigantine,
+  };
 
-  return Object.freeze({
-    primaryShipKey: "brigantine",
-    ships: Object.freeze({
-      brigantine,
-      cutter,
-    }),
-    environment: Object.freeze({
+  if (includeSecondaryShip) {
+    ships.cutter = await loadGltfModel(resolveShowcaseAssetUrl("cutter"));
+  }
+
+  return createShowcaseAssetCatalog({
+    mode: includeSecondaryShip ? "modeled-rich" : "modeled-baseline",
+    ships,
+    environment: {
       lighthouse,
       "harbor-dock": harborDock,
       shoreline,
-    }),
+    },
   });
 }
 
-function createLegacyShowcaseAssetCatalog() {
-  const brigantine = loadGltfModel(resolveShowcaseAssetUrl("brigantine"));
-  return Promise.resolve(brigantine).then((primary) =>
-    Object.freeze({
-      primaryShipKey: "brigantine",
-      ships: Object.freeze({
-        brigantine: primary,
-      }),
-      environment: Object.freeze({}),
-    })
-  );
+async function createLegacyShowcaseAssetCatalog(error = null) {
+  const brigantine = await loadGltfModel(resolveShowcaseAssetUrl("brigantine"));
+  return createShowcaseAssetCatalog({
+    mode: "legacy-fallback",
+    ships: {
+      brigantine,
+    },
+    environment: {},
+    fallbackReason: normalizeAssetCatalogFailureReason(error),
+  });
+}
+
+async function loadShowcaseAssetCatalogWithFallback({ includeSecondaryShip = true } = {}) {
+  try {
+    return await loadShowcaseAssetCatalog({ includeSecondaryShip });
+  } catch (error) {
+    return createLegacyShowcaseAssetCatalog(error);
+  }
 }
 
 function resolveShipModel(state, ship, fallbackModel = null) {
@@ -1682,6 +1716,10 @@ function resolveShipModel(state, ship, fallbackModel = null) {
     fallbackModel ??
     state.shipModel
   );
+}
+
+function hasModeledHarborEnvironment(state) {
+  return Object.keys(state.assetCatalog?.environment ?? {}).length > 0;
 }
 
 function createPerformanceGovernor(performanceFeatures) {
@@ -3036,7 +3074,7 @@ function renderProjectedShadow(ctx, worldPoints, camera, viewport, lightDir, opt
 }
 
 function pushHarborGeometry(camera, viewport, triangles, state) {
-  if (!state.showcaseRealisticModelsEnabled) {
+  if (!hasModeledHarborEnvironment(state)) {
     for (const object of LEGACY_HARBOR_LAYOUT) {
       buildTrianglesFromMesh(
         { positions: [object], indices: [0], normals: null, colors: null, material: createLegacyMeshPrimitive({})?.material, bounds: null, name: "legacy-structure" },
@@ -3905,7 +3943,11 @@ function renderLighthouseBeam(ctx, state, camera, viewport, visuals) {
   const lighthousePlacement = SHOWCASE_ENVIRONMENT_LAYOUT.find(
     (placement) => placement.assetKey === "lighthouse"
   );
-  if (!lighthousePlacement || !state.showcaseRealisticModelsEnabled) {
+  if (
+    !lighthousePlacement ||
+    !state.showcaseRealisticModelsEnabled ||
+    !hasModeledHarborEnvironment(state)
+  ) {
     return;
   }
 
@@ -4280,7 +4322,7 @@ function renderScene(
 
   const sceneMetrics = [
     `focus: ${state.focus}`,
-    `ships: ${state.ships.length} active GLTF hulls across ${new Set(state.ships.map((ship) => ship.modelKey)).size} model families`,
+    `ships: ${state.ships.length} active GLTF hulls across ${new Set(state.ships.map((ship) => resolveShipModel(state, ship, shipModel)?.name ?? ship.modelKey)).size} model families`,
     `moonlight: cold overhead key + ${HARBOR_TORCHES.length + state.ships.reduce((total, ship) => total + (Array.isArray(ship.lanterns) ? ship.lanterns.length : 0), 0)} warm deck and harbor lights`,
     `physics snapshot: ${state.physics.snapshot.stage} (${state.physics.snapshot.stability})`,
     `physics contacts: ${state.contactCount}`,
@@ -4375,17 +4417,28 @@ function syncTextState(state, shipModel, featureAdapters) {
     coordinateSystem: "right-handed world; +x right, +y up, +z forward from the shore",
     focus: state.focus,
     stress: state.stress,
-    ships: state.ships.map((ship) => ({
-      id: ship.id,
-      modelKey: ship.modelKey ?? "brigantine",
-      x: Number(ship.position.x.toFixed(2)),
-      y: Number(ship.position.y.toFixed(2)),
-      z: Number(ship.position.z.toFixed(2)),
-      vx: Number(ship.velocity.x.toFixed(2)),
-      vz: Number(ship.velocity.z.toFixed(2)),
-      massKg: Math.round(getShipMass(ship, resolveShipModel(state, ship, shipModel))),
-      lanterns: Array.isArray(ship.lanterns) ? ship.lanterns.length : 0,
-    })),
+    ships: state.ships.map((ship) => {
+      const resolvedShipModel = resolveShipModel(state, ship, shipModel);
+      return {
+        id: ship.id,
+        modelKey: ship.modelKey ?? "brigantine",
+        resolvedModelKey: resolvedShipModel?.name ?? ship.modelKey ?? "brigantine",
+        x: Number(ship.position.x.toFixed(2)),
+        y: Number(ship.position.y.toFixed(2)),
+        z: Number(ship.position.z.toFixed(2)),
+        vx: Number(ship.velocity.x.toFixed(2)),
+        vz: Number(ship.velocity.z.toFixed(2)),
+        massKg: Math.round(getShipMass(ship, resolvedShipModel)),
+        lanterns: Array.isArray(ship.lanterns) ? ship.lanterns.length : 0,
+      };
+    }),
+    assetCatalog: {
+      mode: state.assetCatalog?.mode ?? "unknown",
+      shipKeys: Object.keys(state.assetCatalog?.ships ?? {}).sort(),
+      environmentKeys: Object.keys(state.assetCatalog?.environment ?? {}).sort(),
+      fallbackReason: state.assetCatalog?.fallbackReason ?? null,
+      requestedRealisticModels: state.showcaseRealisticModelsEnabled,
+    },
     shipPhysics: Object.fromEntries(
       state.ships.map((ship) => [ship.id, resolveShipModel(state, ship, shipModel)?.physics ?? null])
     ),
@@ -4443,9 +4496,9 @@ export async function mountGpuShowcase(options = {}, featureFlags = null) {
     },
     featureAdapters
   );
-  const assetCatalog = await (state.showcaseRealisticModelsEnabled
-    ? loadShowcaseAssetCatalog()
-    : createLegacyShowcaseAssetCatalog());
+  const assetCatalog = await loadShowcaseAssetCatalogWithFallback({
+    includeSecondaryShip: state.showcaseRealisticModelsEnabled,
+  });
   const shipModel = assetCatalog.ships[assetCatalog.primaryShipKey];
 
   state.assetCatalog = assetCatalog;

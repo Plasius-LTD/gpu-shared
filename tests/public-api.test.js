@@ -640,6 +640,249 @@ test("mountGpuShowcase delegates to the injected runtime loader", async () => {
   assert.deepEqual(result, { ok: true, destroy });
 });
 
+function createShowcaseRuntimeAssetDocument() {
+  const positions = new Float32Array([
+    0, 0, 0,
+    1, 0, 0,
+    0, 1, 0,
+  ]);
+  const indices = new Uint16Array([0, 1, 2]);
+  const bytes = Buffer.concat([
+    Buffer.from(positions.buffer),
+    Buffer.from(indices.buffer),
+  ]);
+
+  return {
+    asset: { version: "2.0" },
+    buffers: [{ uri: `data:application/octet-stream;base64,${bytes.toString("base64")}` }],
+    bufferViews: [
+      { buffer: 0, byteOffset: 0, byteLength: positions.byteLength },
+      {
+        buffer: 0,
+        byteOffset: positions.byteLength,
+        byteLength: indices.byteLength,
+      },
+    ],
+    accessors: [
+      {
+        bufferView: 0,
+        componentType: 5126,
+        count: 3,
+        type: "VEC3",
+      },
+      {
+        bufferView: 1,
+        componentType: 5123,
+        count: 3,
+        type: "SCALAR",
+      },
+    ],
+    meshes: [
+      {
+        primitives: [
+          {
+            attributes: { POSITION: 0 },
+            indices: 1,
+          },
+        ],
+      },
+    ],
+    nodes: [
+      {
+        name: "ship",
+        mesh: 0,
+        extras: {
+          physics: {
+            shape: "box",
+          },
+        },
+      },
+    ],
+    scenes: [{ nodes: [0] }],
+    scene: 0,
+  };
+}
+
+function createShowcaseRuntimeHarness({ failAssetPattern = null } = {}) {
+  const originalDocument = globalThis.document;
+  const originalWindow = globalThis.window;
+  const originalFetch = globalThis.fetch;
+  const originalRequestAnimationFrame = globalThis.requestAnimationFrame;
+  const originalCancelAnimationFrame = globalThis.cancelAnimationFrame;
+
+  function createControl(id, extra = {}) {
+    return {
+      id,
+      textContent: "",
+      checked: false,
+      value: "",
+      addEventListener() {},
+      removeEventListener() {},
+      ...extra,
+    };
+  }
+
+  const elements = {
+    "#demoStatus": { textContent: "" },
+    "#demoDetails": { textContent: "" },
+    "#demoCanvas": {
+      width: 1280,
+      height: 720,
+      getContext() {
+        return {};
+      },
+    },
+    "#pauseButton": createControl("pauseButton"),
+    "#stressToggle": createControl("stressToggle"),
+    "#focusMode": createControl("focusMode", { value: "integrated" }),
+    "#sceneMetrics": { innerHTML: "" },
+    "#qualityMetrics": { innerHTML: "" },
+    "#debugMetrics": { innerHTML: "" },
+    "#sceneNotes": { innerHTML: "" },
+  };
+
+  const root = {
+    innerHTML: "<p>placeholder</p>",
+    querySelector(selector) {
+      return elements[selector] ?? null;
+    },
+  };
+
+  const styleElements = new Map();
+  const documentStub = {
+    body: root,
+    head: {
+      appendChild(node) {
+        if (node?.id) {
+          styleElements.set(node.id, node);
+        }
+      },
+    },
+    createElement(tag) {
+      return {
+        tagName: String(tag).toUpperCase(),
+        id: "",
+        textContent: "",
+      };
+    },
+    getElementById(id) {
+      return styleElements.get(id) ?? null;
+    },
+  };
+
+  const assetDocument = createShowcaseRuntimeAssetDocument();
+  const fetchCalls = [];
+
+  globalThis.document = documentStub;
+  globalThis.window = {
+    location: { search: "" },
+    render_game_to_text: () => "previous",
+    advanceTime: () => undefined,
+  };
+  globalThis.fetch = async (input) => {
+    const href = input instanceof URL ? input.href : String(input);
+    fetchCalls.push(href);
+    if (failAssetPattern && href.includes(failAssetPattern)) {
+      throw new Error(`failed to load ${href}`);
+    }
+
+    return {
+      ok: true,
+      async json() {
+        return assetDocument;
+      },
+    };
+  };
+  globalThis.requestAnimationFrame = () => 42;
+  globalThis.cancelAnimationFrame = () => undefined;
+
+  return {
+    elements,
+    fetchCalls,
+    root,
+    restore() {
+      globalThis.document = originalDocument;
+      globalThis.window = originalWindow;
+      globalThis.fetch = originalFetch;
+      globalThis.requestAnimationFrame = originalRequestAnimationFrame;
+      globalThis.cancelAnimationFrame = originalCancelAnimationFrame;
+    },
+  };
+}
+
+test("showcase flag-off baseline still loads modeled harbor assets", async () => {
+  const harness = createShowcaseRuntimeHarness();
+
+  try {
+    const module = await import("../src/showcase-runtime.js");
+    const showcase = await module.mountGpuShowcase(
+      {
+        root: harness.root,
+        packageName: "@plasius/gpu-demo-viewer",
+      },
+      {
+        enabled: {
+          [GPU_SHOWCASE_REALISTIC_MODELS_FEATURE]: false,
+        },
+      }
+    );
+    const snapshot = JSON.parse(globalThis.window.render_game_to_text());
+
+    assert.equal(snapshot.assetCatalog.mode, "modeled-baseline");
+    assert.deepEqual(snapshot.assetCatalog.shipKeys, ["brigantine"]);
+    assert.deepEqual(snapshot.assetCatalog.environmentKeys, [
+      "harbor-dock",
+      "lighthouse",
+      "shoreline",
+    ]);
+    assert.equal(
+      harness.fetchCalls.some((href) => /cutter\.gltf$/u.test(href)),
+      false
+    );
+    assert.equal(
+      harness.fetchCalls.some((href) => /harbor-dock\.gltf$/u.test(href)),
+      true
+    );
+    assert.equal(
+      harness.fetchCalls.some((href) => /shoreline\.gltf$/u.test(href)),
+      true
+    );
+
+    showcase.destroy();
+  } finally {
+    harness.restore();
+  }
+});
+
+test("showcase falls back cleanly when modeled harbor asset loading fails", async () => {
+  const harness = createShowcaseRuntimeHarness({ failAssetPattern: "shoreline.gltf" });
+
+  try {
+    const module = await import("../src/showcase-runtime.js");
+    const showcase = await module.mountGpuShowcase(
+      {
+        root: harness.root,
+        packageName: "@plasius/gpu-demo-viewer",
+      },
+      {
+        enabled: {
+          [GPU_SHOWCASE_REALISTIC_MODELS_FEATURE]: false,
+        },
+      }
+    );
+    const snapshot = JSON.parse(globalThis.window.render_game_to_text());
+
+    assert.equal(snapshot.assetCatalog.mode, "legacy-fallback");
+    assert.deepEqual(snapshot.assetCatalog.shipKeys, ["brigantine"]);
+    assert.deepEqual(snapshot.assetCatalog.environmentKeys, []);
+    assert.match(snapshot.assetCatalog.fallbackReason, /shoreline\.gltf/u);
+
+    showcase.destroy();
+  } finally {
+    harness.restore();
+  }
+});
+
 test("showcase runtime exposes an idempotent destroy hook for browser consumers", async () => {
   const originalDocument = globalThis.document;
   const originalWindow = globalThis.window;

@@ -11,7 +11,7 @@ export const gpuSharedEnGbTranslations = Object.freeze({
   "gpuShared.showcase.details.realistic":
     "Moonlit GLTF ships now mix a brigantine and a cutter against modeled harbor assets; cloth, fluid, and ship-local lighting stay continuous while the governor pressure is {pressureLevel}.",
   "gpuShared.showcase.details.legacy":
-    "Moonlit GLTF ships use the legacy brigantine and placeholder harbor blocks while cloth, fluid, and ship-local lighting stay continuous while the governor pressure is {pressureLevel}.",
+    "Showcase fallback keeps the brigantine-only harbor path active while cloth, fluid, and ship-local lighting stay continuous under {pressureLevel} governor pressure.",
   "gpuShared.showcase.action.pause": "Pause",
   "gpuShared.showcase.action.resume": "Resume",
   "gpuShared.showcase.control.stressMode": "Stress mode",
@@ -52,4 +52,3 @@ export const gpuSharedEnGbTranslations = Object.freeze({
   "gpuShared.debug.allocation.mainColorBuffer": "Main color buffer",
   "gpuShared.debug.allocation.shadowImpressionAtlas": "Shadow impression atlas",
 });
-
