@@ -8,6 +8,20 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.0.1] - 2026-06-27
+
+- **Added**
+  - (placeholder)
+
+- **Changed**
   - The shared harbor showcase now keeps the modeled lighthouse, dock, and
     shoreline asset set even when `gpu_showcase_realistic_models_v1` is
     disabled, falling back only to a brigantine-only ship catalog.
@@ -334,3 +348,4 @@ All notable changes to this project will be documented in this file.
 [0.1.19]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v0.1.19
 [0.1.20]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v0.1.20
 [1.0.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.0
+[1.0.1]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.1
