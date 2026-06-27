@@ -8,10 +8,13 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Changed**
-  - (placeholder)
+  - The shared harbor showcase now keeps the modeled lighthouse, dock, and
+    shoreline asset set even when `gpu_showcase_realistic_models_v1` is
+    disabled, falling back only to a brigantine-only ship catalog.
 
 - **Fixed**
-  - (placeholder)
+  - Added regression coverage for the flag-disabled modeled-harbor path and
+    the bounded legacy fallback used only when showcase asset loading fails.
 
 - **Security**
   - (placeholder)

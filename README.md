@@ -209,6 +209,10 @@ distinct cutter profile, a modeled lighthouse, a dock/warehouse scene, and a
 generated rocky shoreline/breakwater so the harbor reads closer to a believable
 coastal night view on high-end machines.
 
+If `gpu_showcase_realistic_models_v1` is disabled, the harbor keeps the modeled
+lighthouse/dock/shoreline environment and falls back only to a brigantine-only
+ship catalog instead of reverting to placeholder harbor blocks.
+
 For slide-deck screenshots or video capture, open the route with
 `?capture=1&renderScale=1`. Capture mode hides the validation chrome, fills the
 viewport with the scene canvas, and caps the backing buffer at 1080p by default
