@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.0.2] - 2026-06-30
+
+- **Added**
   - Added Animation Adventure mode for deterministic farm props, Peasant Girl asset loading, scripted route beats, and renderer-owned autoplay playback.
 
 - **Changed**
@@ -349,3 +363,4 @@ All notable changes to this project will be documented in this file.
 [0.1.20]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v0.1.20
 [1.0.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.0
 [1.0.1]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.1
+[1.0.2]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.2
