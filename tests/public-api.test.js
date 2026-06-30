@@ -5,7 +5,9 @@ import { createI18n } from "@plasius/translations";
 import {
   GPU_SHOWCASE_PRODUCT_STUDIO_FEATURE,
   GPU_SHOWCASE_REALISTIC_MODELS_FEATURE,
+  GPU_SHOWCASE_ANIMATION_ADVENTURE_FEATURE,
   buildProductStudioSceneObjects,
+  createAnimationAdventureProps,
   createGpuSharedTranslator,
   createProductStudioMeshes,
   gpuSharedEnGbTranslations,
@@ -35,6 +37,10 @@ test("public API exports the shared showcase entrypoints", () => {
   assert.equal(
     GPU_SHOWCASE_PRODUCT_STUDIO_FEATURE,
     "gpu_showcase_product_studio_wavefront_v1"
+  );
+  assert.equal(
+    GPU_SHOWCASE_ANIMATION_ADVENTURE_FEATURE,
+    "gpu-demo.animation-adventure.enabled"
   );
 });
 
@@ -104,7 +110,7 @@ test("showcase focus modes remain stable for family demos", () => {
     "performance",
     "debug",
   ]);
-  assert.deepEqual(showcaseDemoModes, ["harbor", "product-studio"]);
+  assert.deepEqual(showcaseDemoModes, ["harbor", "product-studio", "animation-adventure"]);
 });
 
 test("mountGpuShowcase routes product studio mode to the product runtime loader", async () => {
@@ -153,6 +159,82 @@ test("mountGpuShowcase fails closed when product studio feature flag is disabled
     /gpu_showcase_product_studio_wavefront_v1 must be enabled/u
   );
   assert.equal(productRuntimeLoaded, false);
+});
+
+test("animation adventure props are deterministic for the same seed", () => {
+  const first = createAnimationAdventureProps({
+    seed: 1208,
+    route: [
+      { id: "gate", position: [0, 0, 0], arriveMs: 0 },
+      { id: "cart", position: [7, 0, 0], arriveMs: 1000 },
+    ],
+  });
+  const second = createAnimationAdventureProps({
+    seed: 1208,
+    route: [
+      { id: "gate", position: [0, 0, 0], arriveMs: 0 },
+      { id: "cart", position: [7, 0, 0], arriveMs: 1000 },
+    ],
+  });
+
+  assert.deepEqual(second, first);
+  assert.equal(first.some((prop) => prop.kind === "crop-row"), true);
+  assert.equal(first.some((prop) => prop.kind === "cart"), true);
+  assert.equal(first.filter((prop) => prop.kind === "path-marker").length, 2);
+});
+
+test("mountGpuShowcase routes animation adventure mode to the adventure runtime loader", async () => {
+  let receivedOptions = null;
+  const featureFlags = {
+    enabled: {
+      [GPU_SHOWCASE_ANIMATION_ADVENTURE_FEATURE]: true,
+    },
+  };
+  const adventure = {
+    modelUrl: "/models/peasant-girl.glb",
+    route: [{ id: "gate", position: [0, 0, 0], arriveMs: 0 }],
+    beats: [],
+  };
+
+  const result = await mountGpuShowcase({
+    demoMode: "animation-adventure",
+    animationAdventure: adventure,
+    __featureFlags: featureFlags,
+    __animationAdventureRuntimeLoader: async () => ({
+      async mountGpuAnimationAdventure(options, featureFlags) {
+        receivedOptions = options;
+        return {
+          state: { featureFlags, adventure: options.animationAdventure },
+          destroy() {},
+        };
+      },
+    }),
+  });
+
+  assert.equal(receivedOptions.animationAdventure, adventure);
+  assert.equal(receivedOptions.__animationAdventureRuntimeLoader, undefined);
+  assert.equal(result.state.featureFlags, featureFlags);
+});
+
+test("mountGpuShowcase fails closed when animation adventure flag is disabled", async () => {
+  let runtimeLoaded = false;
+  await assert.rejects(
+    () =>
+      mountGpuShowcase({
+        demoMode: "animation-adventure",
+        __featureFlags: {
+          enabled: {
+            [GPU_SHOWCASE_ANIMATION_ADVENTURE_FEATURE]: false,
+          },
+        },
+        __animationAdventureRuntimeLoader: async () => {
+          runtimeLoaded = true;
+          return {};
+        },
+      }),
+    /gpu-demo\.animation-adventure\.enabled must be enabled/u
+  );
+  assert.equal(runtimeLoaded, false);
 });
 
 test("showcase asset resolution targets the shared brigantine asset", () => {

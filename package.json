@@ -34,7 +34,7 @@
     "demo": "python3 -m http.server --directory ..",
     "demo:example": "node demo/example.js",
     "generate:assets": "node scripts/generate-showcase-assets.mjs",
-    "typecheck": "node --check src/index.js && node --check src/showcase-runtime.js && node --check src/gltf-loader.js && node --check src/product-studio-runtime.js && node --check demo/main.js",
+    "typecheck": "node --check src/index.js && node --check src/showcase-runtime.js && node --check src/gltf-loader.js && node --check src/product-studio-runtime.js && node --check src/animation-adventure-runtime.js && node --check demo/main.js",
     "audit:eslint": "eslint . --max-warnings=0",
     "audit:deps": "npm ls --all --omit=optional --omit=peer > /dev/null 2>&1 || true",
     "audit:npm": "npm audit --audit-level=high --omit=dev",
@@ -58,7 +58,7 @@
   "author": "Plasius LTD <development@plasius.co.uk>",
   "license": "Apache-2.0",
   "peerDependencies": {
-    "@plasius/gpu-renderer": "^0.2.3",
+    "@plasius/gpu-renderer": "^0.2.22",
     "@plasius/translations": "^1.0.17"
   },
   "peerDependenciesMeta": {

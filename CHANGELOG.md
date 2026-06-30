@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - **Added**
-  - (placeholder)
+  - Added Animation Adventure mode for deterministic farm props, Peasant Girl asset loading, scripted route beats, and renderer-owned autoplay playback.
 
 - **Changed**
   - (placeholder)

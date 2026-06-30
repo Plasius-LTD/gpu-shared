@@ -105,7 +105,77 @@ export type ShowcaseFocusMode =
   | "performance"
   | "debug";
 
-export type ShowcaseDemoMode = "harbor" | "product-studio" | "product" | "studio" | "eames";
+export type ShowcaseDemoMode =
+  | "harbor"
+  | "product-studio"
+  | "product"
+  | "studio"
+  | "eames"
+  | "animation-adventure"
+  | "adventure"
+  | "animation";
+
+export type AnimationAdventureVector3 = readonly [number, number, number] | readonly number[];
+
+export interface AnimationAdventureClipRef {
+  readonly id: string;
+  readonly url?: string;
+  readonly clipUrl?: string;
+  readonly category?: string;
+  readonly rootTranslation?: boolean;
+}
+
+export interface AnimationAdventureRoutePoint {
+  readonly id: string;
+  readonly position: AnimationAdventureVector3;
+  readonly arriveMs: number;
+}
+
+export interface AnimationAdventureBeat {
+  readonly id: string;
+  readonly order: number;
+  readonly kind?: string;
+  readonly clipId: string;
+  readonly durationMs: number;
+  readonly pathPointId?: string;
+  readonly rootMotion?: string;
+  readonly blend?: {
+    readonly inMs?: number;
+    readonly outMs?: number;
+  };
+}
+
+export interface AnimationAdventureCamera {
+  readonly mode?: "lagged-follow";
+  readonly cubicBezier?: readonly [number, number, number, number] | readonly number[];
+  readonly lagMs?: number;
+  readonly lookAheadMs?: number;
+  readonly offset?: AnimationAdventureVector3;
+}
+
+export interface AnimationAdventurePropLayout {
+  readonly seed?: number;
+  readonly bounds?: {
+    readonly min: AnimationAdventureVector3;
+    readonly max: AnimationAdventureVector3;
+  };
+  readonly kinds?: readonly string[];
+}
+
+export interface AnimationAdventureConfig {
+  readonly modelUrl?: string | URL;
+  readonly clips?: readonly AnimationAdventureClipRef[];
+  readonly clipRefs?: readonly AnimationAdventureClipRef[];
+  readonly route?: readonly AnimationAdventureRoutePoint[];
+  readonly beats?: readonly AnimationAdventureBeat[];
+  readonly camera?: AnimationAdventureCamera;
+  readonly props?: AnimationAdventurePropLayout;
+  readonly generatedProps?: readonly {
+    readonly id?: string;
+    readonly kind: string;
+    readonly position: AnimationAdventureVector3;
+  }[];
+}
 
 export interface ProductStudioMesh {
   readonly id: number;
@@ -258,6 +328,7 @@ export interface MountGpuShowcaseOptions {
   renderScale?: number;
   productAssetUrl?: string | URL;
   assetUrl?: string | URL;
+  animationAdventure?: AnimationAdventureConfig;
   width?: number;
   height?: number;
   maxDepth?: number;
@@ -303,6 +374,7 @@ export const showcaseFocusModes: readonly ShowcaseFocusMode[];
 export const showcaseDemoModes: readonly ShowcaseDemoMode[];
 export const GPU_SHOWCASE_REALISTIC_MODELS_FEATURE: "gpu_showcase_realistic_models_v1";
 export const GPU_SHOWCASE_PRODUCT_STUDIO_FEATURE: "gpu_showcase_product_studio_wavefront_v1";
+export const GPU_SHOWCASE_ANIMATION_ADVENTURE_FEATURE: "gpu-demo.animation-adventure.enabled";
 
 export function resolveShowcaseAssetUrl(
   baseUrlOrAssetName?: string | URL | ShowcaseAssetName,
@@ -330,6 +402,20 @@ export function buildProductStudioSceneObjects(
 export function mountGpuProductStudio(
   options?: MountGpuShowcaseOptions
 ): Promise<MountGpuProductStudioResult>;
+
+export function createAnimationAdventureProps(
+  layout?: AnimationAdventurePropLayout & {
+    readonly route?: readonly AnimationAdventureRoutePoint[];
+  }
+): readonly {
+  readonly id?: string;
+  readonly kind: string;
+  readonly position: readonly number[];
+}[];
+
+export function mountGpuAnimationAdventure(
+  options?: MountGpuShowcaseOptions
+): Promise<MountGpuShowcaseResult>;
 
 export function mountGpuShowcase(
   options?: MountGpuShowcaseOptions
