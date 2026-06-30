@@ -370,6 +370,27 @@ export interface MountGpuProductStudioResult {
   destroy(): void;
 }
 
+export interface MountGpuAnimationAdventureResult {
+  readonly state: Readonly<{
+    demoMode: "animation-adventure";
+    modelUrl?: string | URL;
+    modelLoaded: boolean;
+    loadedClipCount: number;
+    clipIds: readonly string[];
+    propSeed?: number;
+    propCount: number;
+    rendererSnapshot: Record<string, unknown>;
+  }>;
+  readonly canvas: HTMLCanvasElement;
+  readonly renderer: unknown;
+  readonly props: readonly {
+    readonly id?: string;
+    readonly kind: string;
+    readonly position: readonly number[];
+  }[];
+  destroy(): void;
+}
+
 export const showcaseFocusModes: readonly ShowcaseFocusMode[];
 export const showcaseDemoModes: readonly ShowcaseDemoMode[];
 export const GPU_SHOWCASE_REALISTIC_MODELS_FEATURE: "gpu_showcase_realistic_models_v1";
@@ -415,8 +436,8 @@ export function createAnimationAdventureProps(
 
 export function mountGpuAnimationAdventure(
   options?: MountGpuShowcaseOptions
-): Promise<MountGpuShowcaseResult>;
+): Promise<MountGpuAnimationAdventureResult>;
 
 export function mountGpuShowcase(
   options?: MountGpuShowcaseOptions
-): Promise<MountGpuShowcaseResult | MountGpuProductStudioResult>;
+): Promise<MountGpuShowcaseResult | MountGpuProductStudioResult | MountGpuAnimationAdventureResult>;

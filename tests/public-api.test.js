@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { createI18n } from "@plasius/translations";
 
 import {
@@ -41,6 +42,24 @@ test("public API exports the shared showcase entrypoints", () => {
   assert.equal(
     GPU_SHOWCASE_ANIMATION_ADVENTURE_FEATURE,
     "gpu-demo.animation-adventure.enabled"
+  );
+});
+
+test("public types declare an animation adventure result without shipModel", () => {
+  const declaration = readFileSync(new URL("../src/index.d.ts", import.meta.url), "utf8");
+
+  assert.match(declaration, /interface MountGpuAnimationAdventureResult/u);
+  assert.match(
+    declaration,
+    /mountGpuAnimationAdventure\([^)]*\): Promise<MountGpuAnimationAdventureResult>/su
+  );
+  assert.match(
+    declaration,
+    /MountGpuShowcaseResult \| MountGpuProductStudioResult \| MountGpuAnimationAdventureResult/u
+  );
+  assert.doesNotMatch(
+    declaration.match(/interface MountGpuAnimationAdventureResult \{[\s\S]*?\n\}/u)?.[0] ?? "",
+    /shipModel/u
   );
 });
 
