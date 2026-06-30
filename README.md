@@ -38,6 +38,9 @@ npm install @plasius/gpu-shared
 - Preserves Product Studio UVs, decoded glTF material textures, and core
   `KHR_materials_*` factors so renderer-owned leather, wood, chrome, and
   transmissive surface response can be driven from the source asset.
+- Adds `animation-adventure` mode for the GPU Animation demo, loading Peasant
+  Girl plus selected clips, generating deterministic farm props, and delegating
+  autoplay route/blend/camera playback to `@plasius/gpu-renderer`.
 
 ## Usage
 
@@ -138,7 +141,16 @@ pages and validation harnesses, the package also re-exports
 `createProductStudioMeshes(...)`.
 
 Install `@plasius/gpu-renderer` alongside `@plasius/gpu-shared` when Product
-Studio mode is used. Harbor-only consumers do not need the renderer peer.
+Studio or Animation Adventure mode is used. Harbor-only consumers do not need
+the renderer peer.
+
+### Animation Adventure Mode
+
+`demoMode: "animation-adventure"` mounts an autoplay farm-adventure scene. The
+mode is gated by `gpu-demo.animation-adventure.enabled`, accepts an
+`animationAdventure` manifest with Peasant Girl, clip refs, route points,
+scripted beats, prop seed, and camera defaults, then submits the scene to the
+renderer-owned animated scene surface.
 
 For browser-only demos served without a bundler, keep the import surface on the
 published package name and resolve it with an import map rather than importing a

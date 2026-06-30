@@ -1,2 +1,3 @@
 export const GPU_SHOWCASE_REALISTIC_MODELS_FEATURE = "gpu_showcase_realistic_models_v1";
 export const GPU_SHOWCASE_PRODUCT_STUDIO_FEATURE = "gpu_showcase_product_studio_wavefront_v1";
+export const GPU_SHOWCASE_ANIMATION_ADVENTURE_FEATURE = "gpu-demo.animation-adventure.enabled";
