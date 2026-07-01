@@ -11,6 +11,20 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.0.3] - 2026-07-01
+
+- **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
   - Fixed the shared glTF loader so Product Studio can load binary `.glb`
     catalog models, including the Peasant Girl demo asset, without parsing
     the GLB container as JSON.
@@ -366,3 +380,4 @@ All notable changes to this project will be documented in this file.
 [1.0.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.0
 [1.0.1]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.1
 [1.0.2]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.2
+[1.0.3]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.3
