@@ -8,6 +8,20 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.0.4] - 2026-07-01
+
+- **Added**
+  - (placeholder)
+
+- **Changed**
   - Pass loaded Animation Adventure Peasant Girl model and clip GLB buffers to
     `@plasius/gpu-renderer`, and surface renderer model-renderability snapshot
     fields in the mount result under task `#66`.
@@ -383,3 +397,4 @@ All notable changes to this project will be documented in this file.
 [1.0.1]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.1
 [1.0.2]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.2
 [1.0.3]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.3
+[1.0.4]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.4
