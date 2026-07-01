@@ -1,5 +1,10 @@
 import { shouldUseInlineShowcaseFallback } from "./asset-url.js";
 
+const GLB_MAGIC = 0x46546c67;
+const GLB_VERSION = 2;
+const GLB_JSON_CHUNK_TYPE = 0x4e4f534a;
+const GLB_BIN_CHUNK_TYPE = 0x004e4942;
+
 function decodeDataUri(uri) {
   const match = /^data:.*?;base64,(.+)$/i.exec(uri);
   if (!match) {
@@ -608,6 +613,76 @@ function resolveFetchBaseUrl(requestUrl, responseUrl) {
   }
 }
 
+function shouldReadResponseAsGlb(requestUrl, response) {
+  const contentType = response.headers?.get?.("content-type")?.toLowerCase?.() ?? "";
+  if (contentType.includes("model/gltf-binary")) {
+    return true;
+  }
+
+  try {
+    return new URL(requestUrl, resolveBrowserRequestBaseUrl() ?? "https://plasius.invalid/")
+      .pathname.toLowerCase().endsWith(".glb");
+  } catch {
+    return String(requestUrl).split(/[?#]/u, 1)[0]?.toLowerCase().endsWith(".glb") === true;
+  }
+}
+
+function alignGlbChunkLength(byteLength) {
+  return byteLength + ((4 - (byteLength % 4)) % 4);
+}
+
+function parseGlbDocument(buffer) {
+  if (!(buffer instanceof ArrayBuffer)) {
+    throw new Error("Binary glTF asset must be loaded as an ArrayBuffer.");
+  }
+  if (buffer.byteLength < 20) {
+    throw new Error("Binary glTF asset is too small to contain a valid GLB header.");
+  }
+
+  const view = new DataView(buffer);
+  const magic = view.getUint32(0, true);
+  const version = view.getUint32(4, true);
+  const declaredLength = view.getUint32(8, true);
+  if (magic !== GLB_MAGIC) {
+    throw new Error("Binary glTF asset does not contain a valid GLB magic header.");
+  }
+  if (version !== GLB_VERSION) {
+    throw new Error(`Unsupported binary glTF version: ${version}`);
+  }
+  if (declaredLength > buffer.byteLength) {
+    throw new Error("Binary glTF asset is truncated.");
+  }
+
+  let offset = 12;
+  let document = null;
+  const buffers = [];
+  while (offset + 8 <= declaredLength) {
+    const chunkLength = view.getUint32(offset, true);
+    const chunkType = view.getUint32(offset + 4, true);
+    const chunkStart = offset + 8;
+    const chunkEnd = chunkStart + chunkLength;
+    if (chunkEnd > declaredLength) {
+      throw new Error("Binary glTF asset contains an invalid chunk length.");
+    }
+
+    const chunkBuffer = buffer.slice(chunkStart, chunkEnd);
+    if (chunkType === GLB_JSON_CHUNK_TYPE) {
+      const jsonText = new TextDecoder("utf-8").decode(chunkBuffer).trim();
+      document = JSON.parse(jsonText);
+    } else if (chunkType === GLB_BIN_CHUNK_TYPE) {
+      buffers.push(chunkBuffer);
+    }
+
+    offset = chunkStart + alignGlbChunkLength(chunkLength);
+  }
+
+  if (!document || typeof document !== "object") {
+    throw new Error("Binary glTF asset does not contain a JSON scene chunk.");
+  }
+
+  return { document, buffers };
+}
+
 function createIdentityMatrix() {
   return [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 }
@@ -806,8 +881,18 @@ async function loadGltfDocument(url) {
     throw new Error(`Failed to load glTF asset: ${response.status} ${response.statusText}`);
   }
 
+  if (shouldReadResponseAsGlb(url, response)) {
+    const { document, buffers } = parseGlbDocument(await response.arrayBuffer());
+    return {
+      document,
+      buffers,
+      baseUrl: resolveFetchBaseUrl(url, response.url),
+    };
+  }
+
   return {
     document: await response.json(),
+    buffers: [],
     baseUrl: resolveFetchBaseUrl(url, response.url),
   };
 }
@@ -817,9 +902,12 @@ async function loadInlineShowcaseDocument() {
   return loadGltfDocument(new URL(module.INLINE_SHOWCASE_ASSET_URLS.brigantine));
 }
 
-async function buildGltfModel(document, baseUrl) {
+async function buildGltfModel(document, baseUrl, embeddedBuffers = []) {
   const buffers = await Promise.all(
-    (document.buffers ?? []).map(async (buffer) => {
+    (document.buffers ?? []).map(async (buffer, index) => {
+      if (typeof buffer.uri !== "string" && embeddedBuffers[index]) {
+        return embeddedBuffers[index];
+      }
       if (typeof buffer.uri !== "string") {
         throw new Error("glTF buffer URI is required for demo asset loading.");
       }
@@ -877,14 +965,14 @@ function shouldRetryWithInlineShowcaseFallback(url, error) {
 
 export async function loadGltfModel(url) {
   try {
-    const { document, baseUrl } = await loadGltfDocument(url);
-    return buildGltfModel(document, baseUrl);
+    const { document, baseUrl, buffers } = await loadGltfDocument(url);
+    return buildGltfModel(document, baseUrl, buffers);
   } catch (error) {
     if (!shouldRetryWithInlineShowcaseFallback(url, error)) {
       throw error;
     }
 
-    const { document, baseUrl } = await loadInlineShowcaseDocument();
-    return buildGltfModel(document, baseUrl);
+    const { document, baseUrl, buffers } = await loadInlineShowcaseDocument();
+    return buildGltfModel(document, baseUrl, buffers);
   }
 }

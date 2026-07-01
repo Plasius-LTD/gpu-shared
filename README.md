@@ -103,8 +103,9 @@ console.log(i18n.t(gpuSharedTranslationKeys.debugMainColorBuffer));
 ### Product Studio Mode
 
 Consumers can route the shared showcase entrypoint to Product Studio by passing
-`demoMode: "product-studio"` and a Product Studio GLTF URL. This mode loads the
-model with the shared GLTF loader and delegates GPU execution to
+`demoMode: "product-studio"` and a Product Studio glTF URL. This mode loads
+JSON `.gltf` documents and binary `.glb` containers with the shared glTF loader
+and delegates GPU execution to
 `@plasius/gpu-renderer`.
 Product Studio submits source triangle mesh data to the renderer. Display-quality
 path tracing anywhere in the project requires the renderer mesh BVH path so ray
@@ -258,6 +259,8 @@ surface for these family demos.
     mesh records with positions, indices, normals, material kind, roughness,
     metallic, opacity, and emission.
 - `loadGltfModel(url)`
+  - Loads JSON `.gltf` assets with external or data URI buffers, and binary
+    `.glb` assets with embedded GLB BIN chunks.
 - `resolveShowcaseAssetUrl(baseUrlOrAssetName?, assetName?)`
 - `showcaseFocusModes`
 

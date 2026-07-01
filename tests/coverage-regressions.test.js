@@ -268,6 +268,47 @@ function createTriangleGltfDocument({ bufferUri } = {}) {
   };
 }
 
+function createTriangleGlbDocument() {
+  const { document, bytes, positions, indices } = createTriangleGltfDocument();
+  const glbDocument = {
+    ...document,
+    buffers: [{ byteLength: bytes.byteLength }],
+  };
+  const jsonBytes = Buffer.from(JSON.stringify(glbDocument), "utf8");
+  const jsonPadding = (4 - (jsonBytes.byteLength % 4)) % 4;
+  const binPadding = (4 - (bytes.byteLength % 4)) % 4;
+  const jsonChunkLength = jsonBytes.byteLength + jsonPadding;
+  const binChunkLength = bytes.byteLength + binPadding;
+  const totalLength = 12 + 8 + jsonChunkLength + 8 + binChunkLength;
+  const glb = Buffer.alloc(totalLength);
+  let offset = 0;
+
+  glb.writeUInt32LE(0x46546c67, offset);
+  offset += 4;
+  glb.writeUInt32LE(2, offset);
+  offset += 4;
+  glb.writeUInt32LE(totalLength, offset);
+  offset += 4;
+  glb.writeUInt32LE(jsonChunkLength, offset);
+  offset += 4;
+  glb.writeUInt32LE(0x4e4f534a, offset);
+  offset += 4;
+  jsonBytes.copy(glb, offset);
+  glb.fill(0x20, offset + jsonBytes.byteLength, offset + jsonChunkLength);
+  offset += jsonChunkLength;
+  glb.writeUInt32LE(binChunkLength, offset);
+  offset += 4;
+  glb.writeUInt32LE(0x004e4942, offset);
+  offset += 4;
+  bytes.copy(glb, offset);
+
+  return {
+    glb,
+    positions,
+    indices,
+  };
+}
+
 function createLargeGltfDocument(vertexCount = 55_000) {
   const positions = new Float32Array(vertexCount * 3);
   const indices = new Uint32Array(vertexCount);
@@ -719,6 +760,36 @@ test("loadGltfModel rejects failed asset and nested buffer fetches", async () =>
   try {
     await assert.rejects(loadGltfModel("https://plasius.co.uk/broken.gltf"), /503 Service Unavailable/);
     await assert.rejects(loadGltfModel("https://plasius.co.uk/nested.gltf"), /404 Not Found/);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("loadGltfModel parses binary GLB assets with embedded buffers", async () => {
+  const originalFetch = globalThis.fetch;
+  const { glb, positions, indices } = createTriangleGlbDocument();
+
+  globalThis.fetch = async (input) => {
+    const href = input instanceof URL ? input.href : String(input);
+    assert.equal(href, "https://plasius.co.uk/assets/peasant-girl.glb");
+
+    return {
+      ok: true,
+      url: href,
+      headers: new Headers({ "content-type": "model/gltf-binary" }),
+      async arrayBuffer() {
+        return glb.buffer.slice(glb.byteOffset, glb.byteOffset + glb.byteLength);
+      },
+    };
+  };
+
+  try {
+    const model = await loadGltfModel("https://plasius.co.uk/assets/peasant-girl.glb");
+    assert.equal(model.name, "brigantine");
+    assert.equal(model.positions.length, positions.length);
+    assert.equal(model.indices.length, indices.length);
+    assert.equal(model.primitives[0].positions.length, positions.length);
+    assert.equal(model.physics.shape, "box");
   } finally {
     globalThis.fetch = originalFetch;
   }
