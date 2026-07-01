@@ -11,7 +11,9 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Fixed**
-  - (placeholder)
+  - Fixed the shared glTF loader so Product Studio can load binary `.glb`
+    catalog models, including the Peasant Girl demo asset, without parsing
+    the GLB container as JSON.
 
 - **Security**
   - (placeholder)
