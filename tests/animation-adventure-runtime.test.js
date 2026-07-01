@@ -117,6 +117,11 @@ test("mountGpuAnimationAdventure submits adventure state to gpu-renderer", async
               blendProgress: 1,
               characterPosition: [0, 0, 0],
               cameraPosition: [-1, 2.4, 5.5],
+              modelRenderable: true,
+              fallbackProxyActive: false,
+              skinnedJointCount: 69,
+              skinnedVertexCount: 3318,
+              activeClipRenderable: true,
               frameState: "running",
             };
           },
@@ -137,7 +142,18 @@ test("mountGpuAnimationAdventure submits adventure state to gpu-renderer", async
   assert.equal(rendererOptions.route.length, 2);
   assert.equal(rendererOptions.beats.length, 1);
   assert.equal(rendererOptions.props.some((prop) => prop.kind === "crop-row"), true);
+  assert.equal(rendererOptions.modelAsset instanceof ArrayBuffer, true);
+  assert.deepEqual(rendererOptions.clipAssets.map((clip) => clip.id), [
+    "female-basic-locomotion-idle",
+    "female-basic-locomotion-walking",
+  ]);
+  assert.equal(rendererOptions.clipAssets.every((clip) => clip.asset instanceof ArrayBuffer), true);
   assert.equal(result.state.modelLoaded, true);
+  assert.equal(result.state.modelRenderable, true);
+  assert.equal(result.state.fallbackProxyActive, false);
+  assert.equal(result.state.skinnedJointCount, 69);
+  assert.equal(result.state.skinnedVertexCount, 3318);
+  assert.equal(result.state.activeClipRenderable, true);
   assert.equal(result.state.loadedClipCount, 2);
   assert.equal(result.state.propCount, rendererOptions.props.length);
 

@@ -375,6 +375,11 @@ export interface MountGpuAnimationAdventureResult {
     demoMode: "animation-adventure";
     modelUrl?: string | URL;
     modelLoaded: boolean;
+    modelRenderable: boolean;
+    fallbackProxyActive: boolean;
+    skinnedJointCount: number;
+    skinnedVertexCount: number;
+    activeClipRenderable: boolean;
     loadedClipCount: number;
     clipIds: readonly string[];
     propSeed?: number;
