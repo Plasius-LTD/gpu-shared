@@ -151,10 +151,16 @@ export async function mountGpuAnimationAdventure(options = {}) {
     beats: adventure.beats ?? [],
     props,
     camera: adventure.camera ?? DEFAULT_CAMERA,
+    modelAsset,
+    clipAssets: clips.map((clip, index) => ({
+      id: clip.id,
+      asset: clipAssets[index] ?? null,
+    })),
     animationAdventure: adventure,
   });
   renderer.resize(canvas.width, canvas.height, 1);
   renderer.start();
+  const rendererSnapshot = renderer.getSnapshot();
 
   return {
     canvas,
@@ -162,11 +168,16 @@ export async function mountGpuAnimationAdventure(options = {}) {
       demoMode: "animation-adventure",
       modelUrl: adventure.modelUrl,
       modelLoaded: modelAsset !== null,
+      modelRenderable: rendererSnapshot.modelRenderable === true,
+      fallbackProxyActive: rendererSnapshot.fallbackProxyActive === true,
+      skinnedJointCount: rendererSnapshot.skinnedJointCount ?? 0,
+      skinnedVertexCount: rendererSnapshot.skinnedVertexCount ?? 0,
+      activeClipRenderable: rendererSnapshot.activeClipRenderable === true,
       loadedClipCount: clipAssets.filter(Boolean).length,
       clipIds: clips.map((clip) => clip.id),
       propSeed: adventure.props?.seed,
       propCount: props.length,
-      rendererSnapshot: renderer.getSnapshot(),
+      rendererSnapshot,
     },
     renderer,
     props,

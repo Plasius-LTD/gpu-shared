@@ -151,7 +151,10 @@ the renderer peer.
 mode is gated by `gpu-demo.animation-adventure.enabled`, accepts an
 `animationAdventure` manifest with Peasant Girl, clip refs, route points,
 scripted beats, prop seed, and camera defaults, then submits the scene to the
-renderer-owned animated scene surface.
+renderer-owned animated scene surface. The shared runtime loads the model and
+clip GLB bytes, passes those buffers to `@plasius/gpu-renderer`, and returns
+renderer snapshot fields that distinguish loaded payloads from skinned model
+renderability.
 
 For browser-only demos served without a bundler, keep the import surface on the
 published package name and resolve it with an import map rather than importing a

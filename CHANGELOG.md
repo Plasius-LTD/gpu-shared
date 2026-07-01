@@ -8,7 +8,9 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Changed**
-  - (placeholder)
+  - Pass loaded Animation Adventure Peasant Girl model and clip GLB buffers to
+    `@plasius/gpu-renderer`, and surface renderer model-renderability snapshot
+    fields in the mount result under task `#66`.
 
 - **Fixed**
   - (placeholder)

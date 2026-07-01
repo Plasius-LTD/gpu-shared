@@ -58,7 +58,7 @@
   "author": "Plasius LTD <development@plasius.co.uk>",
   "license": "Apache-2.0",
   "peerDependencies": {
-    "@plasius/gpu-renderer": "^0.2.22",
+    "@plasius/gpu-renderer": "^0.2.25",
     "@plasius/translations": "^1.0.17"
   },
   "peerDependenciesMeta": {
