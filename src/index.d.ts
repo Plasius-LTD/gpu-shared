@@ -117,6 +117,12 @@ export type ShowcaseDemoMode =
 
 export type AnimationAdventureVector3 = readonly [number, number, number] | readonly number[];
 
+export type AnimationAdventureCameraViewMode =
+  | "editor"
+  | "spectator"
+  | "third-person"
+  | "first-person";
+
 export interface AnimationAdventureClipRef {
   readonly id: string;
   readonly url?: string;
@@ -146,11 +152,28 @@ export interface AnimationAdventureBeat {
 }
 
 export interface AnimationAdventureCamera {
-  readonly mode?: "lagged-follow";
+  readonly mode?: "lagged-follow" | AnimationAdventureCameraViewMode;
+  readonly viewMode?: AnimationAdventureCameraViewMode;
+  readonly availableViewModes?: readonly AnimationAdventureCameraViewMode[];
   readonly cubicBezier?: readonly [number, number, number, number] | readonly number[];
   readonly lagMs?: number;
   readonly lookAheadMs?: number;
   readonly offset?: AnimationAdventureVector3;
+  readonly constraints?: {
+    readonly minDistance?: number;
+    readonly maxDistance?: number;
+    readonly minPolarAngle?: number;
+    readonly maxPolarAngle?: number;
+    readonly firstPersonHeadOffset?: number;
+    readonly headLookMaxYaw?: number;
+    readonly headLookMaxPitch?: number;
+    readonly headLookWeight?: number;
+  };
+  readonly headLook?: {
+    readonly enabled?: boolean;
+    readonly activeOnly?: boolean;
+    readonly returnMs?: number;
+  };
 }
 
 export interface AnimationAdventurePropLayout {
@@ -345,8 +368,14 @@ export interface MountGpuShowcaseOptions {
 
 export interface MountGpuShowcaseResult {
   readonly state: Record<string, unknown>;
-  readonly shipModel: GltfModel;
+  readonly shipModel?: GltfModel;
   readonly canvas: HTMLCanvasElement;
+  readonly renderer?: unknown;
+  setCameraViewMode?(viewMode: AnimationAdventureCameraViewMode): void;
+  applyCameraControl?(
+    control: Record<string, unknown>,
+    options?: { readonly activeControl?: boolean },
+  ): void;
   destroy(): void;
 }
 
@@ -384,6 +413,8 @@ export interface MountGpuAnimationAdventureResult {
     clipIds: readonly string[];
     propSeed?: number;
     propCount: number;
+    cameraModesEnabled: boolean;
+    camera: AnimationAdventureCamera;
     rendererSnapshot: Record<string, unknown>;
   }>;
   readonly canvas: HTMLCanvasElement;
@@ -393,6 +424,11 @@ export interface MountGpuAnimationAdventureResult {
     readonly kind: string;
     readonly position: readonly number[];
   }[];
+  setCameraViewMode(viewMode: AnimationAdventureCameraViewMode): void;
+  applyCameraControl(
+    control: Record<string, unknown>,
+    options?: { readonly activeControl?: boolean },
+  ): void;
   destroy(): void;
 }
 
@@ -401,6 +437,7 @@ export const showcaseDemoModes: readonly ShowcaseDemoMode[];
 export const GPU_SHOWCASE_REALISTIC_MODELS_FEATURE: "gpu_showcase_realistic_models_v1";
 export const GPU_SHOWCASE_PRODUCT_STUDIO_FEATURE: "gpu_showcase_product_studio_wavefront_v1";
 export const GPU_SHOWCASE_ANIMATION_ADVENTURE_FEATURE: "gpu-demo.animation-adventure.enabled";
+export const GPU_SHOWCASE_CAMERA_MODES_FEATURE: "gpu-demo.camera-modes.enabled";
 
 export function resolveShowcaseAssetUrl(
   baseUrlOrAssetName?: string | URL | ShowcaseAssetName,
@@ -440,7 +477,8 @@ export function createAnimationAdventureProps(
 }[];
 
 export function mountGpuAnimationAdventure(
-  options?: MountGpuShowcaseOptions
+  options?: MountGpuShowcaseOptions,
+  featureFlags?: unknown
 ): Promise<MountGpuAnimationAdventureResult>;
 
 export function mountGpuShowcase(

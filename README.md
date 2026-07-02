@@ -156,6 +156,14 @@ clip GLB bytes, passes those buffers to `@plasius/gpu-renderer`, and returns
 renderer snapshot fields that distinguish loaded payloads from skinned model
 renderability.
 
+Camera modes are a separate rollout surface controlled by
+`gpu-demo.camera-modes.enabled`. With the flag enabled, the
+`animationAdventure.camera` object may request `viewMode: "editor"`,
+`"spectator"`, `"third-person"`, or `"first-person"` plus camera constraints
+and head-look settings. With the flag disabled, the shared runtime keeps
+legacy `lagged-follow` callers on spectator behavior and only advertises
+`["spectator"]` as available.
+
 For browser-only demos served without a bundler, keep the import surface on the
 published package name and resolve it with an import map rather than importing a
 viewer-private or workspace-private source file:

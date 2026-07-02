@@ -1,7 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { mountGpuAnimationAdventure } from "../src/index.js";
+import {
+  GPU_SHOWCASE_CAMERA_MODES_FEATURE,
+  mountGpuAnimationAdventure,
+} from "../src/index.js";
 
 function createFakeDocument() {
   const styleElements = new Map();
@@ -142,6 +145,9 @@ test("mountGpuAnimationAdventure submits adventure state to gpu-renderer", async
   assert.equal(rendererOptions.route.length, 2);
   assert.equal(rendererOptions.beats.length, 1);
   assert.equal(rendererOptions.props.some((prop) => prop.kind === "crop-row"), true);
+  assert.equal(rendererOptions.camera.viewMode, "spectator");
+  assert.deepEqual(rendererOptions.camera.availableViewModes, ["spectator"]);
+  assert.equal(rendererOptions.camera.headLook.enabled, false);
   assert.equal(rendererOptions.modelAsset instanceof ArrayBuffer, true);
   assert.deepEqual(rendererOptions.clipAssets.map((clip) => clip.id), [
     "female-basic-locomotion-idle",
@@ -156,8 +162,93 @@ test("mountGpuAnimationAdventure submits adventure state to gpu-renderer", async
   assert.equal(result.state.activeClipRenderable, true);
   assert.equal(result.state.loadedClipCount, 2);
   assert.equal(result.state.propCount, rendererOptions.props.length);
+  assert.equal(result.state.cameraModesEnabled, false);
+  assert.equal(result.state.camera.viewMode, "spectator");
 
   result.destroy();
   assert.equal(destroyed, true);
   assert.equal(root.innerHTML, "<p>previous</p>");
+});
+
+test("mountGpuAnimationAdventure passes enabled camera modes through to gpu-renderer", async () => {
+  const { root } = createFakeDocument();
+  let rendererOptions = null;
+  let selectedCameraMode = null;
+  let appliedControl = null;
+
+  const result = await mountGpuAnimationAdventure({
+    root,
+    animationAdventure: {
+      modelUrl: "/models/peasant-girl.glb",
+      clips: [{ id: "idle", url: "/clips/idle.glb" }],
+      camera: {
+        viewMode: "third-person",
+        constraints: {
+          maxDistance: 8,
+          firstPersonHeadOffset: 0.075,
+        },
+        headLook: {
+          enabled: true,
+          returnMs: 180,
+        },
+      },
+    },
+    __featureFlags: {
+      [GPU_SHOWCASE_CAMERA_MODES_FEATURE]: true,
+    },
+    __modelAssetLoader: async () => new ArrayBuffer(4),
+    __clipAssetLoader: async () => new ArrayBuffer(2),
+    __rendererLoader: async () => ({
+      createAnimatedSceneRenderer(options) {
+        rendererOptions = options;
+        return {
+          resize() {},
+          start() {},
+          getSnapshot() {
+            return {
+              frame: 1,
+              activeClipId: "idle",
+              modelRenderable: true,
+              fallbackProxyActive: false,
+              skinnedJointCount: 69,
+              skinnedVertexCount: 3318,
+              activeClipRenderable: true,
+              frameState: "running",
+            };
+          },
+          setCameraViewMode(viewMode) {
+            selectedCameraMode = viewMode;
+          },
+          applyCameraControl(control, options) {
+            appliedControl = { control, options };
+          },
+          destroy() {},
+        };
+      },
+    }),
+  });
+
+  assert.equal(rendererOptions.camera.viewMode, "third-person");
+  assert.deepEqual(rendererOptions.camera.availableViewModes, [
+    "editor",
+    "spectator",
+    "third-person",
+    "first-person",
+  ]);
+  assert.equal(rendererOptions.camera.constraints.maxDistance, 8);
+  assert.equal(rendererOptions.camera.constraints.firstPersonHeadOffset, 0.075);
+  assert.equal(rendererOptions.camera.headLook.enabled, true);
+  assert.equal(rendererOptions.camera.headLook.activeOnly, true);
+  assert.equal(rendererOptions.camera.headLook.returnMs, 180);
+  assert.equal(result.state.cameraModesEnabled, true);
+  assert.equal(result.state.camera.viewMode, "third-person");
+
+  result.setCameraViewMode("first-person");
+  result.applyCameraControl({ yawDelta: 0.25 }, { activeControl: true });
+
+  assert.equal(selectedCameraMode, "first-person");
+  assert.deepEqual(appliedControl, {
+    control: { yawDelta: 0.25 },
+    options: { activeControl: true },
+  });
 });

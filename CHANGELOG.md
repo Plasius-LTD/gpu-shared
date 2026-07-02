@@ -5,10 +5,13 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - **Added**
-  - (placeholder)
+  - Added `gpu-demo.camera-modes.enabled` and Animation Adventure camera
+    pass-through for editor, spectator, third-person, and first-person view
+    modes.
 
 - **Changed**
-  - (placeholder)
+  - Updated the optional `@plasius/gpu-renderer` peer range for the
+    camera-aware animated renderer contract.
 
 - **Fixed**
   - (placeholder)

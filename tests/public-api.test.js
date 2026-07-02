@@ -7,6 +7,7 @@ import {
   GPU_SHOWCASE_PRODUCT_STUDIO_FEATURE,
   GPU_SHOWCASE_REALISTIC_MODELS_FEATURE,
   GPU_SHOWCASE_ANIMATION_ADVENTURE_FEATURE,
+  GPU_SHOWCASE_CAMERA_MODES_FEATURE,
   buildProductStudioSceneObjects,
   createAnimationAdventureProps,
   createGpuSharedTranslator,
@@ -43,6 +44,10 @@ test("public API exports the shared showcase entrypoints", () => {
     GPU_SHOWCASE_ANIMATION_ADVENTURE_FEATURE,
     "gpu-demo.animation-adventure.enabled"
   );
+  assert.equal(
+    GPU_SHOWCASE_CAMERA_MODES_FEATURE,
+    "gpu-demo.camera-modes.enabled"
+  );
 });
 
 test("public types declare an animation adventure result without shipModel", () => {
@@ -57,6 +62,11 @@ test("public types declare an animation adventure result without shipModel", () 
     declaration,
     /MountGpuShowcaseResult \| MountGpuProductStudioResult \| MountGpuAnimationAdventureResult/u
   );
+  assert.match(declaration, /type AnimationAdventureCameraViewMode/u);
+  assert.match(declaration, /readonly viewMode\?: AnimationAdventureCameraViewMode/u);
+  assert.match(declaration, /readonly availableViewModes\?: readonly AnimationAdventureCameraViewMode\[\]/u);
+  assert.match(declaration, /cameraModesEnabled: boolean/u);
+  assert.match(declaration, /setCameraViewMode\(viewMode: AnimationAdventureCameraViewMode\): void/u);
   assert.doesNotMatch(
     declaration.match(/interface MountGpuAnimationAdventureResult \{[\s\S]*?\n\}/u)?.[0] ?? "",
     /shipModel/u
