@@ -8,6 +8,20 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.0.6] - 2026-07-02
+
+- **Added**
+  - (placeholder)
+
+- **Changed**
   - Forward Product Studio feature flags into `@plasius/gpu-renderer` so
     renderer transport flags, including
     `renderer.transport.strictPhysicalLowSppLighting`, reach the wavefront
@@ -421,3 +435,4 @@ All notable changes to this project will be documented in this file.
 [1.0.3]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.3
 [1.0.4]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.4
 [1.0.5]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.5
+[1.0.6]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.6
