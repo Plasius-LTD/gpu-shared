@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.0.7] - 2026-07-02
+
+- **Added**
   - Added load-time Animation Adventure movement validation for clip
     `movementProfile` metadata and beat movement requirements.
 
@@ -439,3 +453,4 @@ All notable changes to this project will be documented in this file.
 [1.0.4]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.4
 [1.0.5]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.5
 [1.0.6]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.6
+[1.0.7]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.7
