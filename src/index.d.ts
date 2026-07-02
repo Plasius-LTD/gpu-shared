@@ -129,6 +129,19 @@ export interface AnimationAdventureClipRef {
   readonly clipUrl?: string;
   readonly category?: string;
   readonly rootTranslation?: boolean;
+  readonly movementProfile?: {
+    readonly motionMode?: "stationary" | "calibrated-in-place" | "root-authored" | "jump" | "modifier" | "invalid" | string;
+    readonly durationMs?: number;
+    readonly rootTranslationDistance?: number;
+    readonly strideLength?: number;
+    readonly strideLengthMeters?: number;
+    readonly expectedSpeed?: number;
+    readonly footContactWindows?: readonly (readonly [number, number] | readonly number[])[];
+    readonly verticalBounds?: readonly [number, number] | readonly number[];
+    readonly loopable?: boolean;
+    readonly worldDisplacementAllowed?: boolean;
+    readonly footSlideTolerance?: number;
+  } | null;
 }
 
 export interface AnimationAdventureRoutePoint {
@@ -145,6 +158,19 @@ export interface AnimationAdventureBeat {
   readonly durationMs: number;
   readonly pathPointId?: string;
   readonly rootMotion?: string;
+  readonly validatedDurationMs?: number;
+  readonly movementRequirement?: {
+    readonly type: "stationary" | "travel" | "jump" | "root-authored";
+    readonly distance?: number;
+    readonly maxDrift?: number;
+    readonly speedRange?: readonly [number, number] | readonly number[];
+    readonly directionToleranceDegrees?: number;
+    readonly verticalArc?: readonly [number, number] | readonly number[];
+    readonly loop?: "once" | "repeat" | "hold";
+    readonly actualSpeed?: number;
+    readonly loopCount?: number;
+    readonly validatedDurationMs?: number;
+  };
   readonly blend?: {
     readonly inMs?: number;
     readonly outMs?: number;
@@ -415,6 +441,11 @@ export interface MountGpuAnimationAdventureResult {
     propCount: number;
     cameraModesEnabled: boolean;
     camera: AnimationAdventureCamera;
+    movementValidation: {
+      readonly status: "passed" | "failed";
+      readonly errors: readonly Record<string, unknown>[];
+      readonly warnings: readonly Record<string, unknown>[];
+    };
     rendererSnapshot: Record<string, unknown>;
   }>;
   readonly canvas: HTMLCanvasElement;

@@ -164,6 +164,148 @@ async function loadBinaryAsset(url, loader) {
   return response.arrayBuffer();
 }
 
+function distance3(a = [0, 0, 0], b = [0, 0, 0]) {
+  return Math.hypot(
+    (b[0] ?? 0) - (a[0] ?? 0),
+    (b[1] ?? 0) - (a[1] ?? 0),
+    (b[2] ?? 0) - (a[2] ?? 0),
+  );
+}
+
+function movementDistancePerLoop(profile = {}) {
+  const rootDistance = Number(profile.rootTranslationDistance ?? profile.rootTranslation?.distance ?? 0);
+  if (Number.isFinite(rootDistance) && rootDistance > 0) {
+    return rootDistance;
+  }
+  const strideLength = Number(profile.strideLength ?? profile.strideLengthMeters ?? 0);
+  return Number.isFinite(strideLength) && strideLength > 0 ? strideLength : 0;
+}
+
+function movementRequirementType(requirement, beat) {
+  if (requirement?.type) {
+    return requirement.type;
+  }
+  if (beat?.kind === "locomotion") {
+    return beat?.rootMotion === "in-place" ? "stationary" : "travel";
+  }
+  if (beat?.kind === "action" || beat?.kind === "idle") {
+    return "stationary";
+  }
+  return beat?.pathPointId ? "travel" : "stationary";
+}
+
+function validateMovementProfiles({ clips, beats, route }) {
+  const profiles = new Map(clips.map((clip) => [clip.id, clip.movementProfile ?? null]));
+  const routePoints = new Map(route.map((point) => [point.id, point]));
+  const errors = [];
+  const warnings = [];
+  const validatedBeats = [];
+  let currentPosition = route[0]?.position ? [...route[0].position] : [0, 0, 0];
+
+  for (const beat of beats) {
+    const requirement = beat.movementRequirement ?? beat.movement ?? null;
+    const type = movementRequirementType(requirement, beat);
+    const profile = profiles.get(beat.clipId);
+    const targetPoint = beat.pathPointId ? routePoints.get(beat.pathPointId) : null;
+    const targetPosition = targetPoint?.position ? [...targetPoint.position] : [...currentPosition];
+    const movesThroughWorld = type === "travel" || type === "jump" || type === "root-authored";
+    const distance = Number(requirement?.distance ?? (movesThroughWorld ? distance3(currentPosition, targetPosition) : 0));
+    const distancePerLoop = movementDistancePerLoop(profile);
+    const durationMs = Math.max(1, Number(profile?.durationMs ?? beat.durationMs ?? 1));
+    const loops = movesThroughWorld && distancePerLoop > 0 ? Math.max(1, Math.ceil(distance / distancePerLoop)) : 1;
+    const derivedDurationMs = movesThroughWorld && distancePerLoop > 0 ? Math.round(loops * durationMs) : beat.durationMs;
+    const actualSpeed = distance > 0 && derivedDurationMs > 0 ? distance / (derivedDurationMs / 1000) : 0;
+    const [minSpeed, maxSpeed] = Array.isArray(requirement?.speedRange)
+      ? [Number(requirement.speedRange[0] ?? 0), Number(requirement.speedRange[1] ?? Infinity)]
+      : [0, Infinity];
+
+    if (!profile) {
+      errors.push({
+        beatId: beat.id,
+        clipId: beat.clipId,
+        expectedDistance: distance,
+        actualDistance: 0,
+        reason: `clip '${beat.clipId}' is missing a movementProfile`,
+      });
+    } else if (profile.motionMode === "invalid") {
+      errors.push({
+        beatId: beat.id,
+        clipId: beat.clipId,
+        expectedDistance: distance,
+        actualDistance: distancePerLoop,
+        reason: `clip '${beat.clipId}' is quarantined for animation adventure playback`,
+      });
+    } else if (movesThroughWorld && profile.worldDisplacementAllowed !== true) {
+      errors.push({
+        beatId: beat.id,
+        clipId: beat.clipId,
+        expectedDistance: distance,
+        actualDistance: distancePerLoop,
+        reason: `beat '${beat.id}' requires ${type} movement but clip '${beat.clipId}' is stationary`,
+      });
+    } else if (movesThroughWorld && distancePerLoop <= 0) {
+      errors.push({
+        beatId: beat.id,
+        clipId: beat.clipId,
+        expectedDistance: distance,
+        actualDistance: 0,
+        reason: `beat '${beat.id}' requires ${type} movement but clip '${beat.clipId}' has no root or calibrated stride distance`,
+      });
+    } else if (!movesThroughWorld && profile.worldDisplacementAllowed === true && (profile.rootTranslationDistance ?? 0) > (requirement?.maxDrift ?? 0.05)) {
+      errors.push({
+        beatId: beat.id,
+        clipId: beat.clipId,
+        expectedDistance: 0,
+        actualDistance: profile.rootTranslationDistance,
+        reason: `stationary beat '${beat.id}' uses a clip with root drift`,
+      });
+    }
+
+    if (movesThroughWorld && actualSpeed > 0 && (actualSpeed < minSpeed || actualSpeed > maxSpeed)) {
+      errors.push({
+        beatId: beat.id,
+        clipId: beat.clipId,
+        expectedDistance: distance,
+        actualDistance: distancePerLoop,
+        reason: `beat '${beat.id}' speed ${actualSpeed.toFixed(3)}m/s is outside ${minSpeed}-${maxSpeed}m/s`,
+      });
+    }
+
+    if (movesThroughWorld && Number(profile?.footSlideTolerance ?? 0) > 0.2) {
+      warnings.push({
+        beatId: beat.id,
+        clipId: beat.clipId,
+        reason: `clip '${beat.clipId}' foot-slide tolerance is loose`,
+      });
+    }
+
+    validatedBeats.push({
+      ...beat,
+      durationMs: derivedDurationMs,
+      validatedDurationMs: derivedDurationMs,
+      movementRequirement: {
+        ...(requirement ?? { type }),
+        type,
+        distance,
+        actualSpeed,
+        loopCount: loops,
+        validatedDurationMs: derivedDurationMs,
+      },
+    });
+
+    if (movesThroughWorld) {
+      currentPosition = targetPosition;
+    }
+  }
+
+  return Object.freeze({
+    status: errors.length ? "failed" : "passed",
+    errors: Object.freeze(errors),
+    warnings: Object.freeze(warnings),
+    beats: Object.freeze(validatedBeats),
+  });
+}
+
 export async function mountGpuAnimationAdventure(options = {}, featureFlags = options.__featureFlags) {
   const root = resolveRoot(options);
   if (!root?.ownerDocument) {
@@ -197,6 +339,17 @@ export async function mountGpuAnimationAdventure(options = {}, featureFlags = op
   }
 
   const route = adventure.route ?? [];
+  const movementValidation = validateMovementProfiles({
+    clips,
+    beats: adventure.beats ?? [],
+    route,
+  });
+  if (movementValidation.status !== "passed") {
+    const firstError = movementValidation.errors[0];
+    throw new Error(
+      `Animation adventure movement validation failed for beat '${firstError?.beatId ?? "unknown"}' clip '${firstError?.clipId ?? "unknown"}': ${firstError?.reason ?? "unknown movement mismatch"}`,
+    );
+  }
   const props = adventure.generatedProps ?? createAnimationAdventureProps({
     ...(adventure.props ?? {}),
     route,
@@ -205,15 +358,20 @@ export async function mountGpuAnimationAdventure(options = {}, featureFlags = op
   const renderer = rendererModule.createAnimatedSceneRenderer({
     canvas,
     route,
-    beats: adventure.beats ?? [],
+    beats: movementValidation.beats,
     props,
     camera,
     modelAsset,
     clipAssets: clips.map((clip, index) => ({
       id: clip.id,
       asset: clipAssets[index] ?? null,
+      movementProfile: clip.movementProfile ?? null,
     })),
-    animationAdventure: adventure,
+    animationAdventure: {
+      ...adventure,
+      beats: movementValidation.beats,
+      movementValidation,
+    },
   });
   renderer.resize(canvas.width, canvas.height, 1);
   renderer.start();
@@ -236,6 +394,11 @@ export async function mountGpuAnimationAdventure(options = {}, featureFlags = op
       propCount: props.length,
       cameraModesEnabled: isFeatureEnabled(featureFlags, GPU_SHOWCASE_CAMERA_MODES_FEATURE),
       camera,
+      movementValidation: {
+        status: movementValidation.status,
+        errors: movementValidation.errors,
+        warnings: movementValidation.warnings,
+      },
       rendererSnapshot,
     },
     renderer,
