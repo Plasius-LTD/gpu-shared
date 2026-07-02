@@ -472,6 +472,7 @@ export async function mountGpuProductStudio(options = {}, featureFlags = null) {
       up: [0, 1, 0],
       fovYDegrees: 43,
     },
+    featureFlags,
     ...lightingOptions,
   });
   const rendererStats = renderer.renderOnce();

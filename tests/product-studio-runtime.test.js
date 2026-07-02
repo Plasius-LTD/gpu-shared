@@ -168,57 +168,65 @@ test("mountGpuProductStudio loads the model and delegates mesh BVH renderer inpu
   const { document, root } = createFakeDocument();
   let rendererOptions = null;
   let destroyed = false;
-  const result = await mountGpuProductStudio({
-    document,
-    root,
-    productAssetUrl: "/data/model.gltf",
-    lightingPreset: "product-studio",
-    lightingIntensity: 1.15,
-    __modelLoader: async (url) => {
-      assert.equal(url, "/data/model.gltf");
-      return createModelFixture();
+  const featureFlags = {
+    enabled: {
+      "renderer.transport.strictPhysicalLowSppLighting": true,
     },
-    __lightingLoader: async () => ({
-      createWavefrontEnvironmentLightingOptions(options) {
-        assert.deepEqual(options, {
-          preset: "product-studio",
-          intensity: 1.15,
-        });
-        return {
-          environmentColor: [0.4, 0.5, 0.6, 1],
-          ambientColor: [0.02, 0.03, 0.04, 1],
-          environmentLighting: {
-            horizonColor: [0.5, 0.6, 0.7, 1],
-            zenithColor: [0.08, 0.1, 0.14, 1],
-            sunDirection: [0, 1, 0],
-            sunColor: [3, 2.8, 2.4, 1],
+  };
+  const result = await mountGpuProductStudio(
+    {
+      document,
+      root,
+      productAssetUrl: "/data/model.gltf",
+      lightingPreset: "product-studio",
+      lightingIntensity: 1.15,
+      __modelLoader: async (url) => {
+        assert.equal(url, "/data/model.gltf");
+        return createModelFixture();
+      },
+      __lightingLoader: async () => ({
+        createWavefrontEnvironmentLightingOptions(options) {
+          assert.deepEqual(options, {
+            preset: "product-studio",
             intensity: 1.15,
-          },
-        };
-      },
-    }),
-    __rendererLoader: async () => ({
-      async createWavefrontPathTracingComputeRenderer(options) {
-        rendererOptions = options;
-        return {
-          renderOnce() {
-            return {
-              frame: 1,
-              width: options.width,
-              height: options.height,
-              maxDepth: options.maxDepth,
-              samplesPerPixel: options.samplesPerPixel,
-              screenRays: options.width * options.height,
-              primaryRays: options.width * options.height * options.samplesPerPixel,
-            };
-          },
-          destroy() {
-            destroyed = true;
-          },
-        };
-      },
-    }),
-  });
+          });
+          return {
+            environmentColor: [0.4, 0.5, 0.6, 1],
+            ambientColor: [0.02, 0.03, 0.04, 1],
+            environmentLighting: {
+              horizonColor: [0.5, 0.6, 0.7, 1],
+              zenithColor: [0.08, 0.1, 0.14, 1],
+              sunDirection: [0, 1, 0],
+              sunColor: [3, 2.8, 2.4, 1],
+              intensity: 1.15,
+            },
+          };
+        },
+      }),
+      __rendererLoader: async () => ({
+        async createWavefrontPathTracingComputeRenderer(options) {
+          rendererOptions = options;
+          return {
+            renderOnce() {
+              return {
+                frame: 1,
+                width: options.width,
+                height: options.height,
+                maxDepth: options.maxDepth,
+                samplesPerPixel: options.samplesPerPixel,
+                screenRays: options.width * options.height,
+                primaryRays: options.width * options.height * options.samplesPerPixel,
+              };
+            },
+            destroy() {
+              destroyed = true;
+            },
+          };
+        },
+      }),
+    },
+    featureFlags,
+  );
 
   assert.equal(result.state.modelName, "fixture-chair");
   assert.equal(result.state.sourceTriangleCount, 6);
@@ -233,6 +241,7 @@ test("mountGpuProductStudio loads the model and delegates mesh BVH renderer inpu
   assert.equal(rendererOptions.displayQuality, true);
   assert.equal(rendererOptions.meshes.length, result.meshes.length);
   assert.equal(Object.hasOwn(rendererOptions, "sceneObjects"), false);
+  assert.equal(rendererOptions.featureFlags, featureFlags);
   assert.equal(rendererOptions.maxDepth, 2);
   assert.equal(rendererOptions.samplesPerPixel, 8);
   assert.equal(result.state.rendererStats.samplesPerPixel, 8);

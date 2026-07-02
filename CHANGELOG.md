@@ -8,7 +8,12 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Changed**
-  - (placeholder)
+  - Forward Product Studio feature flags into `@plasius/gpu-renderer` so
+    renderer transport flags, including
+    `renderer.transport.strictPhysicalLowSppLighting`, reach the wavefront
+    renderer under task `#76`.
+  - Updated the optional `@plasius/gpu-renderer` peer range for the strict
+    physical low-SPP transport release.
 
 - **Fixed**
   - (placeholder)
