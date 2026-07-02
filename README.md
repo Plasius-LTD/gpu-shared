@@ -155,6 +155,11 @@ renderer-owned animated scene surface. The shared runtime loads the model and
 clip GLB bytes, passes those buffers to `@plasius/gpu-renderer`, and returns
 renderer snapshot fields that distinguish loaded payloads from skinned model
 renderability.
+Before playback starts, the shared runtime validates every scripted beat
+against the selected clip `movementProfile`. Travel and jump beats require
+root-authored or calibrated stride distance, stationary beats reject unexpected
+root drift, and invalid manifests throw a beat/clip-specific movement
+validation error instead of silently forcing route movement.
 
 Camera modes are a separate rollout surface controlled by
 `gpu-demo.camera-modes.enabled`. With the flag enabled, the

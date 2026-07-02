@@ -68,8 +68,28 @@ test("mountGpuAnimationAdventure submits adventure state to gpu-renderer", async
     animationAdventure: {
       modelUrl: "/models/peasant-girl.glb",
       clips: [
-        { id: "female-basic-locomotion-idle", url: "/clips/idle.glb" },
-        { id: "female-basic-locomotion-walking", url: "/clips/walk.glb" },
+        {
+          id: "female-basic-locomotion-idle",
+          url: "/clips/idle.glb",
+          movementProfile: {
+            motionMode: "stationary",
+            durationMs: 1000,
+            rootTranslationDistance: 0,
+            expectedSpeed: 0,
+            worldDisplacementAllowed: false,
+          },
+        },
+        {
+          id: "female-basic-locomotion-walking",
+          url: "/clips/walk.glb",
+          movementProfile: {
+            motionMode: "calibrated-in-place",
+            durationMs: 1000,
+            strideLength: 1,
+            expectedSpeed: 1,
+            worldDisplacementAllowed: true,
+          },
+        },
       ],
       route: [
         { id: "gate", position: [0, 0, 0], arriveMs: 0 },
@@ -81,6 +101,7 @@ test("mountGpuAnimationAdventure submits adventure state to gpu-renderer", async
           order: 0,
           clipId: "female-basic-locomotion-idle",
           durationMs: 1000,
+          movementRequirement: { type: "stationary", maxDrift: 0.05 },
           blend: { inMs: 0, outMs: 120 },
         },
       ],
@@ -144,6 +165,7 @@ test("mountGpuAnimationAdventure submits adventure state to gpu-renderer", async
   assert.equal(root.children.length, 1);
   assert.equal(rendererOptions.route.length, 2);
   assert.equal(rendererOptions.beats.length, 1);
+  assert.equal(rendererOptions.beats[0].validatedDurationMs, 1000);
   assert.equal(rendererOptions.props.some((prop) => prop.kind === "crop-row"), true);
   assert.equal(rendererOptions.camera.viewMode, "spectator");
   assert.deepEqual(rendererOptions.camera.availableViewModes, ["spectator"]);
@@ -153,6 +175,7 @@ test("mountGpuAnimationAdventure submits adventure state to gpu-renderer", async
     "female-basic-locomotion-idle",
     "female-basic-locomotion-walking",
   ]);
+  assert.equal(rendererOptions.clipAssets[0].movementProfile.motionMode, "stationary");
   assert.equal(rendererOptions.clipAssets.every((clip) => clip.asset instanceof ArrayBuffer), true);
   assert.equal(result.state.modelLoaded, true);
   assert.equal(result.state.modelRenderable, true);
@@ -164,10 +187,59 @@ test("mountGpuAnimationAdventure submits adventure state to gpu-renderer", async
   assert.equal(result.state.propCount, rendererOptions.props.length);
   assert.equal(result.state.cameraModesEnabled, false);
   assert.equal(result.state.camera.viewMode, "spectator");
+  assert.equal(result.state.movementValidation.status, "passed");
 
   result.destroy();
   assert.equal(destroyed, true);
   assert.equal(root.innerHTML, "<p>previous</p>");
+});
+
+test("mountGpuAnimationAdventure blocks travel beats without movement-capable clips", async () => {
+  const { root } = createFakeDocument();
+
+  await assert.rejects(
+    mountGpuAnimationAdventure({
+      root,
+      animationAdventure: {
+        modelUrl: "/models/peasant-girl.glb",
+        clips: [
+          {
+            id: "farming-watering",
+            url: "/clips/watering.glb",
+            movementProfile: {
+              motionMode: "stationary",
+              durationMs: 1000,
+              rootTranslationDistance: 0,
+              expectedSpeed: 0,
+              worldDisplacementAllowed: false,
+            },
+          },
+        ],
+        route: [
+          { id: "gate", position: [0, 0, 0], arriveMs: 0 },
+          { id: "crop-row", position: [3, 0, 0], arriveMs: 3000 },
+        ],
+        beats: [
+          {
+            id: "bad-walk",
+            order: 0,
+            clipId: "farming-watering",
+            durationMs: 3000,
+            pathPointId: "crop-row",
+            movementRequirement: { type: "travel", distance: 3, speedRange: [0.8, 1.2] },
+          },
+        ],
+      },
+      __modelAssetLoader: async () => new ArrayBuffer(4),
+      __clipAssetLoader: async () => new ArrayBuffer(2),
+      __rendererLoader: async () => ({
+        createAnimatedSceneRenderer() {
+          throw new Error("renderer should not mount after failed movement validation");
+        },
+      }),
+    }),
+    /movement validation failed.*bad-walk.*stationary/u,
+  );
 });
 
 test("mountGpuAnimationAdventure passes enabled camera modes through to gpu-renderer", async () => {
@@ -180,7 +252,19 @@ test("mountGpuAnimationAdventure passes enabled camera modes through to gpu-rend
     root,
     animationAdventure: {
       modelUrl: "/models/peasant-girl.glb",
-      clips: [{ id: "idle", url: "/clips/idle.glb" }],
+      clips: [
+        {
+          id: "idle",
+          url: "/clips/idle.glb",
+          movementProfile: {
+            motionMode: "stationary",
+            durationMs: 1000,
+            rootTranslationDistance: 0,
+            expectedSpeed: 0,
+            worldDisplacementAllowed: false,
+          },
+        },
+      ],
       camera: {
         viewMode: "third-person",
         constraints: {

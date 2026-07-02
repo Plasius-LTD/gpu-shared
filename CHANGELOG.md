@@ -5,10 +5,13 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - **Added**
-  - (placeholder)
+  - Added load-time Animation Adventure movement validation for clip
+    `movementProfile` metadata and beat movement requirements.
 
 - **Changed**
-  - (placeholder)
+  - Changed Animation Adventure mounting to pass validated beat durations and
+    clip movement profiles to `@plasius/gpu-renderer`, and to reject invalid
+    manifests before playback starts.
 
 - **Fixed**
   - (placeholder)
