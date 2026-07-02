@@ -1,13 +1,69 @@
+import { GPU_SHOWCASE_CAMERA_MODES_FEATURE } from "./feature-flags.js";
+
 const STYLE_ID = "plasius-animation-adventure-style";
 const DEFAULT_WIDTH = 960;
 const DEFAULT_HEIGHT = 540;
+const CAMERA_VIEW_MODES = Object.freeze(["editor", "spectator", "third-person", "first-person"]);
 const DEFAULT_CAMERA = Object.freeze({
   mode: "lagged-follow",
+  viewMode: "spectator",
+  availableViewModes: CAMERA_VIEW_MODES,
   cubicBezier: [0.22, 0.61, 0.36, 1],
   lagMs: 240,
   lookAheadMs: 320,
   offset: [-1.1, 2.4, 5.5],
+  constraints: Object.freeze({
+    maxDistance: 10,
+    firstPersonHeadOffset: 0.05,
+  }),
+  headLook: Object.freeze({
+    enabled: true,
+    activeOnly: true,
+    returnMs: 240,
+  }),
 });
+
+function isFeatureEnabled(featureFlags, featureId) {
+  if (typeof featureFlags?.get === "function") {
+    return featureFlags.get(featureId) === true;
+  }
+  if (typeof featureFlags?.[featureId] === "boolean") {
+    return featureFlags[featureId] === true;
+  }
+  if (typeof featureFlags?.enabled?.[featureId] === "boolean") {
+    return featureFlags.enabled[featureId] === true;
+  }
+  if (typeof featureFlags?.flags?.[featureId] === "boolean") {
+    return featureFlags.flags[featureId] === true;
+  }
+  return false;
+}
+
+function normalizeCameraViewMode(value) {
+  return CAMERA_VIEW_MODES.includes(value) ? value : "spectator";
+}
+
+function normalizeAdventureCamera(camera, featureFlags) {
+  const cameraModesEnabled = isFeatureEnabled(featureFlags, GPU_SHOWCASE_CAMERA_MODES_FEATURE);
+  const requested = { ...DEFAULT_CAMERA, ...(camera ?? {}) };
+  const viewMode = normalizeCameraViewMode(requested.viewMode ?? requested.mode);
+  return {
+    ...requested,
+    mode: requested.mode ?? "lagged-follow",
+    viewMode: cameraModesEnabled ? viewMode : "spectator",
+    availableViewModes: cameraModesEnabled ? [...CAMERA_VIEW_MODES] : ["spectator"],
+    constraints: {
+      ...DEFAULT_CAMERA.constraints,
+      ...(requested.constraints ?? {}),
+    },
+    headLook: {
+      ...DEFAULT_CAMERA.headLook,
+      ...(requested.headLook ?? {}),
+      enabled: cameraModesEnabled && requested.headLook?.enabled !== false,
+      activeOnly: true,
+    },
+  };
+}
 
 function createPrng(seed) {
   let state = (Number.isInteger(seed) ? seed : 0x12_08_04) >>> 0;
@@ -108,7 +164,7 @@ async function loadBinaryAsset(url, loader) {
   return response.arrayBuffer();
 }
 
-export async function mountGpuAnimationAdventure(options = {}) {
+export async function mountGpuAnimationAdventure(options = {}, featureFlags = options.__featureFlags) {
   const root = resolveRoot(options);
   if (!root?.ownerDocument) {
     throw new Error("animation adventure requires a root element with an ownerDocument.");
@@ -145,12 +201,13 @@ export async function mountGpuAnimationAdventure(options = {}) {
     ...(adventure.props ?? {}),
     route,
   });
+  const camera = normalizeAdventureCamera(adventure.camera, featureFlags);
   const renderer = rendererModule.createAnimatedSceneRenderer({
     canvas,
     route,
     beats: adventure.beats ?? [],
     props,
-    camera: adventure.camera ?? DEFAULT_CAMERA,
+    camera,
     modelAsset,
     clipAssets: clips.map((clip, index) => ({
       id: clip.id,
@@ -177,10 +234,18 @@ export async function mountGpuAnimationAdventure(options = {}) {
       clipIds: clips.map((clip) => clip.id),
       propSeed: adventure.props?.seed,
       propCount: props.length,
+      cameraModesEnabled: isFeatureEnabled(featureFlags, GPU_SHOWCASE_CAMERA_MODES_FEATURE),
+      camera,
       rendererSnapshot,
     },
     renderer,
     props,
+    setCameraViewMode(viewMode) {
+      renderer.setCameraViewMode?.(viewMode);
+    },
+    applyCameraControl(control, controlOptions) {
+      renderer.applyCameraControl?.(control, controlOptions);
+    },
     destroy() {
       renderer.destroy();
       root.classList?.remove?.("plasius-animation-adventure");
