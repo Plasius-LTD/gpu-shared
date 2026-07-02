@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.0.5] - 2026-07-02
+
+- **Added**
   - Added `gpu-demo.camera-modes.enabled` and Animation Adventure camera
     pass-through for editor, spectator, third-person, and first-person view
     modes.
@@ -401,3 +415,4 @@ All notable changes to this project will be documented in this file.
 [1.0.2]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.2
 [1.0.3]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.3
 [1.0.4]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.4
+[1.0.5]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.5
