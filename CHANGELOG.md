@@ -13,6 +13,8 @@ All notable changes to this project will be documented in this file.
 - **Changed**
   - Changed professional Animation Adventure mounting to reject calibrated
     in-place travel clips and avoid generated 2D farm props in the primary path.
+  - Updated the optional `@plasius/gpu-renderer` peer range for the
+    professional animation renderer release.
 
 - **Fixed**
   - (placeholder)
