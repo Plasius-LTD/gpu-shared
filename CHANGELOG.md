@@ -8,6 +8,20 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.0.10] - 2026-07-03
+
+- **Added**
+  - (placeholder)
+
+- **Changed**
   - Forwarded Product Studio `presentationOutput` into `@plasius/gpu-renderer`
     for source-stable lighting validation captures.
 
@@ -491,3 +505,4 @@ All notable changes to this project will be documented in this file.
 [1.0.7]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.7
 [1.0.8]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.8
 [1.0.9]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.9
+[1.0.10]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.10
