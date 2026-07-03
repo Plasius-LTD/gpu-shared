@@ -126,6 +126,9 @@ includes `renderer.transport.strictPhysicalLowSppLighting` plus the independent
 strict-transport experiment booleans used to compare stable sample routing,
 strict zero overflow, deferred low-SPP Russian roulette, deterministic direct
 lighting, Product Studio environment importance, and transport telemetry.
+Product Studio also forwards `presentationOutput: "tone-mapped" | "linear"` to
+the renderer so validation hosts can compare the default tone-mapped
+presentation with a linear presented output.
 
 ```js
 import { mountGpuShowcase } from "@plasius/gpu-shared";

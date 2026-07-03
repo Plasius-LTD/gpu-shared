@@ -464,6 +464,7 @@ export async function mountGpuProductStudio(options = {}, featureFlags = null) {
     tileSize: Number.isFinite(options.tileSize) ? options.tileSize : 128,
     samplesPerPixel: Number.isFinite(options.samplesPerPixel) ? options.samplesPerPixel : 8,
     denoise: options.denoise !== false,
+    presentationOutput: options.presentationOutput,
     displayQuality: true,
     meshes,
     camera: {
