@@ -11,6 +11,20 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.0.8] - 2026-07-03
+
+- **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
   - Fixed Animation Adventure movement validation so missing or null
     `movementProfile` metadata fails validation instead of throwing a
     `rootTranslationDistance` TypeError under task `#81`.
@@ -456,3 +470,4 @@ All notable changes to this project will be documented in this file.
 [1.0.5]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.5
 [1.0.6]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.6
 [1.0.7]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.7
+[1.0.8]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.8
