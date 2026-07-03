@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   GPU_SHOWCASE_CAMERA_MODES_FEATURE,
+  GPU_SHOWCASE_PROFESSIONAL_ANIMATION_ADVENTURE_FEATURE,
   mountGpuAnimationAdventure,
 } from "../src/index.js";
 
@@ -192,6 +193,172 @@ test("mountGpuAnimationAdventure submits adventure state to gpu-renderer", async
   result.destroy();
   assert.equal(destroyed, true);
   assert.equal(root.innerHTML, "<p>previous</p>");
+});
+
+test("mountGpuAnimationAdventure mounts professional WebGPU renderer with environment assets", async () => {
+  const { root } = createFakeDocument();
+  const loadedEnvironmentUrls = [];
+  let rendererOptions = null;
+
+  const result = await mountGpuAnimationAdventure({
+    root,
+    width: 640,
+    height: 360,
+    animationAdventure: {
+      renderMode: "webgpu-pbr",
+      motionPolicy: "root-motion-required",
+      modelUrl: "/models/peasant-girl.glb",
+      clips: [
+        {
+          id: "female-basic-locomotion-walking",
+          url: "/clips/root-walk.glb",
+          movementProfile: {
+            motionMode: "root-authored",
+            durationMs: 1000,
+            rootTranslationDistance: 1,
+            expectedSpeed: 1,
+            worldDisplacementAllowed: true,
+          },
+        },
+      ],
+      route: [
+        { id: "gate", position: [0, 0, 0], arriveMs: 0 },
+        { id: "crop-row", position: [1, 0, 0], arriveMs: 1000 },
+      ],
+      beats: [
+        {
+          id: "walk-to-crops",
+          order: 0,
+          kind: "locomotion",
+          clipId: "female-basic-locomotion-walking",
+          durationMs: 1000,
+          pathPointId: "crop-row",
+          movementRequirement: { kind: "travel", distanceMeters: 1 },
+        },
+      ],
+      camera: {
+        mode: "cinematic-follow",
+        shoulderOffset: [-0.9, 2.2, 4.8],
+        velocityLookAheadMs: 420,
+        yawSmoothingMs: 180,
+        pitchSmoothingMs: 240,
+        deadZoneRadius: 0.4,
+        maxLagDistance: 2.8,
+      },
+      props: { seed: 1208 },
+      environmentAssets: [
+        { id: "farm-terrain", kind: "terrain", url: "/env/farm-terrain.glb", textureRequired: true },
+      ],
+      environmentInstances: [
+        { id: "terrain-main", assetId: "farm-terrain", position: [0, 0, 0] },
+      ],
+    },
+    __featureFlags: {
+      [GPU_SHOWCASE_PROFESSIONAL_ANIMATION_ADVENTURE_FEATURE]: true,
+    },
+    __modelAssetLoader: async () => new ArrayBuffer(4),
+    __clipAssetLoader: async () => new ArrayBuffer(2),
+    __environmentAssetLoader: async (url) => {
+      loadedEnvironmentUrls.push(String(url));
+      return new ArrayBuffer(8);
+    },
+    __rendererLoader: async () => ({
+      async createProfessionalAnimatedSceneRenderer(options) {
+        rendererOptions = options;
+        return {
+          resize(width, height) {
+            this.size = { width, height };
+          },
+          start() {
+            this.started = true;
+          },
+          getSnapshot() {
+            return {
+              frame: 1,
+              renderMode: "webgpu-pbr",
+              webGpuActive: true,
+              texturedSkinnedRenderingActive: true,
+              textureCount: 2,
+              activeClipId: "female-basic-locomotion-walking",
+              modelRenderable: true,
+              fallbackProxyActive: false,
+              skinnedJointCount: 69,
+              skinnedVertexCount: 3318,
+              activeClipRenderable: true,
+              frameState: "running",
+            };
+          },
+          destroy() {},
+        };
+      },
+    }),
+  });
+
+  assert.deepEqual(loadedEnvironmentUrls, ["/env/farm-terrain.glb"]);
+  assert.equal(rendererOptions.props.length, 0);
+  assert.equal(rendererOptions.camera.mode, "cinematic-follow");
+  assert.equal(rendererOptions.animationAdventure.environmentAssets[0].asset instanceof ArrayBuffer, true);
+  assert.equal(rendererOptions.clipAssets[0].movementProfile.motionMode, "root-authored");
+  assert.equal(result.state.renderMode, "webgpu-pbr");
+  assert.equal(result.state.professionalMode, true);
+  assert.equal(result.state.webGpuActive, true);
+  assert.equal(result.state.texturedSkinnedRenderingActive, true);
+  assert.equal(result.state.textureCount, 2);
+  assert.equal(result.state.propCount, 1);
+  assert.equal(result.state.environmentAssetCount, 1);
+  assert.equal(result.state.fallbackProxyActive, false);
+});
+
+test("mountGpuAnimationAdventure rejects calibrated in-place travel in professional mode", async () => {
+  const { root } = createFakeDocument();
+
+  await assert.rejects(
+    mountGpuAnimationAdventure({
+      root,
+      animationAdventure: {
+        renderMode: "webgpu-pbr",
+        motionPolicy: "root-motion-required",
+        modelUrl: "/models/peasant-girl.glb",
+        clips: [
+          {
+            id: "female-basic-locomotion-walking",
+            url: "/clips/walk.glb",
+            movementProfile: {
+              motionMode: "calibrated-in-place",
+              durationMs: 1000,
+              strideLength: 1,
+              rootTranslationDistance: 0,
+              expectedSpeed: 1,
+              worldDisplacementAllowed: true,
+            },
+          },
+        ],
+        route: [
+          { id: "gate", position: [0, 0, 0], arriveMs: 0 },
+          { id: "crop-row", position: [1, 0, 0], arriveMs: 1000 },
+        ],
+        beats: [
+          {
+            id: "walk-to-crops",
+            order: 0,
+            kind: "locomotion",
+            clipId: "female-basic-locomotion-walking",
+            durationMs: 1000,
+            pathPointId: "crop-row",
+            movementRequirement: { kind: "travel", distanceMeters: 1 },
+          },
+        ],
+      },
+      __modelAssetLoader: async () => new ArrayBuffer(4),
+      __clipAssetLoader: async () => new ArrayBuffer(2),
+      __rendererLoader: async () => ({
+        createProfessionalAnimatedSceneRenderer() {
+          throw new Error("renderer should not mount after failed professional movement validation");
+        },
+      }),
+    }),
+    /requires authored root motion.*calibrated-in-place/u,
+  );
 });
 
 test("mountGpuAnimationAdventure blocks travel beats without movement-capable clips", async () => {

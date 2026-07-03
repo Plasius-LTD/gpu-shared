@@ -160,8 +160,10 @@ export interface AnimationAdventureBeat {
   readonly rootMotion?: string;
   readonly validatedDurationMs?: number;
   readonly movementRequirement?: {
-    readonly type: "stationary" | "travel" | "jump" | "root-authored";
+    readonly type?: "stationary" | "travel" | "jump" | "root-authored";
+    readonly kind?: "stationary" | "travel" | "jump" | "root-authored";
     readonly distance?: number;
+    readonly distanceMeters?: number;
     readonly maxDrift?: number;
     readonly speedRange?: readonly [number, number] | readonly number[];
     readonly directionToleranceDegrees?: number;
@@ -178,7 +180,7 @@ export interface AnimationAdventureBeat {
 }
 
 export interface AnimationAdventureCamera {
-  readonly mode?: "lagged-follow" | AnimationAdventureCameraViewMode;
+  readonly mode?: "lagged-follow" | "cinematic-follow" | AnimationAdventureCameraViewMode;
   readonly viewMode?: AnimationAdventureCameraViewMode;
   readonly availableViewModes?: readonly AnimationAdventureCameraViewMode[];
   readonly cubicBezier?: readonly [number, number, number, number] | readonly number[];
@@ -200,6 +202,12 @@ export interface AnimationAdventureCamera {
     readonly activeOnly?: boolean;
     readonly returnMs?: number;
   };
+  readonly shoulderOffset?: AnimationAdventureVector3;
+  readonly velocityLookAheadMs?: number;
+  readonly yawSmoothingMs?: number;
+  readonly pitchSmoothingMs?: number;
+  readonly deadZoneRadius?: number;
+  readonly maxLagDistance?: number;
 }
 
 export interface AnimationAdventurePropLayout {
@@ -212,6 +220,8 @@ export interface AnimationAdventurePropLayout {
 }
 
 export interface AnimationAdventureConfig {
+  readonly renderMode?: "canvas-2d" | "webgpu-pbr";
+  readonly motionPolicy?: "legacy-compatible" | "root-motion-required";
   readonly modelUrl?: string | URL;
   readonly clips?: readonly AnimationAdventureClipRef[];
   readonly clipRefs?: readonly AnimationAdventureClipRef[];
@@ -223,6 +233,21 @@ export interface AnimationAdventureConfig {
     readonly id?: string;
     readonly kind: string;
     readonly position: AnimationAdventureVector3;
+  }[];
+  readonly environmentAssets?: readonly {
+    readonly id: string;
+    readonly kind: string;
+    readonly url: string | URL;
+    readonly textureRequired?: boolean;
+    readonly normalTextureRequired?: boolean;
+    readonly groundLocked?: boolean;
+  }[];
+  readonly environmentInstances?: readonly {
+    readonly id: string;
+    readonly assetId: string;
+    readonly position: AnimationAdventureVector3;
+    readonly rotation?: AnimationAdventureVector3;
+    readonly scale?: AnimationAdventureVector3;
   }[];
 }
 
@@ -428,10 +453,15 @@ export interface MountGpuProductStudioResult {
 export interface MountGpuAnimationAdventureResult {
   readonly state: Readonly<{
     demoMode: "animation-adventure";
+    renderMode: "canvas-2d" | "webgpu-pbr";
+    professionalMode: boolean;
     modelUrl?: string | URL;
     modelLoaded: boolean;
     modelRenderable: boolean;
     fallbackProxyActive: boolean;
+    textureCount: number;
+    webGpuActive: boolean;
+    texturedSkinnedRenderingActive: boolean;
     skinnedJointCount: number;
     skinnedVertexCount: number;
     activeClipRenderable: boolean;
@@ -439,6 +469,7 @@ export interface MountGpuAnimationAdventureResult {
     clipIds: readonly string[];
     propSeed?: number;
     propCount: number;
+    environmentAssetCount: number;
     cameraModesEnabled: boolean;
     camera: AnimationAdventureCamera;
     movementValidation: {
@@ -468,6 +499,7 @@ export const showcaseDemoModes: readonly ShowcaseDemoMode[];
 export const GPU_SHOWCASE_REALISTIC_MODELS_FEATURE: "gpu_showcase_realistic_models_v1";
 export const GPU_SHOWCASE_PRODUCT_STUDIO_FEATURE: "gpu_showcase_product_studio_wavefront_v1";
 export const GPU_SHOWCASE_ANIMATION_ADVENTURE_FEATURE: "gpu-demo.animation-adventure.enabled";
+export const GPU_SHOWCASE_PROFESSIONAL_ANIMATION_ADVENTURE_FEATURE: "gpu-demo.animation-adventure.professional.enabled";
 export const GPU_SHOWCASE_CAMERA_MODES_FEATURE: "gpu-demo.camera-modes.enabled";
 
 export function resolveShowcaseAssetUrl(

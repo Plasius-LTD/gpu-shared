@@ -167,6 +167,16 @@ root-authored or calibrated stride distance, stationary beats reject unexpected
 root drift, and invalid manifests throw a beat/clip-specific movement
 validation error instead of silently forcing route movement.
 
+Professional Animation Adventure mode is controlled by
+`gpu-demo.animation-adventure.professional.enabled` or by a manifest with
+`renderMode: "webgpu-pbr"` and `motionPolicy: "root-motion-required"`. In this
+mode, `gpu-shared` loads Peasant Girl, root-motion clips, and textured
+environment GLBs, then mounts `@plasius/gpu-renderer` through
+`createProfessionalAnimatedSceneRenderer`. Generated 2D farm props are not used
+in the professional primary path; deterministic placement comes from
+`environmentAssets` plus `environmentInstances`. Travel and jump beats reject
+calibrated in-place clips and require authored root translation.
+
 Camera modes are a separate rollout surface controlled by
 `gpu-demo.camera-modes.enabled`. With the flag enabled, the
 `animationAdventure.camera` object may request `viewMode: "editor"`,

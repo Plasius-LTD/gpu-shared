@@ -8,6 +8,7 @@ import {
   GPU_SHOWCASE_REALISTIC_MODELS_FEATURE,
   GPU_SHOWCASE_ANIMATION_ADVENTURE_FEATURE,
   GPU_SHOWCASE_CAMERA_MODES_FEATURE,
+  GPU_SHOWCASE_PROFESSIONAL_ANIMATION_ADVENTURE_FEATURE,
   buildProductStudioSceneObjects,
   createAnimationAdventureProps,
   createGpuSharedTranslator,
@@ -48,6 +49,10 @@ test("public API exports the shared showcase entrypoints", () => {
     GPU_SHOWCASE_CAMERA_MODES_FEATURE,
     "gpu-demo.camera-modes.enabled"
   );
+  assert.equal(
+    GPU_SHOWCASE_PROFESSIONAL_ANIMATION_ADVENTURE_FEATURE,
+    "gpu-demo.animation-adventure.professional.enabled"
+  );
 });
 
 test("public types declare an animation adventure result without shipModel", () => {
@@ -66,6 +71,9 @@ test("public types declare an animation adventure result without shipModel", () 
   assert.match(declaration, /readonly viewMode\?: AnimationAdventureCameraViewMode/u);
   assert.match(declaration, /readonly availableViewModes\?: readonly AnimationAdventureCameraViewMode\[\]/u);
   assert.match(declaration, /cameraModesEnabled: boolean/u);
+  assert.match(declaration, /professionalMode: boolean/u);
+  assert.match(declaration, /renderMode: "canvas-2d" \| "webgpu-pbr"/u);
+  assert.match(declaration, /environmentAssetCount: number/u);
   assert.match(declaration, /setCameraViewMode\(viewMode: AnimationAdventureCameraViewMode\): void/u);
   assert.doesNotMatch(
     declaration.match(/interface MountGpuAnimationAdventureResult \{[\s\S]*?\n\}/u)?.[0] ?? "",
