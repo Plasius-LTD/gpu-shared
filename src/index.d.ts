@@ -384,6 +384,7 @@ export interface MountGpuShowcaseOptions {
   tileSize?: number;
   samplesPerPixel?: number;
   denoise?: boolean;
+  presentationOutput?: "tone-mapped" | "linear";
   lightingPreset?: string;
   lightingIntensity?: number;
   createState?: () => unknown;

@@ -171,6 +171,7 @@ test("mountGpuProductStudio loads the model and delegates mesh BVH renderer inpu
   const featureFlags = {
     enabled: {
       "renderer.transport.strictPhysicalLowSppLighting": true,
+      "renderer.transport.sourceStableDirectLighting.enabled": true,
       "renderer.transport.stableSampleRouting.enabled": true,
       "renderer.transport.strictZeroOverflow.enabled": false,
       "renderer.transport.deferLowSppRussianRoulette.enabled": true,
@@ -186,6 +187,7 @@ test("mountGpuProductStudio loads the model and delegates mesh BVH renderer inpu
       productAssetUrl: "/data/model.gltf",
       lightingPreset: "product-studio",
       lightingIntensity: 1.15,
+      presentationOutput: "linear",
       __modelLoader: async (url) => {
         assert.equal(url, "/data/model.gltf");
         return createModelFixture();
@@ -245,10 +247,12 @@ test("mountGpuProductStudio loads the model and delegates mesh BVH renderer inpu
   assert.equal(rendererOptions.width, 640);
   assert.equal(rendererOptions.height, 360);
   assert.equal(rendererOptions.displayQuality, true);
+  assert.equal(rendererOptions.presentationOutput, "linear");
   assert.equal(rendererOptions.meshes.length, result.meshes.length);
   assert.equal(Object.hasOwn(rendererOptions, "sceneObjects"), false);
   assert.equal(rendererOptions.featureFlags, featureFlags);
   assert.equal(rendererOptions.featureFlags.enabled["renderer.transport.stableSampleRouting.enabled"], true);
+  assert.equal(rendererOptions.featureFlags.enabled["renderer.transport.sourceStableDirectLighting.enabled"], true);
   assert.equal(rendererOptions.featureFlags.enabled["renderer.transport.strictZeroOverflow.enabled"], false);
   assert.equal(rendererOptions.featureFlags.enabled["renderer.environment.productStudioImportance.enabled"], true);
   assert.equal(rendererOptions.maxDepth, 2);
