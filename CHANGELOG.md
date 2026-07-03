@@ -42,6 +42,10 @@ All notable changes to this project will be documented in this file.
   - Changed Animation Adventure mounting to pass validated beat durations and
     clip movement profiles to `@plasius/gpu-renderer`, and to reject invalid
     manifests before playback starts.
+  - Updated the optional `@plasius/gpu-renderer` peer range for the Product
+    Studio transport experiment flag release.
+  - Extended Product Studio regression coverage for forwarding the strict
+    physical low-SPP transport experiment flags into `@plasius/gpu-renderer`.
 
 - **Fixed**
   - (placeholder)
