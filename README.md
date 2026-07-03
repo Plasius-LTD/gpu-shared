@@ -120,6 +120,12 @@ single-frame preview is not dominated by unresolved low-sample reflection
 noise. The Product Studio canvas preserves a 16:9 presentation ratio inside
 flexible host layouts so the rendered product is not stretched by non-16:9
 containers.
+Renderer feature flags passed to `mountGpuShowcase(...)` through
+`featureFlags` are forwarded into the Product Studio wavefront renderer. This
+includes `renderer.transport.strictPhysicalLowSppLighting` plus the independent
+strict-transport experiment booleans used to compare stable sample routing,
+strict zero overflow, deferred low-SPP Russian roulette, deterministic direct
+lighting, Product Studio environment importance, and transport telemetry.
 
 ```js
 import { mountGpuShowcase } from "@plasius/gpu-shared";

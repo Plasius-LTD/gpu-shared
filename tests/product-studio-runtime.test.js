@@ -171,6 +171,12 @@ test("mountGpuProductStudio loads the model and delegates mesh BVH renderer inpu
   const featureFlags = {
     enabled: {
       "renderer.transport.strictPhysicalLowSppLighting": true,
+      "renderer.transport.stableSampleRouting.enabled": true,
+      "renderer.transport.strictZeroOverflow.enabled": false,
+      "renderer.transport.deferLowSppRussianRoulette.enabled": true,
+      "renderer.transport.deterministicDirectLighting.enabled": false,
+      "renderer.environment.productStudioImportance.enabled": true,
+      "renderer.diagnostics.productTransportTelemetry.enabled": true,
     },
   };
   const result = await mountGpuProductStudio(
@@ -242,6 +248,9 @@ test("mountGpuProductStudio loads the model and delegates mesh BVH renderer inpu
   assert.equal(rendererOptions.meshes.length, result.meshes.length);
   assert.equal(Object.hasOwn(rendererOptions, "sceneObjects"), false);
   assert.equal(rendererOptions.featureFlags, featureFlags);
+  assert.equal(rendererOptions.featureFlags.enabled["renderer.transport.stableSampleRouting.enabled"], true);
+  assert.equal(rendererOptions.featureFlags.enabled["renderer.transport.strictZeroOverflow.enabled"], false);
+  assert.equal(rendererOptions.featureFlags.enabled["renderer.environment.productStudioImportance.enabled"], true);
   assert.equal(rendererOptions.maxDepth, 2);
   assert.equal(rendererOptions.samplesPerPixel, 8);
   assert.equal(result.state.rendererStats.samplesPerPixel, 8);
