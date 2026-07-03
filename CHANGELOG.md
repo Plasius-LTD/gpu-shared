@@ -8,7 +8,8 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Changed**
-  - (placeholder)
+  - Forwarded Product Studio `presentationOutput` into `@plasius/gpu-renderer`
+    for source-stable lighting validation captures.
 
 - **Fixed**
   - (placeholder)
