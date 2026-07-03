@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.0.11] - 2026-07-03
+
+- **Added**
   - Added professional Animation Adventure orchestration behind
     `gpu-demo.animation-adventure.professional.enabled`, including
     `webgpu-pbr`/`root-motion-required` manifest support, environment GLB asset
@@ -512,3 +526,4 @@ All notable changes to this project will be documented in this file.
 [1.0.8]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.8
 [1.0.9]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.9
 [1.0.10]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.10
+[1.0.11]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.11
