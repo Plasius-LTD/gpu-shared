@@ -172,12 +172,13 @@ function distance3(a = [0, 0, 0], b = [0, 0, 0]) {
   );
 }
 
-function movementDistancePerLoop(profile = {}) {
-  const rootDistance = Number(profile.rootTranslationDistance ?? profile.rootTranslation?.distance ?? 0);
+function movementDistancePerLoop(profile) {
+  const movementProfile = profile ?? {};
+  const rootDistance = Number(movementProfile.rootTranslationDistance ?? movementProfile.rootTranslation?.distance ?? 0);
   if (Number.isFinite(rootDistance) && rootDistance > 0) {
     return rootDistance;
   }
-  const strideLength = Number(profile.strideLength ?? profile.strideLengthMeters ?? 0);
+  const strideLength = Number(movementProfile.strideLength ?? movementProfile.strideLengthMeters ?? 0);
   return Number.isFinite(strideLength) && strideLength > 0 ? strideLength : 0;
 }
 
