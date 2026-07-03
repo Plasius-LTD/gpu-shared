@@ -1,4 +1,7 @@
-import { GPU_SHOWCASE_CAMERA_MODES_FEATURE } from "./feature-flags.js";
+import {
+  GPU_SHOWCASE_CAMERA_MODES_FEATURE,
+  GPU_SHOWCASE_PROFESSIONAL_ANIMATION_ADVENTURE_FEATURE,
+} from "./feature-flags.js";
 
 const STYLE_ID = "plasius-animation-adventure-style";
 const DEFAULT_WIDTH = 960;
@@ -63,6 +66,26 @@ function normalizeAdventureCamera(camera, featureFlags) {
       activeOnly: true,
     },
   };
+}
+
+function normalizeProfessionalCamera(camera) {
+  return {
+    mode: "cinematic-follow",
+    offset: [-0.9, 2.2, 4.8],
+    shoulderOffset: [-0.9, 2.2, 4.8],
+    velocityLookAheadMs: 420,
+    yawSmoothingMs: 180,
+    pitchSmoothingMs: 240,
+    deadZoneRadius: 0.4,
+    maxLagDistance: 2.8,
+    ...(camera ?? {}),
+  };
+}
+
+function isProfessionalAdventureMode(adventure, featureFlags) {
+  return adventure.renderMode === "webgpu-pbr"
+    || adventure.motionPolicy === "root-motion-required"
+    || isFeatureEnabled(featureFlags, GPU_SHOWCASE_PROFESSIONAL_ANIMATION_ADVENTURE_FEATURE);
 }
 
 function createPrng(seed) {
@@ -183,6 +206,9 @@ function movementDistancePerLoop(profile) {
 }
 
 function movementRequirementType(requirement, beat) {
+  if (requirement?.kind) {
+    return requirement.kind;
+  }
   if (requirement?.type) {
     return requirement.type;
   }
@@ -195,7 +221,8 @@ function movementRequirementType(requirement, beat) {
   return beat?.pathPointId ? "travel" : "stationary";
 }
 
-function validateMovementProfiles({ clips, beats, route }) {
+function validateMovementProfiles({ clips, beats, route, motionPolicy }) {
+  const rootMotionRequired = motionPolicy === "root-motion-required";
   const profiles = new Map(clips.map((clip) => [clip.id, clip.movementProfile ?? null]));
   const routePoints = new Map(route.map((point) => [point.id, point]));
   const errors = [];
@@ -210,7 +237,7 @@ function validateMovementProfiles({ clips, beats, route }) {
     const targetPoint = beat.pathPointId ? routePoints.get(beat.pathPointId) : null;
     const targetPosition = targetPoint?.position ? [...targetPoint.position] : [...currentPosition];
     const movesThroughWorld = type === "travel" || type === "jump" || type === "root-authored";
-    const distance = Number(requirement?.distance ?? (movesThroughWorld ? distance3(currentPosition, targetPosition) : 0));
+    const distance = Number(requirement?.distanceMeters ?? requirement?.distance ?? (movesThroughWorld ? distance3(currentPosition, targetPosition) : 0));
     const distancePerLoop = movementDistancePerLoop(profile);
     const durationMs = Math.max(1, Number(profile?.durationMs ?? beat.durationMs ?? 1));
     const loops = movesThroughWorld && distancePerLoop > 0 ? Math.max(1, Math.ceil(distance / distancePerLoop)) : 1;
@@ -251,6 +278,22 @@ function validateMovementProfiles({ clips, beats, route }) {
         expectedDistance: distance,
         actualDistance: 0,
         reason: `beat '${beat.id}' requires ${type} movement but clip '${beat.clipId}' has no root or calibrated stride distance`,
+      });
+    } else if (movesThroughWorld && rootMotionRequired && profile.motionMode !== "root-authored" && profile.motionMode !== "jump") {
+      errors.push({
+        beatId: beat.id,
+        clipId: beat.clipId,
+        expectedDistance: distance,
+        actualDistance: distancePerLoop,
+        reason: `beat '${beat.id}' requires authored root motion but clip '${beat.clipId}' is ${profile.motionMode}`,
+      });
+    } else if (movesThroughWorld && rootMotionRequired && Number(profile.rootTranslationDistance ?? 0) <= 0) {
+      errors.push({
+        beatId: beat.id,
+        clipId: beat.clipId,
+        expectedDistance: distance,
+        actualDistance: 0,
+        reason: `beat '${beat.id}' requires authored root motion but clip '${beat.clipId}' has no root translation`,
       });
     } else if (!movesThroughWorld && profile.worldDisplacementAllowed === true && (profile.rootTranslationDistance ?? 0) > (requirement?.maxDrift ?? 0.05)) {
       errors.push({
@@ -314,6 +357,7 @@ export async function mountGpuAnimationAdventure(options = {}, featureFlags = op
   }
   const document = root.ownerDocument;
   const adventure = options.animationAdventure ?? {};
+  const professionalMode = isProfessionalAdventureMode(adventure, featureFlags);
   installStyle(document);
 
   const previousHtml = root.innerHTML;
@@ -327,16 +371,21 @@ export async function mountGpuAnimationAdventure(options = {}, featureFlags = op
   root.appendChild(canvas);
 
   const clips = [...(adventure.clips ?? adventure.clipRefs ?? [])];
-  const [modelAsset, clipAssets, rendererModule] = await Promise.all([
+  const environmentAssets = [...(adventure.environmentAssets ?? [])];
+  const [modelAsset, clipAssets, environmentAssetBuffers, rendererModule] = await Promise.all([
     loadBinaryAsset(adventure.modelUrl, options.__modelAssetLoader),
     Promise.all(clips.map((clip) => loadBinaryAsset(clip.url ?? clip.clipUrl, options.__clipAssetLoader))),
+    Promise.all(environmentAssets.map((asset) => loadBinaryAsset(asset.url, options.__environmentAssetLoader ?? options.__modelAssetLoader))),
     (typeof options.__rendererLoader === "function"
       ? options.__rendererLoader()
       : import("@plasius/gpu-renderer")),
   ]);
 
-  if (typeof rendererModule.createAnimatedSceneRenderer !== "function") {
+  if (!professionalMode && typeof rendererModule.createAnimatedSceneRenderer !== "function") {
     throw new Error("renderer loader must provide createAnimatedSceneRenderer.");
+  }
+  if (professionalMode && typeof rendererModule.createProfessionalAnimatedSceneRenderer !== "function") {
+    throw new Error("renderer loader must provide createProfessionalAnimatedSceneRenderer for professional animation adventure.");
   }
 
   const route = adventure.route ?? [];
@@ -344,6 +393,7 @@ export async function mountGpuAnimationAdventure(options = {}, featureFlags = op
     clips,
     beats: adventure.beats ?? [],
     route,
+    motionPolicy: professionalMode ? "root-motion-required" : adventure.motionPolicy,
   });
   if (movementValidation.status !== "passed") {
     const firstError = movementValidation.errors[0];
@@ -351,13 +401,19 @@ export async function mountGpuAnimationAdventure(options = {}, featureFlags = op
       `Animation adventure movement validation failed for beat '${firstError?.beatId ?? "unknown"}' clip '${firstError?.clipId ?? "unknown"}': ${firstError?.reason ?? "unknown movement mismatch"}`,
     );
   }
-  const props = adventure.generatedProps ?? createAnimationAdventureProps({
-    ...(adventure.props ?? {}),
-    route,
-  });
-  const camera = normalizeAdventureCamera(adventure.camera, featureFlags);
-  const renderer = rendererModule.createAnimatedSceneRenderer({
+  const props = professionalMode
+    ? []
+    : adventure.generatedProps ?? createAnimationAdventureProps({
+        ...(adventure.props ?? {}),
+        route,
+      });
+  const camera = professionalMode
+    ? normalizeProfessionalCamera(adventure.camera)
+    : normalizeAdventureCamera(adventure.camera, featureFlags);
+  const rendererOptions = {
     canvas,
+    navigator: options.navigator,
+    document,
     route,
     beats: movementValidation.beats,
     props,
@@ -372,8 +428,15 @@ export async function mountGpuAnimationAdventure(options = {}, featureFlags = op
       ...adventure,
       beats: movementValidation.beats,
       movementValidation,
+      environmentAssets: environmentAssets.map((asset, index) => ({
+        ...asset,
+        asset: environmentAssetBuffers[index] ?? null,
+      })),
     },
-  });
+  };
+  const renderer = professionalMode
+    ? await rendererModule.createProfessionalAnimatedSceneRenderer(rendererOptions)
+    : rendererModule.createAnimatedSceneRenderer(rendererOptions);
   renderer.resize(canvas.width, canvas.height, 1);
   renderer.start();
   const rendererSnapshot = renderer.getSnapshot();
@@ -382,17 +445,23 @@ export async function mountGpuAnimationAdventure(options = {}, featureFlags = op
     canvas,
     state: {
       demoMode: "animation-adventure",
+      renderMode: professionalMode ? "webgpu-pbr" : (adventure.renderMode ?? "canvas-2d"),
+      professionalMode,
       modelUrl: adventure.modelUrl,
       modelLoaded: modelAsset !== null,
       modelRenderable: rendererSnapshot.modelRenderable === true,
       fallbackProxyActive: rendererSnapshot.fallbackProxyActive === true,
+      textureCount: rendererSnapshot.textureCount ?? 0,
+      webGpuActive: rendererSnapshot.webGpuActive === true,
+      texturedSkinnedRenderingActive: rendererSnapshot.texturedSkinnedRenderingActive === true,
       skinnedJointCount: rendererSnapshot.skinnedJointCount ?? 0,
       skinnedVertexCount: rendererSnapshot.skinnedVertexCount ?? 0,
       activeClipRenderable: rendererSnapshot.activeClipRenderable === true,
       loadedClipCount: clipAssets.filter(Boolean).length,
       clipIds: clips.map((clip) => clip.id),
       propSeed: adventure.props?.seed,
-      propCount: props.length,
+      propCount: professionalMode ? (adventure.environmentInstances?.length ?? 0) : props.length,
+      environmentAssetCount: environmentAssets.length,
       cameraModesEnabled: isFeatureEnabled(featureFlags, GPU_SHOWCASE_CAMERA_MODES_FEATURE),
       camera,
       movementValidation: {
