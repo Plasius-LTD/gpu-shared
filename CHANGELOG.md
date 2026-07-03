@@ -11,7 +11,9 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Fixed**
-  - (placeholder)
+  - Fixed Animation Adventure movement validation so missing or null
+    `movementProfile` metadata fails validation instead of throwing a
+    `rootTranslationDistance` TypeError under task `#81`.
 
 - **Security**
   - (placeholder)

@@ -242,6 +242,53 @@ test("mountGpuAnimationAdventure blocks travel beats without movement-capable cl
   );
 });
 
+test("mountGpuAnimationAdventure reports missing movement profiles without throwing a TypeError", async () => {
+  const { root } = createFakeDocument();
+
+  await assert.rejects(
+    mountGpuAnimationAdventure({
+      root,
+      animationAdventure: {
+        modelUrl: "/models/peasant-girl.glb",
+        clips: [
+          {
+            id: "female-basic-locomotion-walking",
+            url: "/clips/walk.glb",
+            movementProfile: null,
+          },
+        ],
+        route: [
+          { id: "gate", position: [0, 0, 0], arriveMs: 0 },
+          { id: "crop-row", position: [3, 0, 0], arriveMs: 3000 },
+        ],
+        beats: [
+          {
+            id: "bad-walk",
+            order: 0,
+            kind: "locomotion",
+            clipId: "female-basic-locomotion-walking",
+            durationMs: 3000,
+            pathPointId: "crop-row",
+            movementRequirement: { type: "travel", distance: 3, speedRange: [0.8, 1.2] },
+          },
+        ],
+      },
+      __modelAssetLoader: async () => new ArrayBuffer(4),
+      __clipAssetLoader: async () => new ArrayBuffer(2),
+      __rendererLoader: async () => ({
+        createAnimatedSceneRenderer() {
+          throw new Error("renderer should not mount after failed movement validation");
+        },
+      }),
+    }),
+    error => {
+      assert.match(String(error), /movement validation failed.*missing a movementProfile/u);
+      assert.doesNotMatch(String(error), /rootTranslationDistance|Cannot read properties/u);
+      return true;
+    },
+  );
+});
+
 test("mountGpuAnimationAdventure passes enabled camera modes through to gpu-renderer", async () => {
   const { root } = createFakeDocument();
   let rendererOptions = null;
