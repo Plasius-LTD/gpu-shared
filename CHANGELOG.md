@@ -8,7 +8,10 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Changed**
-  - (placeholder)
+  - Forward Product Studio deterministic low-SPP indirect transport flags and
+    renderer contribution diagnostics for `@plasius/gpu-renderer` validation.
+  - Updated the optional `@plasius/gpu-renderer` peer range for the
+    deterministic low-SPP indirect transport release.
 
 - **Fixed**
   - (placeholder)

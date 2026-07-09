@@ -125,7 +125,11 @@ Renderer feature flags passed to `mountGpuShowcase(...)` through
 includes `renderer.transport.strictPhysicalLowSppLighting` plus the independent
 strict-transport experiment booleans used to compare stable sample routing,
 strict zero overflow, deferred low-SPP Russian roulette, deterministic direct
-lighting, Product Studio environment importance, and transport telemetry.
+lighting, deterministic low-SPP indirect transport, Product Studio environment
+importance, and transport telemetry. Renderer frame stats are preserved on the
+returned Product Studio state, including direct, cached-indirect, residual, zero
+termination, and deterministic checksum diagnostics when the renderer reports
+them.
 Product Studio also forwards `presentationOutput: "tone-mapped" | "linear"` to
 the renderer so validation hosts can compare the default tone-mapped
 presentation with a linear presented output.
