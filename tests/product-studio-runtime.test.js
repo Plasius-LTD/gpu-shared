@@ -172,6 +172,7 @@ test("mountGpuProductStudio loads the model and delegates mesh BVH renderer inpu
     enabled: {
       "renderer.transport.strictPhysicalLowSppLighting": true,
       "renderer.transport.sourceStableDirectLighting.enabled": true,
+      "renderer.transport.deterministicLowSppIndirect.enabled": true,
       "renderer.transport.stableSampleRouting.enabled": true,
       "renderer.transport.strictZeroOverflow.enabled": false,
       "renderer.transport.deferLowSppRussianRoulette.enabled": true,
@@ -224,6 +225,13 @@ test("mountGpuProductStudio loads the model and delegates mesh BVH renderer inpu
                 samplesPerPixel: options.samplesPerPixel,
                 screenRays: options.width * options.height,
                 primaryRays: options.width * options.height * options.samplesPerPixel,
+                transportContributions: {
+                  directExplicitLuminance: 0.42,
+                  cachedIndirectLuminance: 0.31,
+                  stochasticResidualLuminance: 0.03,
+                  zeroTerminationCount: 128,
+                  deterministicChecksum: 123456,
+                },
               };
             },
             destroy() {
@@ -253,11 +261,19 @@ test("mountGpuProductStudio loads the model and delegates mesh BVH renderer inpu
   assert.equal(rendererOptions.featureFlags, featureFlags);
   assert.equal(rendererOptions.featureFlags.enabled["renderer.transport.stableSampleRouting.enabled"], true);
   assert.equal(rendererOptions.featureFlags.enabled["renderer.transport.sourceStableDirectLighting.enabled"], true);
+  assert.equal(rendererOptions.featureFlags.enabled["renderer.transport.deterministicLowSppIndirect.enabled"], true);
   assert.equal(rendererOptions.featureFlags.enabled["renderer.transport.strictZeroOverflow.enabled"], false);
   assert.equal(rendererOptions.featureFlags.enabled["renderer.environment.productStudioImportance.enabled"], true);
   assert.equal(rendererOptions.maxDepth, 2);
   assert.equal(rendererOptions.samplesPerPixel, 8);
   assert.equal(result.state.rendererStats.samplesPerPixel, 8);
+  assert.deepEqual(result.state.rendererStats.transportContributions, {
+    directExplicitLuminance: 0.42,
+    cachedIndirectLuminance: 0.31,
+    stochasticResidualLuminance: 0.03,
+    zeroTerminationCount: 128,
+    deterministicChecksum: 123456,
+  });
   assert.equal(result.state.rendererStats.screenRays, 640 * 360);
   assert.equal(result.state.rendererStats.primaryRays, 640 * 360 * 8);
   assert.equal(result.productModel, result.model);
