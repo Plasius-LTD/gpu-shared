@@ -8,6 +8,20 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.0.12] - 2026-07-09
+
+- **Added**
+  - (placeholder)
+
+- **Changed**
   - Forward Product Studio deterministic low-SPP indirect transport flags and
     renderer contribution diagnostics for `@plasius/gpu-renderer` validation.
   - Updated the optional `@plasius/gpu-renderer` peer range for the
@@ -530,3 +544,4 @@ All notable changes to this project will be documented in this file.
 [1.0.9]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.9
 [1.0.10]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.10
 [1.0.11]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.11
+[1.0.12]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.12
