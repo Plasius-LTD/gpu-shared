@@ -8,7 +8,11 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Changed**
-  - (placeholder)
+  - Refreshed published dependency baselines to the latest stable releases,
+    including `@plasius/gpu-lighting` 0.2.13, `@plasius/gpu-renderer` 0.2.39,
+    `@plasius/translations` 1.0.22, ESLint 10.7.0, `globals` 17.7.0,
+    React 19.2.7, and TypeScript 7.0.2.
+  - Regenerated `package-lock.json` from a clean Node 24 install.
 
 - **Fixed**
   - (placeholder)
