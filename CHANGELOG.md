@@ -8,6 +8,20 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.0.13] - 2026-07-10
+
+- **Added**
+  - (placeholder)
+
+- **Changed**
   - Refreshed published dependency baselines to the latest stable releases,
     including `@plasius/gpu-lighting` 0.2.13, `@plasius/gpu-renderer` 0.2.39,
     `@plasius/translations` 1.0.22, ESLint 10.7.0, `globals` 17.7.0,
@@ -549,3 +563,4 @@ All notable changes to this project will be documented in this file.
 [1.0.10]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.10
 [1.0.11]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.11
 [1.0.12]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.12
+[1.0.13]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.13
