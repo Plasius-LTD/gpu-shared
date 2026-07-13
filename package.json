@@ -59,7 +59,7 @@
   "license": "Apache-2.0",
   "peerDependencies": {
     "@plasius/gpu-renderer": "^0.2.39",
-    "@plasius/translations": "^1.0.22"
+    "@plasius/translations": "^1.0.23"
   },
   "peerDependenciesMeta": {
     "@plasius/gpu-renderer": {
@@ -72,7 +72,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@plasius/gpu-lighting": "^0.2.13",
-    "@plasius/translations": "^1.0.22",
+    "@plasius/translations": "^1.0.23",
     "c8": "^11.0.0",
     "eslint": "^10.7.0",
     "globals": "^17.7.0",
