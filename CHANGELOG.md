@@ -9,6 +9,20 @@ All notable changes to this project will be documented in this file.
 
 - **Changed**
   - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.0.14] - 2026-07-13
+
+- **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
   - Consume the RFC-remediated `@plasius/translations` release (task #97).
 
 - **Fixed**
@@ -565,3 +579,4 @@ All notable changes to this project will be documented in this file.
 [1.0.11]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.11
 [1.0.12]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.12
 [1.0.13]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.13
+[1.0.14]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.14
