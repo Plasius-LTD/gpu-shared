@@ -9,6 +9,7 @@ All notable changes to this project will be documented in this file.
 
 - **Changed**
   - (placeholder)
+  - Consume the RFC-remediated `@plasius/translations` release (task #97).
 
 - **Fixed**
   - (placeholder)
