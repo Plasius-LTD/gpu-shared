@@ -8,12 +8,13 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Changed**
-  - (placeholder)
+  - Refreshed transitive internal-package locks to surviving versions and updated the esbuild resolution to clear the current npm audit finding.
 
 - **Fixed**
   - (placeholder)
 
 - **Security**
+  - Added fail-closed source and npm-package admission for the administrative contributor registry and pinned the CI/CD runtime to Node.js 24.18.0 LTS.
   - (placeholder)
 
 ## [1.0.14] - 2026-07-13
