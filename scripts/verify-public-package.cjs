@@ -16,6 +16,58 @@ function main() {
   const parsed = parseNpmPackJson(output);
   const files = Array.isArray(parsed) && parsed[0]?.files ? parsed[0].files : [];
   const paths = files.map((entry) => entry.path);
+  const requiredPaths = [
+    "dist/feedback-diagnostics.cjs",
+    "dist/feedback-diagnostics.js",
+    "src/feedback-diagnostics.d.ts",
+  ];
+  const missingPaths = requiredPaths.filter(
+    (requiredPath) => !paths.includes(requiredPath)
+  );
+  if (missingPaths.length > 0) {
+    console.error("Public package check failed. Required files are missing:");
+    for (const filePath of missingPaths) {
+      console.error(`- ${filePath}`);
+    }
+    process.exit(1);
+  }
+
+  const packageJson = JSON.parse(
+    fs.readFileSync(path.resolve(process.cwd(), "package.json"), "utf8")
+  );
+  const expectedDiagnosticsExport = {
+    types: "./src/feedback-diagnostics.d.ts",
+    import: "./dist/feedback-diagnostics.js",
+    require: "./dist/feedback-diagnostics.cjs",
+  };
+  if (
+    JSON.stringify(packageJson.exports?.["./feedback-diagnostics"]) !==
+    JSON.stringify(expectedDiagnosticsExport)
+  ) {
+    console.error(
+      "Public package check failed. Export ./feedback-diagnostics is incorrect."
+    );
+    process.exit(1);
+  }
+
+  const focusedDiagnosticsCjsPath = path.resolve(
+    process.cwd(),
+    "dist/feedback-diagnostics.cjs"
+  );
+  const focusedDiagnosticsCjs = fs.readFileSync(
+    focusedDiagnosticsCjsPath,
+    "utf8"
+  );
+  assertSafeFocusedBundle("CommonJS", [focusedDiagnosticsCjs]);
+
+  const focusedDiagnosticsEsmPath = path.resolve(
+    process.cwd(),
+    "dist/feedback-diagnostics.js"
+  );
+  assertSafeFocusedBundle(
+    "ES module",
+    collectLocalEsmGraph(focusedDiagnosticsEsmPath)
+  );
 
   const forbiddenTarballPathPatterns = [
     {
@@ -167,6 +219,60 @@ function collectFiles(root, extensions) {
   }
 
   return files;
+}
+
+function collectLocalEsmGraph(entryPath) {
+  const distRoot = path.resolve(process.cwd(), "dist");
+  const pending = [entryPath];
+  const visited = new Set();
+  const sources = [];
+  const localImportPattern =
+    /\b(?:import|export)\s+(?:[^"'`]*?\s+from\s+)?["'](\.\/[^"'`]+\.js)["']/gu;
+
+  while (pending.length > 0) {
+    const currentPath = path.resolve(pending.pop());
+    if (visited.has(currentPath)) {
+      continue;
+    }
+    if (
+      currentPath !== distRoot &&
+      !currentPath.startsWith(`${distRoot}${path.sep}`)
+    ) {
+      throw new Error("Focused diagnostics ES module escaped dist.");
+    }
+
+    visited.add(currentPath);
+    const source = fs.readFileSync(currentPath, "utf8");
+    sources.push(source);
+
+    for (const match of source.matchAll(localImportPattern)) {
+      pending.push(path.resolve(path.dirname(currentPath), match[1]));
+    }
+  }
+
+  return sources;
+}
+
+function assertSafeFocusedBundle(label, sources) {
+  const totalBytes = sources.reduce(
+    (total, source) => total + Buffer.byteLength(source, "utf8"),
+    0
+  );
+  if (totalBytes > 32 * 1024) {
+    console.error(
+      `Public package check failed. Focused diagnostics ${label} bundle exceeds 32 KiB.`
+    );
+    process.exit(1);
+  }
+
+  const unsafePrimitive =
+    /\b(?:fetch|XMLHttpRequest|WebSocket|sendBeacon|localStorage|sessionStorage|indexedDB|console|HTMLCanvasElement|OffscreenCanvas|ImageData|MediaStream|getImageData|toDataURL|toBlob)\b/u;
+  if (sources.some((source) => unsafePrimitive.test(source))) {
+    console.error(
+      `Public package check failed. Focused diagnostics ${label} bundle contains a capture or transport primitive.`
+    );
+    process.exit(1);
+  }
 }
 
 main();

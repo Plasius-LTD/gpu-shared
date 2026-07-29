@@ -22,6 +22,11 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
+    "./feedback-diagnostics": {
+      "types": "./src/feedback-diagnostics.d.ts",
+      "import": "./dist/feedback-diagnostics.js",
+      "require": "./dist/feedback-diagnostics.cjs"
+    },
     "./assets/brigantine.gltf": "./assets/brigantine.gltf",
     "./assets/cutter.gltf": "./assets/cutter.gltf",
     "./assets/lighthouse.gltf": "./assets/lighthouse.gltf",
@@ -34,7 +39,7 @@
     "demo": "python3 -m http.server --directory ..",
     "demo:example": "node demo/example.js",
     "generate:assets": "node scripts/generate-showcase-assets.mjs",
-    "typecheck": "node --check src/index.js && node --check src/showcase-runtime.js && node --check src/gltf-loader.js && node --check src/product-studio-runtime.js && node --check src/animation-adventure-runtime.js && node --check demo/main.js",
+    "typecheck": "node --check src/index.js && node --check src/feedback-diagnostics.js && node --check src/showcase-runtime.js && node --check src/gltf-loader.js && node --check src/product-studio-runtime.js && node --check src/animation-adventure-runtime.js && node --check demo/main.js && tsc -p tsconfig.types.json",
     "audit:eslint": "eslint . --max-warnings=0",
     "audit:deps": "npm ls --all --omit=optional --omit=peer > /dev/null 2>&1 || true",
     "audit:npm": "npm audit --audit-level=high --omit=dev",

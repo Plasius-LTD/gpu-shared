@@ -1,3 +1,5 @@
+export * from "./feedback-diagnostics.js";
+
 export interface GltfModelColor {
   readonly r: number;
   readonly g: number;
