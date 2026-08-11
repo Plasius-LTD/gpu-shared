@@ -26,6 +26,8 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Security**
+  - Updated the development-tool dependency graph to the patched
+    `brace-expansion` release after the feedback release audit.
   - Reject unknown diagnostic fields, unregistered `/player-system` evidence,
     provenance mismatches, exact values and unbounded counters so pixels,
     identity-bearing runtime data and device fingerprints cannot enter the
