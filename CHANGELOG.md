@@ -5,10 +5,14 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - **Added**
-  - (placeholder)
+  - Added bounded, independently validated PVOX Product Studio loading with a
+    dynamically loaded voxel package and a disposable surface-property-grouped
+    renderer compatibility cache.
 
 - **Changed**
   - Refreshed transitive internal-package locks to surviving versions and updated the esbuild resolution to clear the current npm audit finding.
+  - Product Studio now records the immutable source representation and artifact
+    hash and fails closed instead of falling back to GLTF after PVOX selection.
 
 - **Fixed**
   - (placeholder)

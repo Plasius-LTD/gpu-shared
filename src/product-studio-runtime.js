@@ -1,4 +1,5 @@
 import { loadGltfModel } from "./gltf-loader.js";
+import { isPvoxAssetUrl, loadPvoxModel } from "./pvox-loader.js";
 
 const STYLE_ID = "plasius-product-studio-wavefront-style";
 const DEFAULT_PRODUCT_ASSET_URL =
@@ -223,6 +224,7 @@ function createProductStudioMeshFromPrimitive(primitive, primitiveIndex, transfo
   const material = primitive.material ?? {};
   const color = readMaterialColor(material);
   const uvs = Array.isArray(primitive.uvs) ? [...primitive.uvs] : null;
+  const colors = Array.isArray(primitive.colors) ? [...primitive.colors] : null;
 
   return Object.freeze({
     id: 1000 + primitiveIndex,
@@ -230,6 +232,7 @@ function createProductStudioMeshFromPrimitive(primitive, primitiveIndex, transfo
     indices: Object.freeze(indices),
     normals: Array.isArray(primitive.normals) ? Object.freeze([...primitive.normals]) : null,
     uvs: uvs ? Object.freeze(uvs) : null,
+    colors: colors ? Object.freeze(colors) : null,
     material: Object.freeze({ ...material }),
     color: Object.freeze(color),
     emission: Object.freeze(readEmission(material)),
@@ -381,6 +384,8 @@ function installSnapshotHook(state) {
       sourceTriangles: state.sourceTriangleCount,
       meshCount: state.meshCount,
       geometryMode: state.geometryMode,
+      sourceRepresentation: state.sourceRepresentation,
+      compatibilityProjection: state.compatibilityProjection,
       requiresTriangleMeshRenderer: state.requiresTriangleMeshRenderer,
       displayQuality: state.displayQuality,
       requiresMeshBvhForDisplayQuality: state.requiresMeshBvhForDisplayQuality,
@@ -444,7 +449,30 @@ export async function mountGpuProductStudio(options = {}, featureFlags = null) {
       ? options.__rendererLoader
       : () => import("@plasius/gpu-renderer");
   const assetUrl = options.productAssetUrl ?? options.assetUrl ?? DEFAULT_PRODUCT_ASSET_URL;
-  const model = await modelLoader(assetUrl);
+  const requestedRepresentation = options.productAssetRepresentation
+    ?? options.assetRepresentation;
+  if (
+    requestedRepresentation !== undefined
+    && requestedRepresentation !== "gltf"
+    && requestedRepresentation !== "pvox"
+  ) {
+    throw new Error("Product Studio asset representation is unsupported.");
+  }
+  const pvoxAsset = requestedRepresentation === "pvox"
+    || (requestedRepresentation === undefined && isPvoxAssetUrl(assetUrl));
+  const pvoxModelLoader = typeof options.__pvoxModelLoader === "function"
+    ? options.__pvoxModelLoader
+    : loadPvoxModel;
+  const model = pvoxAsset
+    ? await pvoxModelLoader(assetUrl, {
+        expectedArtifactSha256: options.productAssetSha256,
+        name: options.productAssetName,
+        signal: options.signal,
+        fetch: options.__fetch,
+        moduleLoader: options.__voxelLoader,
+        maximumFaces: options.productMaximumSurfaceFaces,
+      })
+    : await modelLoader(assetUrl);
   const meshes = createProductStudioMeshes(model, {
     targetCenter: options.targetCenter,
     targetSize: options.targetSize,
@@ -482,7 +510,12 @@ export async function mountGpuProductStudio(options = {}, featureFlags = null) {
     modelName: model.name,
     sourceTriangleCount: countSourceTriangles(model),
     meshCount: meshes.length,
-    geometryMode: "mesh-bvh-display-quality",
+    sourceRepresentation: model.representation === "pvox" ? "pvox" : "gltf",
+    compatibilityProjection: model.compatibilityProjection ?? null,
+    sourceArtifactSha256: model.sourceArtifactSha256 ?? null,
+    geometryMode: model.representation === "pvox"
+      ? "pvox-derived-surface-cache-display-quality"
+      : "mesh-bvh-display-quality",
     requiresTriangleMeshRenderer: true,
     displayQuality: true,
     requiresMeshBvhForDisplayQuality: true,
