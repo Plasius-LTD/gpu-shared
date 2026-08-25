@@ -71,6 +71,27 @@ await mountGpuShowcase({
 });
 ```
 
+Promoted PVOX assets use the same Product Studio surface and are loaded only
+when the host selects the `pvox` representation supplied by its remotely
+controlled catalog:
+
+```js
+await mountGpuShowcase({
+  root: document.getElementById("app"),
+  demoMode: "product-studio",
+  productAssetUrl: "/api/gpu-demo/assets/pvox-demo/assets/table/hash/model.pvox",
+  productAssetRepresentation: "pvox",
+  productAssetSha256: "<immutable 64-character artifact hash>",
+});
+```
+
+The package dynamically loads optional `@plasius/gpu-model-voxel`, bounds the
+response, validates the complete PVOX artifact against the catalog hash, and
+derives a disposable surface-property-grouped triangle cache for the current
+mesh-BVH Product Studio renderer. PVOX remains the asset of record; this
+compatibility cache is not persisted and is not native PVOX promotion
+evidence. There is no GLTF fallback after a PVOX asset is selected.
+
 ### Showcase Translations
 
 The shared showcase owns its display keys and bundled `en-GB` defaults without
@@ -155,8 +176,9 @@ pages and validation harnesses, the package also re-exports
 `createProductStudioMeshes(...)`.
 
 Install `@plasius/gpu-renderer` alongside `@plasius/gpu-shared` when Product
-Studio or Animation Adventure mode is used. Harbor-only consumers do not need
-the renderer peer.
+Studio or Animation Adventure mode is used. Install optional
+`@plasius/gpu-model-voxel` when Product Studio can receive PVOX catalog rows.
+Harbor-only consumers do not need either peer.
 
 ### Animation Adventure Mode
 
