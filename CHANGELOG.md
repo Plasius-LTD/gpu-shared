@@ -11,7 +11,9 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Fixed**
-  - (placeholder)
+  - Corrected stable/pre-release identity parsing after release metadata lands,
+    and retry the protected merge after checks when repository auto-merge is
+    unavailable.
 
 - **Security**
   - (placeholder)
