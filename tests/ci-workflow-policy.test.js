@@ -94,6 +94,14 @@ test("dependency code cannot run inside the OIDC mutation job", () => {
   assert.match(publishJob, /digest-mismatch: error/u);
   assert.doesNotMatch(publishJob, /npm ci/u);
   assert.doesNotMatch(publishJob, /npm run /u);
+  assert.match(
+    publishJob,
+    /tar -tzf "\$\{TARBALL\}" \| grep -E '\^package\/dist\(\/\|\$\)' >\/dev\/null/u,
+  );
+  assert.doesNotMatch(
+    publishJob,
+    /tar -tzf "\$\{TARBALL\}" \| grep -Eq/u,
+  );
 });
 
 test("release metadata lands through a unique non-force-pushed PR", () => {
