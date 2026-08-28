@@ -16,6 +16,9 @@ All notable changes to this project will be documented in this file.
     unavailable.
   - Moved push-triggered validation from an unavailable self-hosted runner to
     GitHub-hosted Linux so exact-commit release gates can complete.
+  - Made immutable tarball inventory validation consume the complete stream so
+    `pipefail` cannot misclassify a valid `dist` directory after `tar` receives
+    an early-reader SIGPIPE.
 
 - **Security**
   - (placeholder)
