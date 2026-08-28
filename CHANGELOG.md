@@ -21,6 +21,10 @@ All notable changes to this project will be documented in this file.
     an early-reader SIGPIPE.
   - Passed the immutable publication tarball to npm with an explicit local
     `./` path so it cannot be misparsed as a Git dependency shorthand.
+  - Aligned the GitHub-to-npm release boundary with the released
+    `@plasius/schema` template, including pre-mutation privacy checks, sealed
+    inventory revalidation, clean dependency installation, and redacted archive
+    diagnostics.
 
 - **Security**
   - (placeholder)
