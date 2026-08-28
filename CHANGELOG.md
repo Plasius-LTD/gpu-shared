@@ -19,6 +19,8 @@ All notable changes to this project will be documented in this file.
   - Made immutable tarball inventory validation consume the complete stream so
     `pipefail` cannot misclassify a valid `dist` directory after `tar` receives
     an early-reader SIGPIPE.
+  - Passed the immutable publication tarball to npm with an explicit local
+    `./` path so it cannot be misparsed as a Git dependency shorthand.
 
 - **Security**
   - (placeholder)

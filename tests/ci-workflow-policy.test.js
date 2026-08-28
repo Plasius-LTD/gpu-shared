@@ -68,7 +68,8 @@ test("publication uses hosted npm OIDC without a write-token fallback", () => {
   assert.match(cdWorkflow, /environment: production/u);
   assert.match(cdWorkflow, /id-token: write/u);
   assert.match(cdWorkflow, /--provenance/u);
-  assert.match(cdWorkflow, /npm publish/u);
+  assert.match(cdWorkflow, /npm publish "\.\/\$\{TARBALL\}"/u);
+  assert.doesNotMatch(cdWorkflow, /npm publish "\$\{TARBALL\}"/u);
   assert.doesNotMatch(cdWorkflow, /NPM_TOKEN/u);
   assert.doesNotMatch(cdWorkflow, /NODE_AUTH_TOKEN/u);
   assert.doesNotMatch(npmConfig, /_authToken/u);
