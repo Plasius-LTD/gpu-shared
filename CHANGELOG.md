@@ -15,7 +15,8 @@ All notable changes to this project will be documented in this file.
     hash and fails closed instead of falling back to GLTF after PVOX selection.
 
 - **Fixed**
-  - (placeholder)
+  - Prevented the read-only checkout credential from overriding the narrowly
+    scoped release-prep GitHub App token during approved CD branch creation.
 
 - **Security**
   - Replaced token-based npm publication with a two-phase exact-main OIDC workflow, immutable tarball/SBOM hand-off, isolated pull-request validation, and fail-closed integrity checks.
