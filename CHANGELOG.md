@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.1.0] - 2026-08-28
+
+- **Added**
   - Added bounded, independently validated PVOX Product Studio loading with a
     dynamically loaded voxel package and a disposable surface-property-grouped
     renderer compatibility cache.
@@ -587,3 +601,4 @@ All notable changes to this project will be documented in this file.
 [1.0.12]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.12
 [1.0.13]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.13
 [1.0.14]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.14
+[1.1.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.0
