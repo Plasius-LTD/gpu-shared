@@ -106,6 +106,18 @@ test("release metadata lands through a unique non-force-pushed PR", () => {
     releasePrepareWorkflow,
     /BRANCH="release\/\$\{TAG\}-\$\{GITHUB_RUN_ID\}-\$\{GITHUB_RUN_ATTEMPT\}"/u,
   );
+  assert.match(
+    releasePrepareWorkflow,
+    /if gh pr merge "\$\{PR_NUMBER\}" --squash --delete-branch >\/dev\/null 2>&1; then/u,
+  );
+  assert.match(
+    releasePrepareWorkflow,
+    /process\.exit\(1\);\s+\}/u,
+  );
+  assert.doesNotMatch(
+    releasePrepareWorkflow,
+    /process\.exit\(1\);\s+fi/u,
+  );
   assert.doesNotMatch(
     releasePrepareWorkflow,
     /git push origin "HEAD:\$\{BASE_BRANCH\}"/u,
