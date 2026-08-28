@@ -10,7 +10,7 @@ const cdWorkflow = read(".github/workflows/cd.yml");
 const releasePrepareWorkflow = read(".github/workflows/release-prepare.yml");
 const npmConfig = read(".npmrc");
 
-test("pull-request validation admits only same-repository heads", () => {
+test("validation admits only same-repository PR heads and uses available hosted runners", () => {
   assert.match(ciWorkflow, /pull_request:\s*\n\s+branches: \[main\]/u);
   assert.doesNotMatch(ciWorkflow, /pull_request_target:/u);
   assert.match(ciWorkflow, /name: Trusted head admission/u);
@@ -29,12 +29,11 @@ test("pull-request validation admits only same-repository heads", () => {
   );
   assert.equal(
     (
-      ciWorkflow.match(
-        /runs-on: \$\{\{ fromJSON\(github\.event_name == 'pull_request' && '\["ubuntu-latest"\]' \|\| '\["self-hosted","Linux","X64"\]'\) \}\}/gu,
-      ) ?? []
+      ciWorkflow.match(/^ {4}runs-on: ubuntu-latest$/gmu) ?? []
     ).length,
-    2,
+    3,
   );
+  assert.doesNotMatch(ciWorkflow, /self-hosted/u);
 });
 
 test("publication binds a second run to exact main and successful CI", () => {
