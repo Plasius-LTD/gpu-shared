@@ -8,7 +8,8 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Changed**
-  - (placeholder)
+  - Raised the optional `@plasius/gpu-renderer` peer baseline to the first
+    released package carrying immutable Zero-Three evidence.
 
 - **Fixed**
   - Corrected stable/pre-release identity parsing after release metadata lands,
@@ -27,7 +28,10 @@ All notable changes to this project will be documented in this file.
     diagnostics.
 
 - **Security**
-  - (placeholder)
+  - Added permanent fail-closed Zero-Three validation across manifests,
+    dependency graphs, imports, declarations, aliases, bundles, npm tarballs,
+    SBOMs, and active documentation, with immutable CI/CD evidence and no
+    compatibility fallback.
 
 ## [1.1.0] - 2026-08-28
 
