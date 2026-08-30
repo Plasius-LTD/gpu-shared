@@ -68,7 +68,8 @@ test("publication uses hosted npm OIDC without a write-token fallback", () => {
   assert.match(cdWorkflow, /environment: production/u);
   assert.match(cdWorkflow, /id-token: write/u);
   assert.match(cdWorkflow, /--provenance/u);
-  assert.match(cdWorkflow, /npm publish/u);
+  assert.match(cdWorkflow, /npm publish "\.\/\$\{TARBALL\}"/u);
+  assert.doesNotMatch(cdWorkflow, /npm publish "\$\{TARBALL\}"/u);
   assert.doesNotMatch(cdWorkflow, /NPM_TOKEN/u);
   assert.doesNotMatch(cdWorkflow, /NODE_AUTH_TOKEN/u);
   assert.doesNotMatch(npmConfig, /_authToken/u);
@@ -82,10 +83,7 @@ test("dependency code cannot run inside the OIDC mutation job", () => {
   );
   const publishJob = cdWorkflow.slice(cdWorkflow.indexOf("\n  publish:"));
 
-  assert.match(
-    validationJob,
-    /npm ci --no-fund --no-audit --legacy-peer-deps/u,
-  );
+  assert.match(validationJob, /run: npm ci\n/u);
   assert.match(validationJob, /npm pack --ignore-scripts --json/u);
   assert.match(validationJob, /actions\/upload-artifact@v7/u);
   assert.doesNotMatch(validationJob, /environment: production/u);
@@ -102,6 +100,11 @@ test("dependency code cannot run inside the OIDC mutation job", () => {
     publishJob,
     /tar -tzf "\$\{TARBALL\}" \| grep -Eq/u,
   );
+  assert.match(
+    publishJob,
+    /tar -tzf "\$\{TARBALL\}" \| node scripts\/verify-public-package\.cjs --inventory-stdin/u,
+  );
+  assert.doesNotMatch(publishJob, /const prohibited =/u);
 });
 
 test("release metadata lands through a unique non-force-pushed PR", () => {
@@ -131,4 +134,34 @@ test("release metadata lands through a unique non-force-pushed PR", () => {
   );
   assert.doesNotMatch(releasePrepareWorkflow, /--force-with-lease/u);
   assert.doesNotMatch(releasePrepareWorkflow, /secrets: inherit/u);
+});
+
+test("schema-template privacy checks run before install or release mutation", () => {
+  const ciPrivacy = ciWorkflow.indexOf("run: npm run privacy:check");
+  const ciInstall = ciWorkflow.indexOf(
+    "run: npm ci --no-fund --no-audit --legacy-peer-deps",
+  );
+  const ciPackage = ciWorkflow.indexOf("run: npm run pack:check");
+  assert.ok(ciPrivacy >= 0);
+  assert.ok(ciInstall > ciPrivacy);
+  assert.ok(ciPackage > ciInstall);
+
+  const preparePrivacy = releasePrepareWorkflow.indexOf(
+    'npm --prefix "${PACKAGE_DIRECTORY}" run privacy:check',
+  );
+  const prepareVersion = releasePrepareWorkflow.indexOf(
+    'npm version "${TARGET_VER}"',
+  );
+  assert.ok(preparePrivacy >= 0);
+  assert.ok(prepareVersion > preparePrivacy);
+
+  const validationJob = cdWorkflow.slice(
+    cdWorkflow.indexOf("\n  validate_and_pack:"),
+    cdWorkflow.indexOf("\n  publish:"),
+  );
+  assert.ok(validationJob.indexOf("npm run privacy:check") >= 0);
+  assert.ok(
+    validationJob.indexOf("npm ci") >
+      validationJob.indexOf("npm run privacy:check"),
+  );
 });

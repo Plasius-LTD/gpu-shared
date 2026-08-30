@@ -43,6 +43,12 @@ jobs:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
+      - name: Verify private artifact policy
+        run: npm run privacy:check
+
+      - name: Test private artifact policy
+        run: npm run test:privacy
+
       - name: Install deps
         run: npm ci --no-fund --no-audit --legacy-peer-deps
 
@@ -57,6 +63,9 @@ jobs:
 
       - name: Build
         run: npm run build --if-present
+
+      - name: Verify public package contents
+        run: npm run pack:check
 
       - name: Test with coverage
         run: |
