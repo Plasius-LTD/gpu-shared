@@ -1,6 +1,6 @@
 {
   "name": "@plasius/gpu-shared",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "Shared browser-safe demo runtime and asset helpers for the Plasius gpu-* package family.",
   "type": "module",
   "sideEffects": false,
