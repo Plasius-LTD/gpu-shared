@@ -5,9 +5,22 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - **Added**
-  - (placeholder)
+  - Added a consent-required, closed and immutable game-diagnostics contract
+    for the registered generator and GPU demo feedback surfaces, including
+    coarse buckets, safe error codes and public-asset provenance metadata.
+  - Added the focused `@plasius/gpu-shared/feedback-diagnostics` entrypoint so
+    renderer clients do not load showcase or asset-loader modules.
 
 - **Changed**
+  - Correlated each diagnostics surface with its exact provenance and curated
+    asset-set types so invalid cross-surface pairings fail TypeScript checks.
+  - Backed the diagnostics vocabulary, bounds and correlated packet type with
+    `@plasius/schema/feedback-diagnostics-vocabulary`, with runtime-schema
+    parity tests kept outside the browser bundle.
+  - Recorded the protected-CD-published `@plasius/schema ^1.4.0` dependency in
+    the manifest and lock and revalidated diagnostics against the published
+    artifact.
+  - Refreshed transitive internal-package locks to surviving versions and updated the esbuild resolution to clear the current npm audit finding.
   - Raised the optional `@plasius/gpu-renderer` peer baseline to the first
     released package carrying immutable Zero-Three evidence.
 
@@ -50,6 +63,15 @@ All notable changes to this project will be documented in this file.
     scoped release-prep GitHub App token during approved CD branch creation.
 
 - **Security**
+  - Updated the development-tool dependency graph to the patched
+    `brace-expansion` release after the feedback release audit.
+  - Reject unknown diagnostic fields, unregistered `/player-system` evidence,
+    provenance mismatches, exact values and unbounded counters so pixels,
+    identity-bearing runtime data and device fingerprints cannot enter the
+    shared feedback packet.
+  - Snapshot strict data descriptors once, reject accessors, sparse/exotic
+    arrays and proxy failures, and emit only one redacted validation error so
+    time-of-check/time-of-use objects cannot smuggle arbitrary data.
   - Replaced token-based npm publication with a two-phase exact-main OIDC workflow, immutable tarball/SBOM hand-off, isolated pull-request validation, and fail-closed integrity checks.
   - Added fail-closed source and npm-package admission for the administrative contributor registry and pinned the CI/CD runtime to Node.js 24.18.0 LTS.
   - (placeholder)

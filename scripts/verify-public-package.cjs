@@ -35,32 +35,40 @@ function main(argv = process.argv.slice(2)) {
     const files = Array.isArray(parsed) && parsed[0]?.files ? parsed[0].files : [];
     const paths = files.map((entry) => entry.path);
     verifyPackagePathInventory(paths);
+    verifyDiagnosticsPackageContract(paths);
 
-  const forbiddenCodeReferencePatterns = [
-    {
-      label: "private monorepo reference",
-      regex: /\bplasius-ltd-site\b/i,
-    },
-    {
-      label: "Plasius Ltd private reference",
-      regex: /\bplasius(?:\s+|-)ltd\b/i,
-    },
-    {
-      label: "proprietary PGP artifact reference",
-      regex: /\bpgp[-_a-z0-9]*\b/i,
-    },
-    {
-      label: "proprietary Lunari artifact reference",
-      regex: /\blunari\b/i,
-    },
-    {
-      label: "proprietary Pixelverse artifact reference",
-      regex: /\bpixelverse\b/i,
-    },
-  ];
+    const forbiddenCodeReferencePatterns = [
+      {
+        label: "private monorepo reference",
+        regex: /\bplasius-ltd-site\b/i,
+      },
+      {
+        label: "Plasius Ltd private reference",
+        regex: /\bplasius(?:\s+|-)ltd\b/i,
+      },
+      {
+        label: "proprietary PGP artifact reference",
+        regex: /\bpgp[-_a-z0-9]*\b/i,
+      },
+      {
+        label: "proprietary Lunari artifact reference",
+        regex: /\blunari\b/i,
+      },
+      {
+        label: "proprietary Pixelverse artifact reference",
+        regex: /\bpixelverse\b/i,
+      },
+    ];
 
-  const codeRoots = ["src", "tests", "demo"];
-  const codeExtensions = new Set([".ts", ".tsx", ".js", ".mjs", ".cjs", ".json"]);
+    const codeRoots = ["src", "tests", "demo"];
+    const codeExtensions = new Set([
+      ".ts",
+      ".tsx",
+      ".js",
+      ".mjs",
+      ".cjs",
+      ".json",
+    ]);
     const violations = scanCodeReferences(
       codeRoots,
       codeExtensions,
@@ -125,6 +133,54 @@ function verifyPackagePathInventory(paths) {
       `Forbidden publish path metadata was found (${forbiddenCount}); values were not logged.`
     );
   }
+}
+
+function verifyDiagnosticsPackageContract(paths) {
+  const requiredPaths = [
+    "dist/feedback-diagnostics.cjs",
+    "dist/feedback-diagnostics.js",
+    "src/feedback-diagnostics.d.ts",
+  ];
+  const missingPaths = requiredPaths.filter(
+    (requiredPath) => !paths.includes(requiredPath)
+  );
+  if (missingPaths.length > 0) {
+    throw new Error(
+      `Required diagnostics package files are missing (${missingPaths.length}); values were not logged.`
+    );
+  }
+
+  const packageJson = JSON.parse(
+    fs.readFileSync(path.resolve(process.cwd(), "package.json"), "utf8")
+  );
+  const expectedDiagnosticsExport = {
+    types: "./src/feedback-diagnostics.d.ts",
+    import: "./dist/feedback-diagnostics.js",
+    require: "./dist/feedback-diagnostics.cjs",
+  };
+  if (
+    JSON.stringify(packageJson.exports?.["./feedback-diagnostics"]) !==
+    JSON.stringify(expectedDiagnosticsExport)
+  ) {
+    throw new Error("Export ./feedback-diagnostics is incorrect.");
+  }
+
+  const focusedDiagnosticsCjsPath = path.resolve(
+    process.cwd(),
+    "dist/feedback-diagnostics.cjs"
+  );
+  assertSafeFocusedBundle("CommonJS", [
+    fs.readFileSync(focusedDiagnosticsCjsPath, "utf8"),
+  ]);
+
+  const focusedDiagnosticsEsmPath = path.resolve(
+    process.cwd(),
+    "dist/feedback-diagnostics.js"
+  );
+  assertSafeFocusedBundle(
+    "ES module",
+    collectLocalEsmGraph(focusedDiagnosticsEsmPath)
+  );
 }
 
 function normalizePackagePath(candidate) {
@@ -211,6 +267,56 @@ function collectFiles(root, extensions) {
   return files;
 }
 
+function collectLocalEsmGraph(entryPath) {
+  const distRoot = path.resolve(process.cwd(), "dist");
+  const pending = [entryPath];
+  const visited = new Set();
+  const sources = [];
+  const localImportPattern =
+    /\b(?:import|export)\s+(?:[^"'`]*?\s+from\s+)?["'](\.\/[^"'`]+\.js)["']/gu;
+
+  while (pending.length > 0) {
+    const currentPath = path.resolve(pending.pop());
+    if (visited.has(currentPath)) {
+      continue;
+    }
+    if (
+      currentPath !== distRoot &&
+      !currentPath.startsWith(`${distRoot}${path.sep}`)
+    ) {
+      throw new Error("Focused diagnostics ES module escaped dist.");
+    }
+
+    visited.add(currentPath);
+    const source = fs.readFileSync(currentPath, "utf8");
+    sources.push(source);
+
+    for (const match of source.matchAll(localImportPattern)) {
+      pending.push(path.resolve(path.dirname(currentPath), match[1]));
+    }
+  }
+
+  return sources;
+}
+
+function assertSafeFocusedBundle(label, sources) {
+  const totalBytes = sources.reduce(
+    (total, source) => total + Buffer.byteLength(source, "utf8"),
+    0
+  );
+  if (totalBytes > 32 * 1024) {
+    throw new Error(`Focused diagnostics ${label} bundle exceeds 32 KiB.`);
+  }
+
+  const unsafePrimitive =
+    /\b(?:fetch|XMLHttpRequest|WebSocket|sendBeacon|localStorage|sessionStorage|indexedDB|console|HTMLCanvasElement|OffscreenCanvas|ImageData|MediaStream|getImageData|toDataURL|toBlob)\b/u;
+  if (sources.some((source) => unsafePrimitive.test(source))) {
+    throw new Error(
+      `Focused diagnostics ${label} bundle contains a capture or transport primitive.`
+    );
+  }
+}
+
 if (require.main === module) {
   try {
     main();
@@ -223,5 +329,6 @@ if (require.main === module) {
 module.exports = {
   main,
   normalizePackagePath,
+  verifyDiagnosticsPackageContract,
   verifyPackagePathInventory,
 };

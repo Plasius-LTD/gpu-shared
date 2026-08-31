@@ -16,6 +16,21 @@ export {
 } from "./i18n.js";
 export { gpuSharedEnGbTranslations } from "./translations/en-GB.js";
 export {
+  FEEDBACK_GAME_DIAGNOSTICS_CAPABILITY,
+  FEEDBACK_GAME_DIAGNOSTICS_CONTRACT_VERSION,
+  FEEDBACK_GAME_DIAGNOSTICS_FEATURE_FLAG,
+  feedbackGameDiagnosticBackends,
+  feedbackGameDiagnosticCounterCodes,
+  feedbackGameDiagnosticErrorCodes,
+  feedbackGameDiagnosticFeatureIds,
+  feedbackGameDiagnosticFrameRateBuckets,
+  feedbackGameDiagnosticFrameTimeBuckets,
+  feedbackGameDiagnosticRenderers,
+  feedbackGameDiagnosticSurfaceRegistrations,
+  feedbackGameDiagnosticViewportBuckets,
+  parseFeedbackGameDiagnostics,
+} from "./feedback-diagnostics.js";
+export {
   GPU_SHOWCASE_PRODUCT_STUDIO_FEATURE,
   GPU_SHOWCASE_REALISTIC_MODELS_FEATURE,
   GPU_SHOWCASE_ANIMATION_ADVENTURE_FEATURE,

@@ -7,5 +7,6 @@
 - [ADR-0005 Product Studio Wavefront Adapter](./adr-0005-product-studio-wavefront-adapter.md)
 - [ADR-0006 Animation Adventure Camera Mode Contract](./adr-0006-animation-adventure-camera-mode-contract.md)
 - [ADR-0007 Professional Animation Orchestration](./adr-0007-professional-animation-orchestration.md)
+- [ADR-0008 Privacy-Safe Feedback Diagnostic Contract](./adr-0008-privacy-safe-feedback-diagnostic-contract.md)
 - [ADR-0009 Exact-main OIDC package publishing](./adr-0009-exact-main-oidc-package-publishing.md)
 - [ADR-0010 PVOX Product Studio Compatibility Projection](./adr-0010-pvox-product-studio-compatibility-projection.md)

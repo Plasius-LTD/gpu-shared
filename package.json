@@ -22,6 +22,11 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
+    "./feedback-diagnostics": {
+      "types": "./src/feedback-diagnostics.d.ts",
+      "import": "./dist/feedback-diagnostics.js",
+      "require": "./dist/feedback-diagnostics.cjs"
+    },
     "./assets/brigantine.gltf": "./assets/brigantine.gltf",
     "./assets/cutter.gltf": "./assets/cutter.gltf",
     "./assets/lighthouse.gltf": "./assets/lighthouse.gltf",
@@ -34,7 +39,7 @@
     "demo": "python3 -m http.server --directory ..",
     "demo:example": "node demo/example.js",
     "generate:assets": "node scripts/generate-showcase-assets.mjs",
-    "typecheck": "node --check src/index.js && node --check src/showcase-runtime.js && node --check src/gltf-loader.js && node --check src/pvox-loader.js && node --check src/product-studio-runtime.js && node --check src/animation-adventure-runtime.js && node --check demo/main.js",
+    "typecheck": "node --check src/index.js && node --check src/feedback-diagnostics.js && node --check src/showcase-runtime.js && node --check src/gltf-loader.js && node --check src/pvox-loader.js && node --check src/product-studio-runtime.js && node --check src/animation-adventure-runtime.js && node --check demo/main.js && tsc -p tsconfig.types.json",
     "zero-three": "node scripts/verify-zero-three.cjs --package --evidence-out release-artifacts/zero-three-evidence.json",
     "zero-three:source": "node scripts/verify-zero-three.cjs --source-only",
     "zero-three:test": "node --test tests/zero-three.test.cjs",
@@ -62,6 +67,9 @@
   ],
   "author": "Plasius LTD <development@plasius.co.uk>",
   "license": "Apache-2.0",
+  "dependencies": {
+    "@plasius/schema": "^1.4.0"
+  },
   "peerDependencies": {
     "@plasius/gpu-model-voxel": "^0.1.0",
     "@plasius/gpu-renderer": "^0.2.40",
@@ -111,6 +119,7 @@
     }
   ],
   "overrides": {
+    "brace-expansion": "^5.0.9",
     "esbuild": "^0.28.1",
     "minimatch": "^10.2.1"
   },
