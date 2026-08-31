@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.1.1] - 2026-08-31
+
+- **Added**
   - Added a consent-required, closed and immutable game-diagnostics contract
     for the registered generator and GPU demo feedback surfaces, including
     coarse buckets, safe error codes and public-asset provenance metadata.
@@ -641,3 +655,4 @@ All notable changes to this project will be documented in this file.
 [1.0.13]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.13
 [1.0.14]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.14
 [1.1.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.0
+[1.1.1]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.1
