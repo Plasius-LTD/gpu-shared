@@ -68,7 +68,7 @@
   "author": "Plasius LTD <development@plasius.co.uk>",
   "license": "Apache-2.0",
   "dependencies": {
-    "@plasius/schema": "^1.4.0"
+    "@plasius/schema": "^1.4.3"
   },
   "peerDependencies": {
     "@plasius/gpu-model-voxel": "^0.1.0",
@@ -88,12 +88,12 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@plasius/gpu-lighting": "^0.2.13",
+    "@plasius/gpu-lighting": "^0.2.14",
     "@plasius/translations": "^1.0.23",
     "c8": "^11.0.0",
-    "eslint": "^10.7.0",
-    "globals": "^17.7.0",
-    "react": "^19.2.7",
+    "eslint": "^10.9.1",
+    "globals": "^17.11.0",
+    "react": "^19.2.8",
     "tsup": "^8.5.1",
     "typescript": "^7.0.2"
   },
