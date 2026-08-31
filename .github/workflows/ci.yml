@@ -34,7 +34,7 @@ jobs:
   build-test:
     needs: trusted_head
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
-    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["self-hosted","Linux","X64"]') }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
 
@@ -42,6 +42,15 @@ jobs:
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
+
+      - name: Enforce permanent Zero-Three install admission
+        run: npm run zero-three:source
+
+      - name: Verify private artifact policy
+        run: npm run privacy:check
+
+      - name: Test private artifact policy
+        run: npm run test:privacy
 
       - name: Install deps
         run: npm ci --no-fund --no-audit --legacy-peer-deps
@@ -58,6 +67,9 @@ jobs:
       - name: Build
         run: npm run build --if-present
 
+      - name: Verify public package contents
+        run: npm run pack:check
+
       - name: Test with coverage
         run: |
           set -euo pipefail
@@ -71,6 +83,17 @@ jobs:
           else
             npm run test -- --coverage
           fi
+
+      - name: Enforce permanent Zero-Three package evidence
+        run: npm run zero-three
+
+      - name: Retain Zero-Three package evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: zero-three-evidence-${{ github.sha }}
+          path: release-artifacts/zero-three-evidence.json
+          if-no-files-found: error
+          retention-days: 90
 
       - name: Locate coverage report
         run: |
@@ -127,7 +150,7 @@ jobs:
     name: Public artifact integrity
     needs: trusted_head
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
-    runs-on: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["self-hosted","Linux","X64"]') }}
+    runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
       contents: read
@@ -138,6 +161,10 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
+      - name: Enforce permanent Zero-Three source policy
+        run: npm run zero-three:source
+      - name: Verify permanent Zero-Three negative fixtures
+        run: npm run zero-three:test
       - name: Verify public artifact integrity
         run: node ./scripts/verify-public-artifacts.cjs '--package-dir' '.'
   # END PLASIUS PUBLIC ARTIFACT INTEGRITY JOB

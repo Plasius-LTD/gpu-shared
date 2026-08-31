@@ -107,11 +107,9 @@ load public assets and render canvases, but this diagnostics module never
 captures user pixels or performs diagnostic storage, logging, analytics, or
 network transport.
 
-Release is blocked until `@plasius/schema` 1.4.0 is published through its
-protected CD workflow, `@plasius/schema ^1.4.0` is added to this package's
-manifest and lock, and the package is revalidated against that published
-artifact. The unpublished schema dependency is intentionally absent from the
-manifest and lock.
+The contract consumes the protected-CD-published `@plasius/schema ^1.4.0`
+dependency recorded in this package's manifest and lock. Parity, type, bundle
+and privacy tests validate it against that published artifact.
 
 Publishing the contract does not enable collection. Production callers must
 also receive the remotely evaluated, default-off
@@ -127,6 +125,27 @@ await mountGpuShowcase({
   },
 });
 ```
+
+Promoted PVOX assets use the same Product Studio surface and are loaded only
+when the host selects the `pvox` representation supplied by its remotely
+controlled catalog:
+
+```js
+await mountGpuShowcase({
+  root: document.getElementById("app"),
+  demoMode: "product-studio",
+  productAssetUrl: "/api/gpu-demo/assets/pvox-demo/assets/table/hash/model.pvox",
+  productAssetRepresentation: "pvox",
+  productAssetSha256: "<immutable 64-character artifact hash>",
+});
+```
+
+The package dynamically loads optional `@plasius/gpu-model-voxel`, bounds the
+response, validates the complete PVOX artifact against the catalog hash, and
+derives a disposable surface-property-grouped triangle cache for the current
+mesh-BVH Product Studio renderer. PVOX remains the asset of record; this
+compatibility cache is not persisted and is not native PVOX promotion
+evidence. There is no GLTF fallback after a PVOX asset is selected.
 
 ### Showcase Translations
 
@@ -212,8 +231,9 @@ pages and validation harnesses, the package also re-exports
 `createProductStudioMeshes(...)`.
 
 Install `@plasius/gpu-renderer` alongside `@plasius/gpu-shared` when Product
-Studio or Animation Adventure mode is used. Harbor-only consumers do not need
-the renderer peer.
+Studio or Animation Adventure mode is used. Install optional
+`@plasius/gpu-model-voxel` when Product Studio can receive PVOX catalog rows.
+Harbor-only consumers do not need either peer.
 
 ### Animation Adventure Mode
 
@@ -376,6 +396,19 @@ npm test
 npm run build
 ```
 
+## Zero-Three architecture invariant
+
+This GPU-native package permanently prohibits Three.js and every package whose
+dependency, peer, or optional graph reaches it. The prohibition covers source,
+public declarations, tests, tooling, manifests, lockfiles, installed graphs,
+bundles, npm tarballs, SBOMs, and active documentation. There is no compatibility
+mode, waiver, or renderer fallback.
+
+Run `npm run zero-three:source` before installation and `npm run zero-three`
+after building to generate the immutable package evidence consumed by site
+release-integrity validation. `npm run zero-three:test` exercises the fail-closed
+negative fixtures.
+
 <!-- BEGIN PLASIUS RELEASE INTEGRITY -->
 ## Release integrity
 
@@ -386,7 +419,7 @@ main pushes validate on approved self-hosted runners. Release preparation and
 publication use a two-run exact-main protocol on GitHub-hosted Node.js 24.18.0
 LTS. A read-only job seals the package tarball and SBOM before a dependency-free
 production job publishes that exact artifact through npm OIDC with provenance;
-there is no npm write-token fallback. CD remains disabled until the npm trusted
-publisher binding and protected-branch-only production environment are
-independently verified.
+there is no npm write-token fallback. Production publication remains gated by
+the npm trusted-publisher binding and the protected-branch-only GitHub
+production environment.
 <!-- END PLASIUS RELEASE INTEGRITY -->

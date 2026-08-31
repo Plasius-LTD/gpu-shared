@@ -88,6 +88,7 @@ jobs:
         with:
           ref: ${{ inputs.base_branch }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Create release-prep GitHub App token
         id: release_prep_app_token
@@ -147,6 +148,8 @@ jobs:
             echo "Package manifest not found: ${PACKAGE_JSON}" >&2
             exit 1
           fi
+
+          npm --prefix "${PACKAGE_DIRECTORY}" run privacy:check
 
           NAME=$(PACKAGE_JSON_PATH="${PACKAGE_JSON}" node -p "const path = require('node:path'); const pkg = require(path.resolve(process.env.PACKAGE_JSON_PATH)); pkg.name || ''")
           CURRENT_VER=$(PACKAGE_JSON_PATH="${PACKAGE_JSON}" node -p "const path = require('node:path'); const pkg = require(path.resolve(process.env.PACKAGE_JSON_PATH)); pkg.version || ''")
@@ -408,7 +411,7 @@ jobs:
             if gh pr merge "${PR_NUMBER}" --squash --delete-branch; then
               echo "Release metadata PR #${PR_NUMBER} merged."
             else
-              echo "Immediate merge was not available for release metadata PR #${PR_NUMBER}; enabling auto-merge and waiting."
+              echo "Immediate merge was not available for release metadata PR #${PR_NUMBER}; waiting for required checks and retrying the protected merge."
               gh pr merge "${PR_NUMBER}" --auto --squash --delete-branch || true
 
               DEADLINE=$((SECONDS + MERGE_TIMEOUT_SECONDS))
@@ -421,6 +424,10 @@ jobs:
                 if [ "${STATE}" = "CLOSED" ]; then
                   echo "Release metadata PR #${PR_NUMBER} closed without merging." >&2
                   exit 1
+                fi
+                if gh pr merge "${PR_NUMBER}" --squash --delete-branch >/dev/null 2>&1; then
+                  echo "Release metadata PR #${PR_NUMBER} merged after required checks completed."
+                  break
                 fi
                 sleep 10
               done
@@ -459,7 +466,7 @@ jobs:
           if (!match) {
             console.error(`Cannot derive pre-release identity from invalid version ${version}.`);
             process.exit(1);
-          fi
+          }
           const identifiers = match[1] ? match[1].split(".") : [];
           if (identifiers.length > 1 && /^[0-9]+$/.test(identifiers.at(-1))) {
             identifiers.pop();

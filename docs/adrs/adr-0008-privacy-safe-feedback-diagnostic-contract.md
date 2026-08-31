@@ -49,11 +49,9 @@ network transport, logging, analytics, or storage operation. Other package
 modules continue to load public assets and render canvases for their existing
 showcase responsibilities.
 
-Release is blocked until the protected schema CD workflow publishes
-`@plasius/schema` 1.4.0, this package records `@plasius/schema ^1.4.0` in both
-its manifest and lock, and validation is repeated against the published
-artifact. The unpublished dependency is deliberately absent from the current
-manifest and lock.
+The protected schema CD workflow has published `@plasius/schema` 1.4.x. This
+package records `@plasius/schema ^1.4.0` in its manifest and lock, and validates
+the contract against that published artifact.
 
 ## Consequences
 

@@ -89,6 +89,19 @@ export interface GltfModel {
   readonly color: GltfModelColor;
   readonly physics: Readonly<Record<string, unknown>>;
   readonly primitives: readonly GltfModelPrimitive[];
+  readonly representation?: "gltf" | "pvox";
+  readonly compatibilityProjection?: "pvox-derived-surface-cache";
+  readonly sourceArtifactSha256?: string;
+}
+
+export interface LoadPvoxModelOptions {
+  readonly expectedArtifactSha256?: string;
+  readonly maximumBytes?: number;
+  readonly maximumFaces?: number;
+  readonly name?: string;
+  readonly signal?: AbortSignal;
+  readonly fetch?: typeof fetch;
+  readonly moduleLoader?: () => Promise<Readonly<Record<string, unknown>>>;
 }
 
 export type ShowcaseAssetName =
@@ -404,6 +417,12 @@ export interface MountGpuShowcaseOptions {
   renderScale?: number;
   productAssetUrl?: string | URL;
   assetUrl?: string | URL;
+  productAssetRepresentation?: "gltf" | "pvox";
+  assetRepresentation?: "gltf" | "pvox";
+  productAssetSha256?: string;
+  productAssetName?: string;
+  productMaximumSurfaceFaces?: number;
+  signal?: AbortSignal;
   animationAdventure?: AnimationAdventureConfig;
   width?: number;
   height?: number;
@@ -440,6 +459,9 @@ export interface MountGpuProductStudioResult {
     sourceTriangleCount: number;
     meshCount: number;
     geometryMode: string;
+    sourceRepresentation: "gltf" | "pvox";
+    compatibilityProjection: "pvox-derived-surface-cache" | null;
+    sourceArtifactSha256: string | null;
     requiresTriangleMeshRenderer: boolean;
     displayQuality: boolean;
     requiresMeshBvhForDisplayQuality: boolean;
@@ -511,6 +533,13 @@ export function resolveShowcaseAssetUrl(
 ): URL;
 
 export function loadGltfModel(url: string | URL): Promise<GltfModel>;
+
+export function isPvoxAssetUrl(value: unknown): boolean;
+
+export function loadPvoxModel(
+  url: string | URL,
+  options?: LoadPvoxModelOptions
+): Promise<GltfModel>;
 
 export function createProductStudioMeshes(
   model: GltfModel,

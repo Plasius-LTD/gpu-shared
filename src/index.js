@@ -7,6 +7,7 @@ import {
 } from "./feature-flags.js";
 
 export { resolveShowcaseAssetUrl } from "./asset-url.js";
+export { isPvoxAssetUrl, loadPvoxModel } from "./pvox-loader.js";
 export {
   createGpuSharedTranslator,
   gpuSharedTranslationKeys,

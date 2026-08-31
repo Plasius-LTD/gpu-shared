@@ -14,8 +14,6 @@ import {
   FEEDBACK_VIEWPORT_BUCKETS,
 } from "@plasius/schema/feedback-diagnostics-vocabulary";
 
-// Release blocker: add @plasius/schema ^1.4.0 to package.json and the lock after
-// that version is published through its protected CD workflow.
 export const FEEDBACK_GAME_DIAGNOSTICS_CONTRACT_VERSION =
   FEEDBACK_CONTRACT_VERSION;
 export const FEEDBACK_GAME_DIAGNOSTICS_FEATURE_FLAG =

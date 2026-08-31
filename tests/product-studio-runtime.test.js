@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   createProductStudioMeshes,
+  loadPvoxModel,
   mountGpuProductStudio,
 } from "../src/index.js";
 
@@ -147,6 +148,121 @@ function createFakeDocument() {
   return { document, root };
 }
 
+test("loadPvoxModel validates PVOX and preserves decoded surface-property groups", async () => {
+  const expectedArtifactSha256 = "a".repeat(64);
+  const bytes = Uint8Array.from([0x50, 0x56, 0x4f, 0x58]);
+  const decoded = {
+    artifactSha256: expectedArtifactSha256,
+    surfaces: [
+      {
+        surfaceIndex: 0,
+        baseColor: [0.4, 0.2, 0.1, 1],
+        roughness: 0.65,
+        metallic: 0.1,
+        specular: 0.8,
+        emission: [0, 0, 0],
+      },
+      {
+        surfaceIndex: 1,
+        baseColor: [0.7, 0.72, 0.75, 1],
+        roughness: 0.2,
+        metallic: 0.9,
+        specular: 1,
+        emission: [0.05, 0.04, 0.03],
+      },
+    ],
+  };
+  const validatePvoxV1 = async (actualBytes, expectations) => {
+    assert.deepEqual(actualBytes, bytes);
+    assert.deepEqual(expectations, { artifactSha256: expectedArtifactSha256 });
+    return decoded;
+  };
+  const createPvoxSurfaceMeshV1 = (actualDecoded) => {
+    assert.equal(actualDecoded, decoded);
+    return {
+      representation: "pvox-derived-surface-cache",
+      sourceArtifactSha256: expectedArtifactSha256,
+      positions: new Float32Array([
+        0, 0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0,
+        0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1,
+      ]),
+      normals: new Float32Array([
+        0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1,
+        0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0, -1,
+      ]),
+      colors: new Float32Array([
+        0.4, 0.2, 0.1, 1, 0.4, 0.2, 0.1, 1,
+        0.4, 0.2, 0.1, 1, 0.4, 0.2, 0.1, 1,
+        0.7, 0.72, 0.75, 1, 0.7, 0.72, 0.75, 1,
+        0.7, 0.72, 0.75, 1, 0.7, 0.72, 0.75, 1,
+      ]),
+      surfaceIndices: new Uint32Array([0, 0, 0, 0, 1, 1, 1, 1]),
+      indices: new Uint32Array([0, 1, 2, 0, 2, 3, 4, 5, 6, 4, 6, 7]),
+      triangleCount: 4,
+      bounds: { minimum: [0, 0, 0], maximum: [1, 1, 1] },
+    };
+  };
+
+  const model = await loadPvoxModel("/api/gpu-demo/assets/model.pvox", {
+    expectedArtifactSha256,
+    fetch: async () => new Response(bytes, {
+      status: 200,
+      headers: { "Content-Type": "application/vnd.plasius.pvox" },
+    }),
+    moduleLoader: async () => ({ validatePvoxV1, createPvoxSurfaceMeshV1 }),
+  });
+
+  assert.equal(model.representation, "pvox");
+  assert.equal(model.compatibilityProjection, "pvox-derived-surface-cache");
+  assert.equal(model.sourceArtifactSha256, expectedArtifactSha256);
+  assert.equal(model.primitives.length, 2);
+  assert.equal(model.primitives[0].material.roughness, 0.65);
+  assert.equal(model.primitives[1].material.metallic, 0.9);
+  assert.deepEqual(model.primitives[1].material.emissive, {
+    r: 0.05,
+    g: 0.04,
+    b: 0.03,
+    a: 1,
+  });
+});
+
+test("loadPvoxModel rejects MIME drift and oversized responses before PVOX validation", async () => {
+  const validatePvoxV1 = async () => {
+    throw new Error("validation must not be reached");
+  };
+  const moduleLoader = async () => ({
+    PVOX_STATIC_MAXIMUM_ARTIFACT_BYTES_V1: 65_536,
+    validatePvoxV1,
+    createPvoxSurfaceMeshV1() {
+      throw new Error("surface derivation must not be reached");
+    },
+  });
+
+  await assert.rejects(
+    loadPvoxModel("/api/gpu-demo/assets/model.pvox", {
+      fetch: async () => new Response(Uint8Array.from([1]), {
+        status: 200,
+        headers: { "Content-Type": "application/octet-stream" },
+      }),
+      moduleLoader,
+    }),
+    /unexpected content type/u,
+  );
+  await assert.rejects(
+    loadPvoxModel("/api/gpu-demo/assets/model.pvox", {
+      fetch: async () => new Response(null, {
+        status: 200,
+        headers: {
+          "Content-Type": "application/vnd.plasius.pvox",
+          "Content-Length": "65537",
+        },
+      }),
+      moduleLoader,
+    }),
+    /bounded artifact profile/u,
+  );
+});
+
 test("product studio meshes preserve GLTF primitive triangles for mesh BVH rendering", () => {
   const meshes = createProductStudioMeshes(createModelFixture());
   const modelMeshes = meshes.filter((mesh) => mesh.id >= 1000);
@@ -157,6 +273,7 @@ test("product studio meshes preserve GLTF primitive triangles for mesh BVH rende
   assert.deepEqual(modelMeshes[0].uvs, createModelFixture().primitives[0].uvs);
   assert.equal(modelMeshes[0].baseColorTexture.width, 2);
   assert.equal(modelMeshes[0].normalTexture.scale, 0.7);
+  assert.deepEqual(modelMeshes[0].colors, createModelFixture().primitives[0].colors);
   assert.equal(modelMeshes[0].material.baseColorTexture.height, 2);
   assert.equal(modelMeshes[1].materialKind, "metal");
   assert.equal(meshes.some((mesh) => mesh.materialKind === "emissive"), true);
@@ -287,4 +404,52 @@ test("mountGpuProductStudio loads the model and delegates mesh BVH renderer inpu
   result.destroy();
   assert.equal(destroyed, true);
   assert.equal(root.innerHTML, "<p>previous</p>");
+});
+
+test("mountGpuProductStudio selects the PVOX loader without falling back to GLTF", async () => {
+  const { document, root } = createFakeDocument();
+  const artifactSha256 = "b".repeat(64);
+  const pvoxModel = {
+    ...createModelFixture(),
+    name: "uploaded-pvox-table",
+    representation: "pvox",
+    compatibilityProjection: "pvox-derived-surface-cache",
+    sourceArtifactSha256: artifactSha256,
+  };
+  let rendererOptions = null;
+  const result = await mountGpuProductStudio({
+    document,
+    root,
+    productAssetUrl: "/api/gpu-demo/assets/pvox-demo/assets/table/hash/model.pvox",
+    productAssetRepresentation: "pvox",
+    productAssetSha256: artifactSha256,
+    productAssetName: "Uploaded table",
+    __modelLoader: async () => {
+      throw new Error("GLTF loader must not be used for PVOX");
+    },
+    __pvoxModelLoader: async (url, options) => {
+      assert.equal(url, "/api/gpu-demo/assets/pvox-demo/assets/table/hash/model.pvox");
+      assert.equal(options.expectedArtifactSha256, artifactSha256);
+      assert.equal(options.name, "Uploaded table");
+      return pvoxModel;
+    },
+    __lightingLoader: async () => ({}),
+    __rendererLoader: async () => ({
+      async createWavefrontPathTracingComputeRenderer(options) {
+        rendererOptions = options;
+        return {
+          renderOnce: () => ({ frame: 1 }),
+          destroy() {},
+        };
+      },
+    }),
+  });
+
+  assert.equal(result.state.modelName, "uploaded-pvox-table");
+  assert.equal(result.state.sourceRepresentation, "pvox");
+  assert.equal(result.state.compatibilityProjection, "pvox-derived-surface-cache");
+  assert.equal(result.state.sourceArtifactSha256, artifactSha256);
+  assert.equal(result.state.geometryMode, "pvox-derived-surface-cache-display-quality");
+  assert.equal(rendererOptions.meshes.length, result.meshes.length);
+  result.destroy();
 });

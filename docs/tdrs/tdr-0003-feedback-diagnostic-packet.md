@@ -22,10 +22,9 @@ privacy-safe renderer diagnostics attached to a structured bug report.
 - Errors contain a fixed safe message and no rejected value.
 - The module contains no network, persistence, logging or capture behavior.
 
-## Release blocker
+## Release dependency
 
-Do not release this contract until `@plasius/schema` 1.4.0 has been published
-through protected CD, `@plasius/schema ^1.4.0` has been added to this package's
-manifest and lock, and all parity, type, bundle and privacy validation has
-passed against that published artifact. The unpublished dependency is
-intentionally absent from the current manifest and lock.
+`@plasius/schema` 1.4.x is published through protected CD,
+`@plasius/schema ^1.4.0` is recorded in this package's manifest and lock, and
+parity, type, bundle and privacy validation runs against that published
+artifact.

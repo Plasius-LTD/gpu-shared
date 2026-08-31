@@ -17,13 +17,50 @@ All notable changes to this project will be documented in this file.
   - Backed the diagnostics vocabulary, bounds and correlated packet type with
     `@plasius/schema/feedback-diagnostics-vocabulary`, with runtime-schema
     parity tests kept outside the browser bundle.
-  - Kept release blocked until protected CD publishes `@plasius/schema` 1.4.0
-    and `@plasius/schema ^1.4.0` is recorded in this package's manifest and
-    lock; the unpublished dependency is intentionally not declared.
+  - Recorded the protected-CD-published `@plasius/schema ^1.4.0` dependency in
+    the manifest and lock and revalidated diagnostics against the published
+    artifact.
   - Refreshed transitive internal-package locks to surviving versions and updated the esbuild resolution to clear the current npm audit finding.
+  - Raised the optional `@plasius/gpu-renderer` peer baseline to the first
+    released package carrying immutable Zero-Three evidence.
 
 - **Fixed**
-  - (placeholder)
+  - Corrected stable/pre-release identity parsing after release metadata lands,
+    and retry the protected merge after checks when repository auto-merge is
+    unavailable.
+  - Moved push-triggered validation from an unavailable self-hosted runner to
+    GitHub-hosted Linux so exact-commit release gates can complete.
+  - Made immutable tarball inventory validation consume the complete stream so
+    `pipefail` cannot misclassify a valid `dist` directory after `tar` receives
+    an early-reader SIGPIPE.
+  - Passed the immutable publication tarball to npm with an explicit local
+    `./` path so it cannot be misparsed as a Git dependency shorthand.
+  - Aligned the GitHub-to-npm release boundary with the released
+    `@plasius/schema` template, including pre-mutation privacy checks, sealed
+    inventory revalidation, clean dependency installation, and redacted archive
+    diagnostics.
+
+- **Security**
+  - Added permanent fail-closed Zero-Three validation across manifests,
+    dependency graphs, imports, declarations, aliases, bundles, npm tarballs,
+    SBOMs, and active documentation, with immutable CI/CD evidence and no
+    compatibility fallback.
+
+## [1.1.0] - 2026-08-28
+
+- **Added**
+  - Added bounded, independently validated PVOX Product Studio loading with a
+    dynamically loaded voxel package and a disposable surface-property-grouped
+    renderer compatibility cache.
+
+- **Changed**
+  - Refreshed transitive internal-package locks to surviving versions and updated the esbuild resolution to clear the current npm audit finding.
+  - Product Studio now records the immutable source representation and artifact
+    hash and fails closed instead of falling back to GLTF after PVOX selection.
+
+- **Fixed**
+  - Prevented the read-only checkout credential from overriding the narrowly
+    scoped release-prep GitHub App token during approved CD branch creation.
 
 - **Security**
   - Updated the development-tool dependency graph to the patched
@@ -603,3 +640,4 @@ All notable changes to this project will be documented in this file.
 [1.0.12]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.12
 [1.0.13]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.13
 [1.0.14]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.0.14
+[1.1.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.0

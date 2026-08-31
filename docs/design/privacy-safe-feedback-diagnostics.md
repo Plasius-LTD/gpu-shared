@@ -48,10 +48,9 @@ The browser implementation consumes the lightweight
 vocabulary, bound and discriminated TypeScript type. Its tests also validate
 accepted output with the full `@plasius/schema/feedback-diagnostics` runtime
 schema without putting that schema builder in the browser bundle. The schema
-1.4 package is not published yet, so publishing it through protected CD,
-recording `@plasius/schema ^1.4.0` in this package and its lock, and rerunning
-parity, type, bundle and privacy tests are release blockers. Until then this
-branch must not be released.
+1.4 package is published through protected CD, `@plasius/schema ^1.4.0` is
+recorded in this package and its lock, and parity, type, bundle and privacy
+tests run against that published artifact.
 
 The parser returns a new, deeply immutable structured value. It never strips
 unknown fields because silently accepting a wider object could let an unsafe
@@ -94,8 +93,8 @@ and renderer/viewer integrations that pass their own no-pixel validation.
 
 ## Rollout and rollback
 
-After the schema package/lock release blocker is resolved, publishing the
-package contract still does not enable production collection. Production
+Publishing the package contract does not enable production collection.
+Production
 remains off until `feedback.game-diagnostics.enabled` and
 `feedback.game-diagnostics.attach` are both granted by their remote
 source-of-truth evaluators. Rollback is the persisted feature flag; callers
