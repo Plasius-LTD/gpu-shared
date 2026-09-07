@@ -8,6 +8,20 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.1.3] - 2026-09-07
+
+- **Added**
+  - (placeholder)
+
+- **Changed**
   - Refreshed compatible @plasius/* lockfile resolutions to the latest published releases.
  - (placeholder)
 
@@ -672,3 +686,4 @@ All notable changes to this project will be documented in this file.
 [1.1.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.0
 [1.1.1]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.1
 [1.1.2]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.2
+[1.1.3]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.3
