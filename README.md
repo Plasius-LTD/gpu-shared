@@ -413,9 +413,11 @@ negative fixtures.
 ## Release integrity
 
 CI keeps the administrative contributor registry outside Git and npm package
-artifacts using exact, case-normalised path checks. External fork heads are
-rejected; same-repository pull requests validate on GitHub-hosted runners and
-main pushes validate on approved self-hosted runners. Release preparation and
+artifacts using exact, case-normalised path checks. CI validates repository-owned
+branch pushes on explicit `[self-hosted, Linux, X64]` runners. Pull-request and
+`pull_request_target` events do not execute CI code. Maintainers review fork
+contributions before moving accepted commits to repository-owned branches.
+Release preparation and
 publication use a two-run exact-main protocol on GitHub-hosted Node.js 24.18.0
 LTS. A read-only job seals the package tarball and SBOM before a dependency-free
 production job publishes that exact artifact through npm OIDC with provenance;
@@ -423,3 +425,33 @@ there is no npm write-token fallback. Production publication remains gated by
 the npm trusted-publisher binding and the protected-branch-only GitHub
 production environment.
 <!-- END PLASIUS RELEASE INTEGRITY -->
+
+
+### CI admission and release merge confirmation
+
+The quarantined runner group restricts both repositories and workflow refs.
+Before admitting a review or generated release branch, inspect its exact commit
+and workflow, lock the branch with admin enforcement, deny force pushes,
+deletions and fork syncing, and retain empty push allowances. Verify its SHA
+again, then admit only
+`Plasius-LTD/gpu-shared/.github/workflows/ci.yml@refs/heads/<locked-branch>`.
+Remove temporary admission before unlocking or updating a branch; a reviewed
+SHA string alone may not match the workflow ref used by runner scheduling.
+Keep `ci.yml@refs/heads/main` and the main-only `npm-audit-fix.yml` admission;
+preserve all unrelated group restrictions. Do not add hosted CI fallbacks.
+Node dependency caching is disabled before source admission.
+
+Release preparation waits for the PR API to report `MERGED`, including when a
+successful merge command only queues the request. It fails closed on closed
+PRs, API errors, unexpected states or the bounded merge timeout. The generated
+release branch needs the same review and locked-ref admission before its
+required CI can execute. Continue through the ordinary protected merge and
+`cd.yml` exact-main/production OIDC gates, and verify the published version and
+provenance. Never reuse a removed version.
+
+The inherited `platform.public-artifact-integrity.enabled` flag controls staged
+public distribution; mandatory integrity checks remain enforced in either flag
+state. Rollback disables `cd.yml` or the affected distribution channel and
+removes temporary runner admission, without restoring the administrative path
+or a token-based publication path. See
+[ADR-0011](docs/adrs/adr-0011-trusted-ci-and-confirmed-release-merges.md).

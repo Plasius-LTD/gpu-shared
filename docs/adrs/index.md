@@ -10,3 +10,4 @@
 - [ADR-0008 Privacy-Safe Feedback Diagnostic Contract](./adr-0008-privacy-safe-feedback-diagnostic-contract.md)
 - [ADR-0009 Exact-main OIDC package publishing](./adr-0009-exact-main-oidc-package-publishing.md)
 - [ADR-0010 PVOX Product Studio Compatibility Projection](./adr-0010-pvox-product-studio-compatibility-projection.md)
+- [ADR-0011 Trusted CI and confirmed release merges](./adr-0011-trusted-ci-and-confirmed-release-merges.md)

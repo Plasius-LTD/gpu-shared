@@ -12,10 +12,10 @@ All notable changes to this project will be documented in this file.
  - (placeholder)
 
 - **Fixed**
-  - (placeholder)
+  - Require observed MERGED state before release preparation continues, including queued merge requests; fail closed on API errors, closed PRs and timeout.
 
 - **Security**
-  - (placeholder)
+  - Restore explicit trusted-push self-hosted CI and main-only audit validation, with bounded jobs, disabled automatic dependency caches and documented locked-branch runner admission.
 
 ## [1.1.2] - 2026-08-31
 
