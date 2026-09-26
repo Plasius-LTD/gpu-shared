@@ -11,6 +11,12 @@
 Shared browser-safe demo runtime and asset helpers for the Plasius `gpu-*`
 package family.
 
+glTF PBR omissions follow the format defaults: white base color, metallic 1
+and roughness 1. Explicit factors, including zero, are preserved. Product Studio
+passes these materials and original textures to the mesh renderer.
+See [original Eames fidelity admission](docs/eames-qualification-admission.md);
+asset fidelity alone does not qualify image quality or application performance.
+
 Apache-2.0. ESM + CJS builds.
 
 ## Install

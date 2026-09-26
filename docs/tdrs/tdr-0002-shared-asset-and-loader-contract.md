@@ -13,6 +13,10 @@ loader for Product Studio.
   compatibility.
 - `loadGltfModel(...)` loads the GLTF mesh, embedded physics metadata,
   per-primitive material data, and flattened aggregate fields.
+- Omitted glTF PBR values use white base color and metallic/roughness 1;
+  explicit zero is retained. Product Studio keeps source textures and material
+  factors. Representative Eames evidence must pass source fidelity admission
+  (ADR-0012), independently of quality/performance qualification.
 - `loadPvoxModel(...)` dynamically loads `@plasius/gpu-model-voxel`, enforces
   the released static artifact ceiling and MIME type, validates the complete
   PVOX hash closure, and derives an in-memory surface-property-grouped mesh.

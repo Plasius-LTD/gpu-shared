@@ -376,7 +376,7 @@ function getMaterialTexture(document, textureRef, imageResources) {
 function getMaterialInfo(document, primitive, imageResources) {
   const material = document.materials?.[primitive.material] ?? null;
   const pbr = material?.pbrMetallicRoughness ?? null;
-  const factor = pbr?.baseColorFactor ?? [0.56, 0.33, 0.22, 1];
+  const factor = pbr?.baseColorFactor ?? [1, 1, 1, 1];
   const emissive = Array.isArray(material?.emissiveFactor) ? material.emissiveFactor : [0, 0, 0];
   const extensions = material?.extensions ?? {};
   const specular = extensions.KHR_materials_specular ?? null;
@@ -400,11 +400,11 @@ function getMaterialInfo(document, primitive, imageResources) {
     roughness:
       typeof pbr?.roughnessFactor === "number"
         ? pbr.roughnessFactor
-        : 0.92,
+        : 1,
     metallic:
       typeof pbr?.metallicFactor === "number"
         ? pbr.metallicFactor
-        : 0.08,
+        : 1,
     opacity: factor[3] ?? 1,
     emissive: Object.freeze({
       r: emissive[0] ?? 0,

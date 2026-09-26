@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Correct omitted glTF PBR factors to white/metallic 1/roughness 1, preserving
+  explicit values and Product Studio chrome/material propagation. Add regression
+  tests and original Eames fidelity admission requirements.
+
 - **Added**
   - (placeholder)
 
