@@ -1,5 +1,9 @@
 # @plasius/gpu-shared
 
+The glTF loader preserves `material.doubleSided` (default `false`) and Product
+Studio forwards it to renderer meshes. Non-boolean values reject. Use a renderer
+with matching sidedness support; non-glTF two-sided sheets must opt in explicitly.
+
 The glTF loader and Product Studio mapper preserve `TEXCOORD_1` as optional
 `uvs1`, alongside `uvs` (TEXCOORD_0). Texture `texCoord` and transform overrides
 select the coordinate set. Missing referenced UV1, malformed UVs and sets above

@@ -8,6 +8,10 @@ loader for Product Studio.
 
 ## Contract
 
+- glTF `material.doubleSided` defaults false and must be boolean. Product Studio
+  forwards it unchanged as mesh `doubleSided`; renderer traversal enforces it
+  (ADR0014). This is independent of normal mapping and adaptive sampling.
+
 - glTF primitives and Product Studio meshes retain optional `uvs1` for
   TEXCOORD_1 separately from `uvs`. Texture selectors (including transform
   overrides) are preserved. Missing referenced UV1 and unsupported sets reject;

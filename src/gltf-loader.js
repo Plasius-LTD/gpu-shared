@@ -389,8 +389,12 @@ function getMaterialInfo(document, primitive, imageResources) {
   const anisotropy = extensions.KHR_materials_anisotropy ?? null;
   const dispersion = extensions.KHR_materials_dispersion ?? null;
 
+  if (material?.doubleSided !== undefined && typeof material.doubleSided !== "boolean") {
+    throw new Error("glTF material.doubleSided must be a boolean.");
+  }
   return Object.freeze({
     name: material?.name ?? "default-material",
+    doubleSided: material?.doubleSided === true,
     color: Object.freeze({
       r: factor[0],
       g: factor[1],

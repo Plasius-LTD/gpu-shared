@@ -238,6 +238,7 @@ function createProductStudioMeshFromPrimitive(primitive, primitiveIndex, transfo
     color: Object.freeze(color),
     emission: Object.freeze(readEmission(material)),
     materialKind: readMaterialKind(material),
+    doubleSided: material.doubleSided === true,
     materialRefId: 1000 + primitiveIndex,
     roughness: Number.isFinite(material.roughness) ? material.roughness : 0.72,
     metallic: Number.isFinite(material.metallic) ? material.metallic : 0,

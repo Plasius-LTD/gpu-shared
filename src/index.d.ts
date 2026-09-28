@@ -14,6 +14,8 @@ export interface GltfModelBounds {
 
 export interface GltfModelMaterial {
   readonly name: string;
+  /** glTF defaults to single-sided surfaces. */
+  readonly doubleSided?: boolean;
   readonly color: GltfModelColor;
   readonly roughness: number;
   readonly metallic: number;
@@ -270,6 +272,7 @@ export interface AnimationAdventureConfig {
 
 export interface ProductStudioMesh {
   readonly id: number;
+  readonly doubleSided?: boolean;
   readonly positions: readonly number[];
   readonly indices: readonly number[];
   readonly normals?: readonly number[] | null;
