@@ -1,5 +1,12 @@
 # @plasius/gpu-shared
 
+The glTF loader and Product Studio mapper preserve `TEXCOORD_1` as optional
+`uvs1`, alongside `uvs` (TEXCOORD_0). Texture `texCoord` and transform overrides
+select the coordinate set. Missing referenced UV1, malformed UVs and sets above
+1 reject rather than silently substituting UV0. Requires a renderer with the
+[dual-UV material contract](docs/design/dual-uv-reference.md); this is source
+fidelity support, not a new quality/performance qualification.
+
 [![npm version](https://img.shields.io/npm/v/@plasius/gpu-shared.svg)](https://www.npmjs.com/package/@plasius/gpu-shared)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/Plasius-LTD/gpu-shared/ci.yml?branch=main&label=build&style=flat)](https://github.com/Plasius-LTD/gpu-shared/actions/workflows/ci.yml)
 [![coverage](https://img.shields.io/codecov/c/github/Plasius-LTD/gpu-shared)](https://codecov.io/gh/Plasius-LTD/gpu-shared)

@@ -1,5 +1,7 @@
 # ADR Index
 
+- [ADR0013: Dual-UV material fidelity](adr-0013-dual-uv-material-fidelity.md)
+
 - [ADR-0012 Standards-based glTF fidelity admission](./adr-0012-gltf-fidelity-admission.md)
 
 - [ADR-0001 Package Scope](./adr-0001-package-scope.md)

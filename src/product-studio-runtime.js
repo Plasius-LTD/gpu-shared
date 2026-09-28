@@ -232,6 +232,7 @@ function createProductStudioMeshFromPrimitive(primitive, primitiveIndex, transfo
     indices: Object.freeze(indices),
     normals: Array.isArray(primitive.normals) ? Object.freeze([...primitive.normals]) : null,
     uvs: uvs ? Object.freeze(uvs) : null,
+    uvs1: Array.isArray(primitive.uvs1) ? Object.freeze([...primitive.uvs1]) : null,
     colors: colors ? Object.freeze(colors) : null,
     material: Object.freeze({ ...material }),
     color: Object.freeze(color),

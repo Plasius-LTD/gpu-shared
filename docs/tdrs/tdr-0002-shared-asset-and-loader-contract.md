@@ -8,6 +8,11 @@ loader for Product Studio.
 
 ## Contract
 
+- glTF primitives and Product Studio meshes retain optional `uvs1` for
+  TEXCOORD_1 separately from `uvs`. Texture selectors (including transform
+  overrides) are preserved. Missing referenced UV1 and unsupported sets reject;
+  the renderer must implement the corresponding per-texture selection (ADR0013).
+
 - `resolveShowcaseAssetUrl(...)` resolves package-owned showcase assets from the
   published package location, defaulting to the brigantine for backward
   compatibility.

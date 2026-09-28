@@ -76,6 +76,8 @@ export interface GltfModelPrimitive {
   readonly indices: readonly number[];
   readonly normals: readonly number[] | null;
   readonly uvs?: readonly number[] | null;
+  /** TEXCOORD_1; textures select it with texCoord: 1. */
+  readonly uvs1?: readonly number[] | null;
   readonly colors: readonly number[] | null;
   readonly material: GltfModelMaterial;
   readonly bounds: GltfModelBounds;
@@ -272,6 +274,8 @@ export interface ProductStudioMesh {
   readonly indices: readonly number[];
   readonly normals?: readonly number[] | null;
   readonly uvs?: readonly number[] | null;
+  /** TEXCOORD_1; textures select it with texCoord: 1. */
+  readonly uvs1?: readonly number[] | null;
   readonly material?: GltfModelMaterial;
   readonly color: readonly number[];
   readonly emission?: readonly number[];

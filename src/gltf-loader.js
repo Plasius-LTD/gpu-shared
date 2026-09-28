@@ -247,10 +247,7 @@ function normalizeTextureTransformPair(value, fallback) {
 function readTextureTransform(textureRef) {
   const transformExtension = textureRef?.extensions?.KHR_texture_transform ?? null;
   return {
-    texCoord:
-      typeof transformExtension?.texCoord === "number"
-        ? transformExtension.texCoord
-        : textureRef?.texCoord ?? 0,
+    texCoord: transformExtension?.texCoord ?? textureRef?.texCoord ?? 0,
     offset: normalizeTextureTransformPair(transformExtension?.offset, [0, 0]),
     scale: normalizeTextureTransformPair(transformExtension?.scale, [1, 1]),
     rotation: Number.isFinite(transformExtension?.rotation) ? Number(transformExtension.rotation) : 0,
@@ -362,6 +359,9 @@ function getMaterialTexture(document, textureRef, imageResources) {
   }
 
   const transform = readTextureTransform(textureRef);
+  if (transform.texCoord !== 0 && transform.texCoord !== 1) {
+    throw new Error("glTF texture texCoord must select supported UV set 0 or 1.");
+  }
   const transformedPixels = applyTextureTransformToPixels(pixels, transform);
   return Object.freeze({
     texCoord: transform.texCoord,
@@ -808,6 +808,14 @@ function collectScenePrimitives(document, buffers, imageResources) {
           typeof primitive.attributes.TEXCOORD_0 === "number"
             ? readAccessor(document, primitive.attributes.TEXCOORD_0, buffers)
             : null;
+        const uvs1 = typeof primitive.attributes.TEXCOORD_1 === "number"
+          ? readAccessor(document, primitive.attributes.TEXCOORD_1, buffers)
+          : null;
+        for (const [set, values] of [[0, uvs], [1, uvs1]]) {
+          if (values && (values.length !== positions.length / 3 * 2 || !values.every(Number.isFinite))) {
+            throw new Error(`glTF TEXCOORD_${set} must contain one finite UV pair per vertex.`);
+          }
+        }
         const transformedPositions = [];
         const transformedNormals = [];
 
@@ -832,6 +840,11 @@ function collectScenePrimitives(document, buffers, imageResources) {
             ? readAccessor(document, primitive.indices, buffers).map((value) => Number(value))
             : Array.from({ length: transformedPositions.length / 3 }, (_, index) => index);
         const material = getMaterialInfo(document, primitive, imageResources);
+        for (const [name, texture] of Object.entries(material)) {
+          if (name.endsWith("Texture") && texture?.texCoord === 1 && !uvs1) {
+            throw new Error(`glTF ${name} requires missing TEXCOORD_1.`);
+          }
+        }
         const primitiveName =
           `${node.name ?? mesh.name ?? "mesh"}-${primitiveIndex}`;
 
@@ -845,6 +858,7 @@ function collectScenePrimitives(document, buffers, imageResources) {
                 ? Object.freeze(transformedNormals)
                 : null,
             uvs: uvs ? Object.freeze(uvs) : null,
+            uvs1: uvs1 ? Object.freeze(uvs1) : null,
             colors: colors ? Object.freeze(colors) : null,
             material,
             bounds: computeBounds(transformedPositions),
