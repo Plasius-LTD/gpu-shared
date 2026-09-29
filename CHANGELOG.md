@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.1.4] - 2026-09-29
+
 - Add opt-in native Shoreline drawing through `@plasius/gpu-renderer`, preserving
   shared simulation, remote rollout and an explicit Canvas2D compatibility path.
 - Improve generated harbour assets with curved sails, rigging, railings, corrected
@@ -695,3 +709,4 @@ All notable changes to this project will be documented in this file.
 [1.1.1]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.1
 [1.1.2]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.2
 [1.1.3]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.3
+[1.1.4]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.4
