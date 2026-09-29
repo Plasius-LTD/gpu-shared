@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Preserve source texture pixels with validated transform/wrap metadata instead
+  of lossy same-size baking; forward unchanged through Product Studio (#135).
+
+- Preserve glTF single-/double-sided material policy through Product Studio meshes; validate authored booleans and retain the single-sided default (#134).
+
+- Preserve and validate TEXCOORD_1 through glTF loading and Product Studio; honor per-texture UV selectors and transform overrides (#133).
+
+- Correct omitted glTF PBR factors to white/metallic 1/roughness 1, preserving
+  explicit values and Product Studio chrome/material propagation. Add regression
+  tests and original Eames fidelity admission requirements.
+
 - **Added**
   - (placeholder)
 

@@ -1,5 +1,24 @@
 # @plasius/gpu-shared
 
+The glTF loader preserves original texture pixels and dimensions instead of
+baking repeats into a smaller effective image. Texture slots now carry immutable
+`transform: {offset, scale, rotation}`, `wrapS` and `wrapT` metadata. Product
+Studio forwards them unchanged. Coordinate selection precedes transform and
+wrapping. Invalid transforms/wrap modes reject. This requires a coordinated
+GPU-native renderer update; older consumers must not silently ignore metadata.
+See [ADR0015](docs/adrs/adr-0015-preserve-texture-transforms.md).
+
+The glTF loader preserves `material.doubleSided` (default `false`) and Product
+Studio forwards it to renderer meshes. Non-boolean values reject. Use a renderer
+with matching sidedness support; non-glTF two-sided sheets must opt in explicitly.
+
+The glTF loader and Product Studio mapper preserve `TEXCOORD_1` as optional
+`uvs1`, alongside `uvs` (TEXCOORD_0). Texture `texCoord` and transform overrides
+select the coordinate set. Missing referenced UV1, malformed UVs and sets above
+1 reject rather than silently substituting UV0. Requires a renderer with the
+[dual-UV material contract](docs/design/dual-uv-reference.md); this is source
+fidelity support, not a new quality/performance qualification.
+
 [![npm version](https://img.shields.io/npm/v/@plasius/gpu-shared.svg)](https://www.npmjs.com/package/@plasius/gpu-shared)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/Plasius-LTD/gpu-shared/ci.yml?branch=main&label=build&style=flat)](https://github.com/Plasius-LTD/gpu-shared/actions/workflows/ci.yml)
 [![coverage](https://img.shields.io/codecov/c/github/Plasius-LTD/gpu-shared)](https://codecov.io/gh/Plasius-LTD/gpu-shared)
@@ -10,6 +29,12 @@
 
 Shared browser-safe demo runtime and asset helpers for the Plasius `gpu-*`
 package family.
+
+glTF PBR omissions follow the format defaults: white base color, metallic 1
+and roughness 1. Explicit factors, including zero, are preserved. Product Studio
+passes these materials and original textures to the mesh renderer.
+See [original Eames fidelity admission](docs/eames-qualification-admission.md);
+asset fidelity alone does not qualify image quality or application performance.
 
 Apache-2.0. ESM + CJS builds.
 

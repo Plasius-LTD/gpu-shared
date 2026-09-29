@@ -8,11 +8,24 @@ loader for Product Studio.
 
 ## Contract
 
+- glTF `material.doubleSided` defaults false and must be boolean. Product Studio
+  forwards it unchanged as mesh `doubleSided`; renderer traversal enforces it
+  (ADR0014). This is independent of normal mapping and adaptive sampling.
+
+- glTF primitives and Product Studio meshes retain optional `uvs1` for
+  TEXCOORD_1 separately from `uvs`. Texture selectors (including transform
+  overrides) are preserved. Missing referenced UV1 and unsupported sets reject;
+  the renderer must implement the corresponding per-texture selection (ADR0013).
+
 - `resolveShowcaseAssetUrl(...)` resolves package-owned showcase assets from the
   published package location, defaulting to the brigantine for backward
   compatibility.
 - `loadGltfModel(...)` loads the GLTF mesh, embedded physics metadata,
   per-primitive material data, and flattened aggregate fields.
+- Omitted glTF PBR values use white base color and metallic/roughness 1;
+  explicit zero is retained. Product Studio keeps source textures and material
+  factors. Representative Eames evidence must pass source fidelity admission
+  (ADR-0012), independently of quality/performance qualification.
 - `loadPvoxModel(...)` dynamically loads `@plasius/gpu-model-voxel`, enforces
   the released static artifact ceiling and MIME type, validates the complete
   PVOX hash closure, and derives an in-memory surface-property-grouped mesh.

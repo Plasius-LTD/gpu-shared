@@ -14,6 +14,8 @@ export interface GltfModelBounds {
 
 export interface GltfModelMaterial {
   readonly name: string;
+  /** glTF defaults to single-sided surfaces. */
+  readonly doubleSided?: boolean;
   readonly color: GltfModelColor;
   readonly roughness: number;
   readonly metallic: number;
@@ -66,6 +68,14 @@ export interface GltfModelTextureInfo {
   readonly height: number;
   readonly data: Uint8ClampedArray;
   readonly texCoord?: number;
+  /** Applied by the renderer after UV-set selection; source pixels are never baked. */
+  readonly transform?: {
+    readonly offset: readonly [number, number];
+    readonly scale: readonly [number, number];
+    readonly rotation: number;
+  };
+  readonly wrapS?: 10497 | 33071 | 33648;
+  readonly wrapT?: 10497 | 33071 | 33648;
   readonly scale?: number;
   readonly strength?: number;
 }
@@ -76,6 +86,8 @@ export interface GltfModelPrimitive {
   readonly indices: readonly number[];
   readonly normals: readonly number[] | null;
   readonly uvs?: readonly number[] | null;
+  /** TEXCOORD_1; textures select it with texCoord: 1. */
+  readonly uvs1?: readonly number[] | null;
   readonly colors: readonly number[] | null;
   readonly material: GltfModelMaterial;
   readonly bounds: GltfModelBounds;
@@ -268,10 +280,13 @@ export interface AnimationAdventureConfig {
 
 export interface ProductStudioMesh {
   readonly id: number;
+  readonly doubleSided?: boolean;
   readonly positions: readonly number[];
   readonly indices: readonly number[];
   readonly normals?: readonly number[] | null;
   readonly uvs?: readonly number[] | null;
+  /** TEXCOORD_1; textures select it with texCoord: 1. */
+  readonly uvs1?: readonly number[] | null;
   readonly material?: GltfModelMaterial;
   readonly color: readonly number[];
   readonly emission?: readonly number[];

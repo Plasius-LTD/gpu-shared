@@ -235,116 +235,31 @@ async function loadImageResource(document, image, index, buffers, baseUrl) {
 }
 
 function normalizeTextureTransformPair(value, fallback) {
-  if (!Array.isArray(value) || value.length < 2) {
-    return fallback;
+  if (value === undefined) return Object.freeze(fallback);
+  if (!Array.isArray(value) || value.length !== 2 || !value.every(Number.isFinite)) {
+    throw new Error("glTF texture transform must contain finite two-component offset/scale values.");
   }
-  return [
-    Number.isFinite(value[0]) ? Number(value[0]) : fallback[0],
-    Number.isFinite(value[1]) ? Number(value[1]) : fallback[1],
-  ];
+  return Object.freeze([...value]);
 }
 
 function readTextureTransform(textureRef) {
-  const transformExtension = textureRef?.extensions?.KHR_texture_transform ?? null;
+  const extension = textureRef?.extensions?.KHR_texture_transform ?? {};
+  const rotation = extension.rotation ?? 0;
+  if (!Number.isFinite(rotation)) throw new Error("glTF texture transform rotation must be finite.");
   return {
-    texCoord:
-      typeof transformExtension?.texCoord === "number"
-        ? transformExtension.texCoord
-        : textureRef?.texCoord ?? 0,
-    offset: normalizeTextureTransformPair(transformExtension?.offset, [0, 0]),
-    scale: normalizeTextureTransformPair(transformExtension?.scale, [1, 1]),
-    rotation: Number.isFinite(transformExtension?.rotation) ? Number(transformExtension.rotation) : 0,
+    texCoord: extension.texCoord ?? textureRef?.texCoord ?? 0,
+    transform: Object.freeze({
+      offset: normalizeTextureTransformPair(extension.offset, [0, 0]),
+      scale: normalizeTextureTransformPair(extension.scale, [1, 1]),
+      rotation,
+    }),
   };
 }
 
-function wrapTextureCoordinate(value) {
-  return ((value % 1) + 1) % 1;
-}
-
-function transformTextureCoordinate(uv, transform) {
-  const scaledU = uv[0] * transform.scale[0];
-  const scaledV = uv[1] * transform.scale[1];
-  const cosine = Math.cos(transform.rotation);
-  const sine = Math.sin(transform.rotation);
-  return [
-    scaledU * cosine - scaledV * sine + transform.offset[0],
-    scaledU * sine + scaledV * cosine + transform.offset[1],
-  ];
-}
-
-function readTexturePixel(data, width, height, x, y) {
-  const clampedX = Math.min(width - 1, Math.max(0, x));
-  const clampedY = Math.min(height - 1, Math.max(0, y));
-  const offset = (clampedY * width + clampedX) * 4;
-  return [
-    data[offset] ?? 0,
-    data[offset + 1] ?? 0,
-    data[offset + 2] ?? 0,
-    data[offset + 3] ?? 255,
-  ];
-}
-
-function mixChannel(a, b, weight) {
-  return a + (b - a) * weight;
-}
-
-function sampleTexturePixel(data, width, height, uv) {
-  const u = wrapTextureCoordinate(uv[0]);
-  const v = wrapTextureCoordinate(uv[1]);
-  const sourceX = u * Math.max(width - 1, 0);
-  const sourceY = (1 - v) * Math.max(height - 1, 0);
-  const x0 = Math.floor(sourceX);
-  const y0 = Math.floor(sourceY);
-  const x1 = Math.min(width - 1, x0 + 1);
-  const y1 = Math.min(height - 1, y0 + 1);
-  const tx = sourceX - x0;
-  const ty = sourceY - y0;
-  const topLeft = readTexturePixel(data, width, height, x0, y0);
-  const topRight = readTexturePixel(data, width, height, x1, y0);
-  const bottomLeft = readTexturePixel(data, width, height, x0, y1);
-  const bottomRight = readTexturePixel(data, width, height, x1, y1);
-  return [0, 1, 2, 3].map((channelIndex) => {
-    const top = mixChannel(topLeft[channelIndex], topRight[channelIndex], tx);
-    const bottom = mixChannel(bottomLeft[channelIndex], bottomRight[channelIndex], tx);
-    return mixChannel(top, bottom, ty);
-  });
-}
-
-function applyTextureTransformToPixels(pixels, transform) {
-  const isIdentityTransform =
-    transform.offset[0] === 0 &&
-    transform.offset[1] === 0 &&
-    transform.scale[0] === 1 &&
-    transform.scale[1] === 1 &&
-    transform.rotation === 0;
-  if (isIdentityTransform) {
-    return pixels;
-  }
-
-  const transformedData = new Uint8ClampedArray(pixels.data.length);
-  for (let y = 0; y < pixels.height; y += 1) {
-    const outputV = pixels.height > 1 ? 1 - y / (pixels.height - 1) : 0;
-    for (let x = 0; x < pixels.width; x += 1) {
-      const outputU = pixels.width > 1 ? x / (pixels.width - 1) : 0;
-      const sourcePixel = sampleTexturePixel(
-        pixels.data,
-        pixels.width,
-        pixels.height,
-        transformTextureCoordinate([outputU, outputV], transform)
-      );
-      const offset = (y * pixels.width + x) * 4;
-      transformedData[offset] = sourcePixel[0];
-      transformedData[offset + 1] = sourcePixel[1];
-      transformedData[offset + 2] = sourcePixel[2];
-      transformedData[offset + 3] = sourcePixel[3];
-    }
-  }
-
-  return Object.freeze({
-    width: pixels.width,
-    height: pixels.height,
-    data: transformedData,
-  });
+function readTextureWrap(value) {
+  const mode = value ?? 10497;
+  if (![10497, 33071, 33648].includes(mode)) throw new Error("glTF texture wrap mode is invalid.");
+  return mode;
 }
 
 function getMaterialTexture(document, textureRef, imageResources) {
@@ -362,21 +277,27 @@ function getMaterialTexture(document, textureRef, imageResources) {
   }
 
   const transform = readTextureTransform(textureRef);
-  const transformedPixels = applyTextureTransformToPixels(pixels, transform);
+  if (transform.texCoord !== 0 && transform.texCoord !== 1) {
+    throw new Error("glTF texture texCoord must select supported UV set 0 or 1.");
+  }
+  const sampler = document.samplers?.[texture.sampler] ?? {};
   return Object.freeze({
     texCoord: transform.texCoord,
+    transform: transform.transform,
+    wrapS: readTextureWrap(sampler.wrapS),
+    wrapT: readTextureWrap(sampler.wrapT),
     scale: textureRef.scale,
     strength: textureRef.strength,
-    width: transformedPixels.width,
-    height: transformedPixels.height,
-    data: transformedPixels.data,
+    width: pixels.width,
+    height: pixels.height,
+    data: pixels.data,
   });
 }
 
 function getMaterialInfo(document, primitive, imageResources) {
   const material = document.materials?.[primitive.material] ?? null;
   const pbr = material?.pbrMetallicRoughness ?? null;
-  const factor = pbr?.baseColorFactor ?? [0.56, 0.33, 0.22, 1];
+  const factor = pbr?.baseColorFactor ?? [1, 1, 1, 1];
   const emissive = Array.isArray(material?.emissiveFactor) ? material.emissiveFactor : [0, 0, 0];
   const extensions = material?.extensions ?? {};
   const specular = extensions.KHR_materials_specular ?? null;
@@ -389,8 +310,12 @@ function getMaterialInfo(document, primitive, imageResources) {
   const anisotropy = extensions.KHR_materials_anisotropy ?? null;
   const dispersion = extensions.KHR_materials_dispersion ?? null;
 
+  if (material?.doubleSided !== undefined && typeof material.doubleSided !== "boolean") {
+    throw new Error("glTF material.doubleSided must be a boolean.");
+  }
   return Object.freeze({
     name: material?.name ?? "default-material",
+    doubleSided: material?.doubleSided === true,
     color: Object.freeze({
       r: factor[0],
       g: factor[1],
@@ -400,11 +325,11 @@ function getMaterialInfo(document, primitive, imageResources) {
     roughness:
       typeof pbr?.roughnessFactor === "number"
         ? pbr.roughnessFactor
-        : 0.92,
+        : 1,
     metallic:
       typeof pbr?.metallicFactor === "number"
         ? pbr.metallicFactor
-        : 0.08,
+        : 1,
     opacity: factor[3] ?? 1,
     emissive: Object.freeze({
       r: emissive[0] ?? 0,
@@ -808,6 +733,14 @@ function collectScenePrimitives(document, buffers, imageResources) {
           typeof primitive.attributes.TEXCOORD_0 === "number"
             ? readAccessor(document, primitive.attributes.TEXCOORD_0, buffers)
             : null;
+        const uvs1 = typeof primitive.attributes.TEXCOORD_1 === "number"
+          ? readAccessor(document, primitive.attributes.TEXCOORD_1, buffers)
+          : null;
+        for (const [set, values] of [[0, uvs], [1, uvs1]]) {
+          if (values && (values.length !== positions.length / 3 * 2 || !values.every(Number.isFinite))) {
+            throw new Error(`glTF TEXCOORD_${set} must contain one finite UV pair per vertex.`);
+          }
+        }
         const transformedPositions = [];
         const transformedNormals = [];
 
@@ -832,6 +765,11 @@ function collectScenePrimitives(document, buffers, imageResources) {
             ? readAccessor(document, primitive.indices, buffers).map((value) => Number(value))
             : Array.from({ length: transformedPositions.length / 3 }, (_, index) => index);
         const material = getMaterialInfo(document, primitive, imageResources);
+        for (const [name, texture] of Object.entries(material)) {
+          if (name.endsWith("Texture") && texture?.texCoord === 1 && !uvs1) {
+            throw new Error(`glTF ${name} requires missing TEXCOORD_1.`);
+          }
+        }
         const primitiveName =
           `${node.name ?? mesh.name ?? "mesh"}-${primitiveIndex}`;
 
@@ -845,6 +783,7 @@ function collectScenePrimitives(document, buffers, imageResources) {
                 ? Object.freeze(transformedNormals)
                 : null,
             uvs: uvs ? Object.freeze(uvs) : null,
+            uvs1: uvs1 ? Object.freeze(uvs1) : null,
             colors: colors ? Object.freeze(colors) : null,
             material,
             bounds: computeBounds(transformedPositions),

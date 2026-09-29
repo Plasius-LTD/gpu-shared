@@ -547,11 +547,13 @@ test("loadGltfModel preserves UVs and material textures for product-studio asset
     assert.equal(primitive.material.normalTexture.scale, 0.75);
     assert.equal(primitive.material.baseColorTexture.data.length, 16);
     assert.deepEqual([...primitive.material.baseColorTexture.data], [
-      205, 121, 66, 255,
-      170, 123, 72, 255,
-      138, 91, 56, 255,
-      94, 65, 38, 255,
+      255, 128, 64, 255,
+      192, 160, 96, 255,
+      128, 96, 64, 255,
+      32, 16, 8, 255,
     ]);
+    assert.deepEqual(primitive.material.baseColorTexture.transform,
+      { offset: [0.25, 0.25], scale: [0.5, 0.5], rotation: 0 });
   } finally {
     globalThis.fetch = originalFetch;
     globalThis.createImageBitmap = originalCreateImageBitmap;
