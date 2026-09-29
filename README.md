@@ -21,6 +21,8 @@ Native setup errors remain visible. Device loss pauses the scene and requires a
 reload. Reduced motion starts paused; pause stops GPU resubmission until the view
 changes. Static harbour geometry is cached, render size and buffers are bounded,
 and teardown releases GPU resources. Frame intervals are measured, not synthesized.
+The diagnostics disclosure reports native submission counts, render size and the
+scene's actual rendering techniques alongside its geometry and quality budgets.
 
 See [ADR-0012](docs/adrs/adr-0012-native-shoreline-orchestration.md) for rollout and
 the package/site release order.

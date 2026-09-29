@@ -658,7 +658,7 @@ test("native showcase submits world geometry, freezes on pause and disposes rend
     const showcase=await mountGpuShowcase({root:harness.root,__navigator:{gpu:{}},
       __featureFlags:{'gpu-demo.scene-fidelity.enabled':true},
       __nativeRendererLoader:async()=>({createNativeSceneRenderer:async()=>({
-        render(frame){draws.push(frame);return {backend:'webgpu-raster',vertexCount:frame.vertices.length/12};},
+        render(frame){draws.push(frame);return {backend:'webgpu-raster',vertexCount:frame.vertices.length/12,submittedFrames:draws.length,width:1280,height:720};},
         destroy(){destroyed++;},
       })}),
     });
@@ -668,6 +668,9 @@ test("native showcase submits world geometry, freezes on pause and disposes rend
     assert.equal(draws[0].vertices.length%36,0);
     const eye=draws[0].camera.eye;
     assert.equal(harness.ctx.operations.length,0);
+    assert.match(harness.elements['#debugMetrics'].innerHTML,/Submitted frames: 2/);
+    assert.match(harness.elements['#debugMetrics'].innerHTML,/1280 × 720/);
+    assert.match(harness.elements['#sceneNotes'].innerHTML,/procedural harbour assets/i);
     harness.listenerRegistry.get('pauseButton:click')();
     frames.shift()(48); frames.shift()(64);
     assert.equal(draws.length,2);
