@@ -4292,6 +4292,16 @@ function renderScene(
     });
     setListContent(dom.sceneMetrics, ["Renderer: native WebGPU raster", `Geometry: ${state.nativeRenderer.vertexCount / 3} triangles`, "Lighting: directional sun and atmospheric sky"]);
     setListContent(dom.qualityMetrics, ["Antialiasing: 4 samples", "Shadows: filtered 2048px depth map", "Water: animated surface with planar reflection", `Frame interval: ${state.lastDecision.metrics.averageFrameTimeMs.toFixed(2)} ms`]);
+    setListContent(dom.debugMetrics, [
+      `Submitted frames: ${state.nativeRenderer.submittedFrames}`,
+      `Render target: ${state.nativeRenderer.width} × ${state.nativeRenderer.height}`,
+      "Frame timing: browser callback intervals",
+    ]);
+    setListContent(dom.sceneNotes, [
+      "Technology demonstration: procedural harbour assets",
+      "Water: analytic waves, moving wakes and a planar reflection",
+      "Surface lighting: directional sun, atmospheric sky and filtered shadows",
+    ]);
     dom.status.textContent = state.paused ? state.translate(gpuSharedTranslationKeys.statusPaused) : state.translate(gpuSharedTranslationKeys.statusLive, { fps: state.lastDecision.metrics.fps.toFixed(1) });
     dom.details.textContent = state.translate(gpuSharedTranslationKeys.detailsNative);
     return;

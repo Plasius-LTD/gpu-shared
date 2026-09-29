@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Populate native Shoreline diagnostics with submission counts, render dimensions
+  and scene notes so the disclosure contains no empty telemetry sections.
+
 - **Added**
   - (placeholder)
 
