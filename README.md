@@ -1,5 +1,13 @@
 # @plasius/gpu-shared
 
+The glTF loader preserves original texture pixels and dimensions instead of
+baking repeats into a smaller effective image. Texture slots now carry immutable
+`transform: {offset, scale, rotation}`, `wrapS` and `wrapT` metadata. Product
+Studio forwards them unchanged. Coordinate selection precedes transform and
+wrapping. Invalid transforms/wrap modes reject. This requires a coordinated
+GPU-native renderer update; older consumers must not silently ignore metadata.
+See [ADR0015](docs/adrs/adr-0015-preserve-texture-transforms.md).
+
 The glTF loader preserves `material.doubleSided` (default `false`) and Product
 Studio forwards it to renderer meshes. Non-boolean values reject. Use a renderer
 with matching sidedness support; non-glTF two-sided sheets must opt in explicitly.

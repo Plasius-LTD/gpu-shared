@@ -68,6 +68,14 @@ export interface GltfModelTextureInfo {
   readonly height: number;
   readonly data: Uint8ClampedArray;
   readonly texCoord?: number;
+  /** Applied by the renderer after UV-set selection; source pixels are never baked. */
+  readonly transform?: {
+    readonly offset: readonly [number, number];
+    readonly scale: readonly [number, number];
+    readonly rotation: number;
+  };
+  readonly wrapS?: 10497 | 33071 | 33648;
+  readonly wrapT?: 10497 | 33071 | 33648;
   readonly scale?: number;
   readonly strength?: number;
 }

@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Preserve source texture pixels with validated transform/wrap metadata instead
+  of lossy same-size baking; forward unchanged through Product Studio (#135).
+
 - Preserve glTF single-/double-sided material policy through Product Studio meshes; validate authored booleans and retain the single-sided default (#134).
 
 - Preserve and validate TEXCOORD_1 through glTF loading and Product Studio; honor per-texture UV selectors and transform overrides (#133).

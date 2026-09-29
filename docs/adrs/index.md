@@ -15,3 +15,4 @@
 - [ADR-0009 Exact-main OIDC package publishing](./adr-0009-exact-main-oidc-package-publishing.md)
 - [ADR-0010 PVOX Product Studio Compatibility Projection](./adr-0010-pvox-product-studio-compatibility-projection.md)
 - [ADR-0011 Trusted CI and confirmed release merges](./adr-0011-trusted-ci-and-confirmed-release-merges.md)
+- [ADR-0015 Preserve texture transforms](./adr-0015-preserve-texture-transforms.md)

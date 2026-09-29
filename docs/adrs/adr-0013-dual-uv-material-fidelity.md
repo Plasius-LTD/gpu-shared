@@ -2,6 +2,9 @@
 
 Status: accepted. Tracking site#2256 / shared#133, parent Feature site#2114.
 
+Texture baking described below is historical and superseded by
+[ADR0015](adr-0015-preserve-texture-transforms.md).
+
 The loader owns glTF coordinate decoding. Preserve TEXCOORD_0 as `uvs` and
 TEXCOORD_1 as `uvs1`, including normalized/strided accessors. Product Studio
 forwards both unchanged through rigid placement and source-scale normalization.

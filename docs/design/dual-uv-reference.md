@@ -9,8 +9,8 @@ Preserve TEXCOORD_0 as `uvs`; add optional `uvs1` for TEXCOORD_1. Honor each
 texture's `texCoord`, including the KHR_texture_transform override. Reject
 unsupported sets, missing referenced coordinates, malformed lengths and nonfinite
 coordinates rather than silently sampling another set. Preserve UV0-only inputs.
-Keep the existing texture-transform baking policy; replacing that resampling
-policy and implementing other material lobes is outside this fix.
+The original UV-only change kept transform baking. That policy is superseded by
+[texture preservation](texture-transform-preservation.md) and ADR0015.
 
 Renderer: retain both coordinates through CPU-upload and GPU-built geometry,
 barycentric interpolation and per-texture selection for the five core and twelve
