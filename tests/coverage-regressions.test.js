@@ -643,6 +643,44 @@ test("mountGpuShowcase supports fullscreen capture mode with a bounded 1080p can
   }
 });
 
+test("native showcase submits world geometry, freezes on pause and disposes renderer", async () => {
+  const originals = Object.fromEntries(['document','window','fetch','requestAnimationFrame','cancelAnimationFrame'].map(key=>[key,globalThis[key]]));
+  const harness=createSceneHarness();
+  const frames=[]; const draws=[]; let destroyed=0;
+  const document=createTriangleGltfDocument().document;
+  Object.assign(globalThis,{
+    document:harness.documentStub,window:harness.windowStub,
+    fetch:async()=>({ok:true,json:async()=>document}),
+    requestAnimationFrame:callback=>{frames.push(callback);return frames.length;},
+    cancelAnimationFrame:()=>{},
+  });
+  try {
+    const showcase=await mountGpuShowcase({root:harness.root,__navigator:{gpu:{}},
+      __featureFlags:{'gpu-demo.scene-fidelity.enabled':true},
+      __nativeRendererLoader:async()=>({createNativeSceneRenderer:async()=>({
+        render(frame){draws.push(frame);return {backend:'webgpu-raster',vertexCount:frame.vertices.length/12};},
+        destroy(){destroyed++;},
+      })}),
+    });
+    frames.shift()(16); frames.shift()(32);
+    assert.ok(draws[0].vertices.length>0);
+    assert.ok(draws[0].vertices.every(Number.isFinite),`nonfinite component ${draws[0].vertices.findIndex(v=>!Number.isFinite(v))}: ${draws[0].vertices.slice(108,144)}`);
+    assert.equal(draws[0].vertices.length%36,0);
+    const eye=draws[0].camera.eye;
+    assert.equal(harness.ctx.operations.length,0);
+    harness.listenerRegistry.get('pauseButton:click')();
+    frames.shift()(48); frames.shift()(64);
+    assert.equal(draws.length,2);
+    assert.equal(JSON.parse(globalThis.window.render_game_to_text()).renderer.backend,'webgpu-raster');
+    harness.elements['#focusMode'].value='cloth';
+    harness.listenerRegistry.get('focusMode:change')();
+    frames.shift()(80);
+    assert.equal(draws.length,3);
+    assert.notDeepEqual(draws[2].camera.eye,eye);
+    showcase.destroy();showcase.destroy();assert.equal(destroyed,1);
+  } finally { Object.assign(globalThis,originals); }
+});
+
 test("mountGpuShowcase fails fast when a 2D canvas context is unavailable", async () => {
   const originalDocument = globalThis.document;
   const originalWindow = globalThis.window;

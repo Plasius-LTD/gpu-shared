@@ -340,6 +340,8 @@ export const gpuSharedTranslationKeys: Readonly<{
   showcaseSubtitle: "gpuShared.showcase.subtitle";
   statusBooting: "gpuShared.showcase.status.booting";
   statusLive: "gpuShared.showcase.status.live";
+  statusPaused: "gpuShared.showcase.status.paused";
+  detailsNative: "gpuShared.showcase.details.native";
   detailsBooting: "gpuShared.showcase.details.booting";
   detailsPhysics: "gpuShared.showcase.details.physics";
   detailsRealistic: "gpuShared.showcase.details.realistic";

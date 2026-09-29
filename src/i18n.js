@@ -5,6 +5,8 @@ export const gpuSharedTranslationKeys = Object.freeze({
   showcaseSubtitle: "gpuShared.showcase.subtitle",
   statusBooting: "gpuShared.showcase.status.booting",
   statusLive: "gpuShared.showcase.status.live",
+  statusPaused: "gpuShared.showcase.status.paused",
+  detailsNative: "gpuShared.showcase.details.native",
   detailsBooting: "gpuShared.showcase.details.booting",
   detailsPhysics: "gpuShared.showcase.details.physics",
   detailsRealistic: "gpuShared.showcase.details.realistic",
@@ -68,4 +70,3 @@ export function translateGpuSharedText(key, args, translate) {
 export function createGpuSharedTranslator(translate) {
   return (key, args) => translateGpuSharedText(key, args, translate);
 }
-

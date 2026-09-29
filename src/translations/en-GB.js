@@ -4,6 +4,8 @@ export const gpuSharedEnGbTranslations = Object.freeze({
     "Shared 3D validation scene using GLTF ships, cloth, fluid continuity, adaptive performance, and telemetry.",
   "gpuShared.showcase.status.booting": "Booting 3D scene...",
   "gpuShared.showcase.status.live": "3D scene live - {fps} FPS",
+  "gpuShared.showcase.status.paused": "Scene paused",
+  "gpuShared.showcase.details.native": "Native surfaces · reflective water · filtered shadows",
   "gpuShared.showcase.details.booting":
     "Preparing a moonlit harbor scene, GLTF hull data, cloth and fluid continuity plans, and adaptive quality metadata.",
   "gpuShared.showcase.details.physics":

@@ -1,5 +1,30 @@
 # @plasius/gpu-shared
 
+## Native Shoreline rendering
+
+The harbour can use `@plasius/gpu-renderer` native surface drawing when its caller
+explicitly supplies the remote `gpu-demo.scene-fidelity.enabled` decision in
+`__featureFlags`. This remains separate from route access capabilities. The native
+path dynamically loads the renderer and supplies world geometry, camera, cloth and
+wakes; unrelated pages do not load it. It requires renderer 0.2.46 or later,
+which exports `createNativeSceneRenderer`.
+
+The scene includes curved sails, standing rigging, boat and lighthouse railings,
+continuous coastal terrain, a smaller animated flag, filtered cast shadows and
+water reflections. These are authored procedural showcase assets, not game footage.
+This raster pass does not claim ray tracing, photorealism or finished game art.
+
+At the library boundary, a missing/disabled decision or unavailable WebGPU retains
+the Canvas2D compatibility path. The public site's disabled decision instead
+prevents mounting any demo and shows its existing managed-disabled panel.
+Native setup errors remain visible. Device loss pauses the scene and requires a
+reload. Reduced motion starts paused; pause stops GPU resubmission until the view
+changes. Static harbour geometry is cached, render size and buffers are bounded,
+and teardown releases GPU resources. Frame intervals are measured, not synthesized.
+
+See [ADR-0012](docs/adrs/adr-0012-native-shoreline-orchestration.md) for rollout and
+the package/site release order.
+
 [![npm version](https://img.shields.io/npm/v/@plasius/gpu-shared.svg)](https://www.npmjs.com/package/@plasius/gpu-shared)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/Plasius-LTD/gpu-shared/ci.yml?branch=main&label=build&style=flat)](https://github.com/Plasius-LTD/gpu-shared/actions/workflows/ci.yml)
 [![coverage](https://img.shields.io/codecov/c/github/Plasius-LTD/gpu-shared)](https://codecov.io/gh/Plasius-LTD/gpu-shared)

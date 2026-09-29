@@ -72,7 +72,7 @@
   },
   "peerDependencies": {
     "@plasius/gpu-model-voxel": "^0.1.0",
-    "@plasius/gpu-renderer": "^0.2.40",
+    "@plasius/gpu-renderer": "^0.2.46",
     "@plasius/translations": "^1.0.23"
   },
   "peerDependenciesMeta": {
