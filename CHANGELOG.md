@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Add opt-in native Shoreline drawing through `@plasius/gpu-renderer`, preserving
+  shared simulation, remote rollout and an explicit Canvas2D compatibility path.
+- Improve generated harbour assets with curved sails, rigging, railings, corrected
+  lighthouse alignment, closed warehouse roofs, continuous coastal terrain and a
+  proportionate flag. Keep controls and status readable on narrow screens.
+- Fix missing fallback cloth motion parameters producing nonfinite geometry; use
+  measured frame intervals, honour reduced motion and avoid paused GPU resubmission.
+
 - **Added**
   - (placeholder)
 

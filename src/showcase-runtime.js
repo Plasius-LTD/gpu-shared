@@ -1,5 +1,6 @@
 import { resolveShowcaseAssetUrl } from "./asset-url.js";
 import { loadGltfModel } from "./gltf-loader.js";
+import { appendShowcaseFlagPole, loadNativeShowcaseRenderer, packShowcaseSurfaces } from "./native-showcase.js";
 import { GPU_SHOWCASE_REALISTIC_MODELS_FEATURE } from "./feature-flags.js";
 import {
   createGpuSharedTranslator,
@@ -22,7 +23,7 @@ const HARBOR_BOUNDS = Object.freeze({
 const CAMERA_PRESETS = Object.freeze({
   integrated: Object.freeze({ yaw: -0.55, pitch: 0.34, distance: 27, target: [0, 2.2, 0] }),
   lighting: Object.freeze({ yaw: -0.28, pitch: 0.28, distance: 23, target: [0, 2.8, 0] }),
-  cloth: Object.freeze({ yaw: -1.1, pitch: 0.25, distance: 15, target: [-8.4, 5.3, -1.5] }),
+  cloth: Object.freeze({ yaw: -0.7, pitch: 0.16, distance: 8.5, target: [-3.2, 3.9, 2.7] }),
   fluid: Object.freeze({ yaw: -0.4, pitch: 0.18, distance: 18, target: [0, 1.2, 6] }),
   physics: Object.freeze({ yaw: -0.12, pitch: 0.27, distance: 16, target: [0, 1.8, 6.8] }),
   performance: Object.freeze({ yaw: -0.65, pitch: 0.36, distance: 24, target: [0, 2.2, 0] }),
@@ -557,6 +558,7 @@ function createFallbackFluidFeatureAdapters() {
 function createFallbackClothFeatureAdapters() {
   const defaultContinuity = Object.freeze({
     amplitudeFloor: 0.22,
+    broadMotionFloor: 0.78,
     wrinkleFloor: 0.32,
     damping: 0.58,
     creaseBias: 0.14,
@@ -896,10 +898,10 @@ const SHORELINE_FOAM_ANCHORS = Object.freeze([
   Object.freeze({ x: 7.0, z: 3.22, length: 0.72, angle: 0.18 }),
 ]);
 const FLAG_LAYOUT = Object.freeze({
-  origin: Object.freeze({ x: -3.5, y: 5.9, z: 2.4 }),
-  width: 4.8,
-  height: 2.7,
-  mastOffsetX: 1.8,
+  origin: Object.freeze({ x: -3.5, y: 4.6, z: 1.9 }),
+  width: 2.2,
+  height: 1.25,
+  mastOffsetX: 0.65,
 });
 function injectStyles() {
   if (document.getElementById(STYLE_ID)) {
@@ -1168,15 +1170,15 @@ function injectStyles() {
     @media (max-width: 640px) {
       .plasius-demo__status {
         left: 10px;
-        bottom: 10px;
-        max-width: calc(100vw - 126px);
+        bottom: 56px;
+        max-width: calc(100% - 20px);
         padding: 6px 8px;
       }
       .plasius-demo__status-text {
         display: none;
       }
       .plasius-demo__status-badge {
-        max-width: calc(100vw - 142px);
+        max-width: calc(100vw - 54px);
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
@@ -1186,13 +1188,9 @@ function injectStyles() {
         left: 10px;
         right: 10px;
         max-width: calc(100vw - 20px);
-        flex-wrap: nowrap;
-        overflow-x: auto;
+        flex-wrap: wrap;
+        overflow-x: visible;
         padding-bottom: 4px;
-        scrollbar-width: none;
-      }
-      .plasius-demo__toolbar::-webkit-scrollbar {
-        display: none;
       }
       .plasius-demo button,
       .plasius-demo .plasius-toggle,
@@ -1514,7 +1512,7 @@ function buildCamera(state, canvas) {
   const preset = CAMERA_PRESETS[state.focus] ?? CAMERA_PRESETS.integrated;
   const yaw = state.camera.yaw ?? preset.yaw;
   const pitch = state.camera.pitch ?? preset.pitch;
-  const distance = state.camera.distance ?? preset.distance;
+  const distance = (state.camera.distance ?? preset.distance) * Math.max(1, 1.3 / (canvas.width / canvas.height));
   const target = state.camera.target ?? vec3(...preset.target);
   const eye = vec3(
     target.x + Math.sin(yaw) * Math.cos(pitch) * distance,
@@ -1581,6 +1579,7 @@ function buildTrianglesFromMesh(
       const ac = subVec3(c, a);
       const faceNormal = normalizeVec3(crossVec3(ab, ac));
       let normal = faceNormal;
+      let vertexNormals;
       if (Array.isArray(primitive.normals)) {
         const aNormal = transformDirection(
           vec3(
@@ -1606,17 +1605,18 @@ function buildTrianglesFromMesh(
           ),
           transform
         );
+        vertexNormals = [aNormal, bNormal, cNormal];
         normal = normalizeVec3(
           scaleVec3(addVec3(addVec3(aNormal, bNormal), cNormal), 1 / 3)
         );
       }
 
       const viewDir = normalizeVec3(subVec3(camera.eye, a));
-      if (dotVec3(faceNormal, viewDir) <= 0) {
+      if (!viewport.native && dotVec3(faceNormal, viewDir) <= 0) {
         continue;
       }
 
-      const projected = [
+      const projected = viewport.native ? [] : [
         projectPoint(a, camera, viewport),
         projectPoint(b, camera, viewport),
         projectPoint(c, camera, viewport),
@@ -1626,8 +1626,10 @@ function buildTrianglesFromMesh(
       }
 
       triangles.push({
+        worldPoints: [a, b, c],
+        vertexNormals,
         points: projected,
-        depth: (projected[0].depth + projected[1].depth + projected[2].depth) / 3,
+        depth: viewport.native ? 0 : (projected[0].depth + projected[1].depth + projected[2].depth) / 3,
         worldCenter: scaleVec3(addVec3(addVec3(a, b), c), 1 / 3),
         normal,
         baseColor: resolvedColor,
@@ -1821,7 +1823,7 @@ function buildDemoDom(root, options) {
             </label>
             <label class="plasius-toggle">
               ${t(gpuSharedTranslationKeys.focus)}
-              <select id="focusMode">
+              <select id="focusMode" aria-label="${t(gpuSharedTranslationKeys.focus)}">
                 ${showcaseFocusModes
                   .map(
                     (mode) =>
@@ -4145,7 +4147,7 @@ function renderScene(
   fluidFeatures,
   clothFeatures
 ) {
-  const viewport = { width: canvas.width, height: canvas.height };
+  const viewport = { width: canvas.width, height: canvas.height, native: typeof ctx.render === "function" };
   const camera = buildCamera(state, canvas);
   state.camera.eye = camera.eye;
   const lightingPlan = lightingFeatures.createBandPlan({
@@ -4166,7 +4168,7 @@ function renderScene(
   state.demoVisuals = visuals;
   const reflectionStrength = visuals.reflectionStrength;
   const shadowStrength = visuals.shadowAccent;
-  drawSkyAndShore(
+  if (!viewport.native) drawSkyAndShore(
     ctx,
     canvas,
     state,
@@ -4185,6 +4187,7 @@ function renderScene(
     fluidFeatures
   );
   for (const bandMesh of water.bandMeshes) {
+    if (viewport.native) break;
     const bandAccent = bandMesh.band === "near" ? 0.06 : bandMesh.band === "mid" ? 0.04 : 0;
     for (let index = 0; index < bandMesh.indices.length; index += 3) {
       const a = bandMesh.positions[bandMesh.indices[index]];
@@ -4219,7 +4222,13 @@ function renderScene(
   const shorelineFoamSegments = buildShorelineFoamSegments(state);
   const lightSources = collectSceneLightSources(state, visuals);
 
-  pushHarborGeometry(camera, viewport, sceneTriangles, state);
+  if (viewport.native) {
+    if (!state.nativeStaticTriangles) {
+      state.nativeStaticTriangles = [];
+      pushHarborGeometry(camera, viewport, state.nativeStaticTriangles, state);
+    }
+    sceneTriangles.push(...state.nativeStaticTriangles);
+  } else pushHarborGeometry(camera, viewport, sceneTriangles, state);
   const cloth = buildClothSurface(
     state,
     state,
@@ -4232,13 +4241,14 @@ function renderScene(
     const b = cloth.positions[cloth.indices[index + 1]];
     const c = cloth.positions[cloth.indices[index + 2]];
     const normal = normalizeVec3(crossVec3(subVec3(b, a), subVec3(c, a)));
-    const projected = [projectPoint(a, camera, viewport), projectPoint(b, camera, viewport), projectPoint(c, camera, viewport)];
+    const projected = viewport.native ? [] : [projectPoint(a, camera, viewport), projectPoint(b, camera, viewport), projectPoint(c, camera, viewport)];
     if (projected.some((value) => value === null)) {
       continue;
     }
     sceneTriangles.push({
+      worldPoints: [a, b, c],
       points: projected,
-      depth: (projected[0].depth + projected[1].depth + projected[2].depth) / 3,
+      depth: viewport.native ? 0 : (projected[0].depth + projected[1].depth + projected[2].depth) / 3,
       worldCenter: scaleVec3(addVec3(addVec3(a, b), c), 1 / 3),
       normal,
       baseColor: cloth.color,
@@ -4272,6 +4282,20 @@ function renderScene(
     );
   }
 
+  if (viewport.native) {
+    appendShowcaseFlagPole(sceneTriangles, FLAG_LAYOUT.origin);
+    state.nativeRenderer = ctx.render({
+      vertices: packShowcaseSurfaces(sceneTriangles),
+      camera: { eye: [camera.eye.x, camera.eye.y, camera.eye.z], target: [camera.target.x, camera.target.y, camera.target.z], fov: camera.fov },
+      time: state.time,
+      wakes: state.ships.slice(0, 4).map(ship => [ship.position.x, ship.position.z, ship.rotationY]),
+    });
+    setListContent(dom.sceneMetrics, ["Renderer: native WebGPU raster", `Geometry: ${state.nativeRenderer.vertexCount / 3} triangles`, "Lighting: directional sun and atmospheric sky"]);
+    setListContent(dom.qualityMetrics, ["Antialiasing: 4 samples", "Shadows: filtered 2048px depth map", "Water: animated surface with planar reflection", `Frame interval: ${state.lastDecision.metrics.averageFrameTimeMs.toFixed(2)} ms`]);
+    dom.status.textContent = state.paused ? state.translate(gpuSharedTranslationKeys.statusPaused) : state.translate(gpuSharedTranslationKeys.statusLive, { fps: state.lastDecision.metrics.fps.toFixed(1) });
+    dom.details.textContent = state.translate(gpuSharedTranslationKeys.detailsNative);
+    return;
+  }
   drawTriangles(ctx, waterTriangles, lightDir, reflectionStrength, camera, shadowStrength);
   for (const ship of state.ships) {
     renderShipShadow(
@@ -4415,6 +4439,7 @@ function updateSceneState(state, dt, shipModel, featureAdapters) {
 function syncTextState(state, shipModel, featureAdapters) {
   const snapshot = {
     coordinateSystem: "right-handed world; +x right, +y up, +z forward from the shore",
+    renderer: state.nativeRenderer ?? { backend: "canvas-2d", reason: state.rendererFallbackReason },
     focus: state.focus,
     stress: state.stress,
     ships: state.ships.map((ship) => {
@@ -4510,16 +4535,37 @@ export async function mountGpuShowcase(options = {}, featureFlags = null) {
   state.demoDescription = resolveSceneDescription(state, options, shipModel).description;
   syncTextState(state, shipModel, featureAdapters);
 
-  const ctx = dom.canvas.getContext("2d");
+  const nativeEnabled = isFeatureEnabled(featureFlags, "gpu-demo.scene-fidelity.enabled", false);
+  const nativeRenderer = await loadNativeShowcaseRenderer({
+    enabled: nativeEnabled,
+    canvas: dom.canvas,
+    navigator: options.__navigator ?? globalThis.navigator,
+    loader: options.__nativeRendererLoader,
+    onUnavailable(message) { dom.status.textContent = message; state.paused = true; state.rendererUnavailable = true; dom.pauseButton.disabled = true; },
+  });
+  state.rendererFallbackReason = nativeEnabled ? "webgpu-unavailable" : "native-rollout-disabled";
+  const ctx = nativeRenderer ?? dom.canvas.getContext("2d");
   if (!ctx) {
     throw new Error("2D canvas context is required for the shared showcase.");
   }
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
+  if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+    state.paused = true;
+    dom.pauseButton.textContent = state.translate(gpuSharedTranslationKeys.resume);
+  }
   let animationFrameId = 0;
   let destroyed = false;
+  let lastRenderTime = null;
+  let lastNativeSceneKey = null;
   const renderFrame = (nowMs) => {
     if (destroyed) {
+      return;
+    }
+    if (document.hidden) {
+      state.lastTimeMs = null;
+      lastRenderTime = null;
+      animationFrameId = requestAnimationFrame(renderFrame);
       return;
     }
     if (!state.paused) {
@@ -4532,13 +4578,14 @@ export async function mountGpuShowcase(options = {}, featureFlags = null) {
       state.frame += 1;
       updateSceneState(state, dt, shipModel, featureAdapters);
       updatePackageState(state, options, shipModel, dt);
-      const syntheticFrame = 14.2 + state.sprays.length * 0.1 + (state.stress ? 6.4 : 0);
-      state.lastDecision = recordTelemetry(state, syntheticFrame);
+      if (lastRenderTime !== null) state.lastDecision = recordTelemetry(state, Math.max(0.1, nowMs - lastRenderTime));
     }
+    lastRenderTime = nowMs;
 
     state.demoDescription = resolveSceneDescription(state, options, shipModel).description;
     resizeCanvasToDisplaySize(dom.canvas, state);
-    renderScene(
+    const sceneKey = `${state.time}:${state.focus}:${dom.canvas.width}:${dom.canvas.height}`;
+    if (!state.rendererUnavailable && (!nativeRenderer || sceneKey !== lastNativeSceneKey)) renderScene(
       ctx,
       dom.canvas,
       state,
@@ -4548,15 +4595,18 @@ export async function mountGpuShowcase(options = {}, featureFlags = null) {
       featureAdapters.fluid,
       featureAdapters.cloth
     );
+    lastNativeSceneKey = sceneKey;
     syncTextState(state, shipModel, featureAdapters);
     animationFrameId = requestAnimationFrame(renderFrame);
   };
 
   const handlePauseClick = () => {
+    if (state.rendererUnavailable) return;
     state.paused = !state.paused;
     dom.pauseButton.textContent = state.paused
       ? state.translate(gpuSharedTranslationKeys.resume)
       : state.translate(gpuSharedTranslationKeys.pause);
+    if (nativeRenderer && state.paused) dom.status.textContent = state.translate(gpuSharedTranslationKeys.statusPaused);
   };
   const handleStressChange = () => {
     state.stress = dom.stressToggle.checked;
@@ -4579,6 +4629,7 @@ export async function mountGpuShowcase(options = {}, featureFlags = null) {
       return;
     }
     destroyed = true;
+    nativeRenderer?.destroy();
     if (animationFrameId) {
       cancelAnimationFrame(animationFrameId);
     }

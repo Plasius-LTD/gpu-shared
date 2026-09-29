@@ -4,11 +4,15 @@ import { fileURLToPath } from "node:url";
 
 const repoRoot = fileURLToPath(new URL("../", import.meta.url));
 const assetsDir = path.join(repoRoot, "assets");
-const inlineModulePath = path.join(repoRoot, "src", "showcase-inline-assets.js");
+const inlineModulePath = path.join(
+  repoRoot,
+  "src",
+  "showcase-inline-assets.js",
+);
 
 const MATERIAL_LIBRARY = Object.freeze({
   "painted-hull": {
-    baseColorFactor: [0.42, 0.24, 0.16, 1],
+    baseColorFactor: [0.14, 0.052, 0.025, 1],
     metallicFactor: 0.08,
     roughnessFactor: 0.76,
   },
@@ -18,7 +22,7 @@ const MATERIAL_LIBRARY = Object.freeze({
     roughnessFactor: 0.42,
   },
   "deck-plank": {
-    baseColorFactor: [0.53, 0.39, 0.26, 1],
+    baseColorFactor: [0.31, 0.2, 0.095, 1],
     metallicFactor: 0.02,
     roughnessFactor: 0.9,
   },
@@ -31,6 +35,16 @@ const MATERIAL_LIBRARY = Object.freeze({
     baseColorFactor: [0.82, 0.79, 0.72, 1],
     metallicFactor: 0,
     roughnessFactor: 0.96,
+  },
+  "rigging-rope": {
+    baseColorFactor: [0.055, 0.038, 0.023, 1],
+    metallicFactor: 0,
+    roughnessFactor: 0.96,
+  },
+  "headland-grass": {
+    baseColorFactor: [0.085, 0.12, 0.055, 1],
+    metallicFactor: 0,
+    roughnessFactor: 0.98,
   },
   "metal-dark": {
     baseColorFactor: [0.21, 0.22, 0.24, 1],
@@ -219,7 +233,9 @@ class PrimitiveBuilder {
 }
 
 function createPrimitiveMap(materialNames) {
-  return Object.fromEntries(materialNames.map((name) => [name, new PrimitiveBuilder(name)]));
+  return Object.fromEntries(
+    materialNames.map((name) => [name, new PrimitiveBuilder(name)]),
+  );
 }
 
 function addBox(builder, min, max) {
@@ -265,8 +281,16 @@ function addCylinder(builder, options) {
     const angle = (index / radialSegments) * Math.PI * 2;
     const cosine = Math.cos(angle);
     const sine = Math.sin(angle);
-    topRing.push(vec3(center[0] + cosine * radiusTop, topY, center[2] + sine * radiusTop));
-    bottomRing.push(vec3(center[0] + cosine * radiusBottom, bottomY, center[2] + sine * radiusBottom));
+    topRing.push(
+      vec3(center[0] + cosine * radiusTop, topY, center[2] + sine * radiusTop),
+    );
+    bottomRing.push(
+      vec3(
+        center[0] + cosine * radiusBottom,
+        bottomY,
+        center[2] + sine * radiusBottom,
+      ),
+    );
     sideNormals.push(normalizeVec3(vec3(cosine, sideSlope, sine)));
   }
 
@@ -277,7 +301,12 @@ function addCylinder(builder, options) {
       topRing[index],
       topRing[next],
       bottomRing[next],
-      [sideNormals[index], sideNormals[index], sideNormals[next], sideNormals[next]]
+      [
+        sideNormals[index],
+        sideNormals[index],
+        sideNormals[next],
+        sideNormals[next],
+      ],
     );
   }
 
@@ -326,31 +355,46 @@ function addTrapezoidPrism(builder, options) {
 }
 
 function addGabledRoof(builder, options) {
-  const {
-    minX,
-    maxX,
-    minZ,
-    maxZ,
-    eaveY,
-    ridgeY,
-  } = options;
-  const ridgeZ = (minZ + maxZ) * 0.5;
+  const { minX, maxX, minZ, maxZ, eaveY, ridgeY } = options;
+  const ridgeX = (minX + maxX) * 0.5;
   const leftFront = vec3(minX, eaveY, maxZ);
   const rightFront = vec3(maxX, eaveY, maxZ);
   const leftBack = vec3(minX, eaveY, minZ);
   const rightBack = vec3(maxX, eaveY, minZ);
-  const ridgeFront = vec3(0, ridgeY, maxZ);
-  const ridgeBack = vec3(0, ridgeY, minZ);
-  const ridgeMidFront = vec3(0, ridgeY, ridgeZ + (maxZ - ridgeZ) * 0.2);
-  const ridgeMidBack = vec3(0, ridgeY, ridgeZ - (ridgeZ - minZ) * 0.2);
+  const ridgeFront = vec3(ridgeX, ridgeY, maxZ);
+  const ridgeBack = vec3(ridgeX, ridgeY, minZ);
 
-  builder.addQuad(leftBack, leftFront, ridgeMidFront, ridgeMidBack);
-  builder.addQuad(ridgeMidBack, ridgeMidFront, rightFront, rightBack);
+  builder.addQuad(leftBack, leftFront, ridgeFront, ridgeBack);
+  builder.addQuad(ridgeBack, ridgeFront, rightFront, rightBack);
   builder.addTriangle(leftFront, rightFront, ridgeFront);
   builder.addTriangle(rightBack, leftBack, ridgeBack);
 }
 
 function addHull(builder, deckBuilder, stations) {
+  // Subdivide longitudinal stations with a shape-preserving cubic interpolation.
+  const controls = stations;
+  stations = [];
+  for (let i = 0; i < controls.length - 1; i++) {
+    for (let step = 0; step < 4; step++) {
+      const t = step / 4;
+      const p0 = controls[Math.max(0, i - 1)],
+        p1 = controls[i],
+        p2 = controls[i + 1],
+        p3 = controls[Math.min(controls.length - 1, i + 2)];
+      const station = {};
+      for (const key of ["halfWidth", "deckY", "bottomY", "camber"]) {
+        station[key] =
+          0.5 *
+          (2 * p1[key] +
+            (-p0[key] + p2[key]) * t +
+            (2 * p0[key] - 5 * p1[key] + 4 * p2[key] - p3[key]) * t * t +
+            (-p0[key] + 3 * p1[key] - 3 * p2[key] + p3[key]) * t * t * t);
+      }
+      station.z = p1.z + (p2.z - p1.z) * t;
+      stations.push(station);
+    }
+  }
+  stations.push(controls.at(-1));
   const rings = stations.map((station) => {
     const lowerY = station.bottomY + (station.deckY - station.bottomY) * 0.28;
     const upperY = station.bottomY + (station.deckY - station.bottomY) * 0.76;
@@ -369,39 +413,54 @@ function addHull(builder, deckBuilder, stations) {
   for (let index = 0; index < rings.length - 1; index += 1) {
     const current = rings[index];
     const next = rings[index + 1];
-    builder.addQuad(current.keel, current.chineLowerStarboard, next.chineLowerStarboard, next.keel);
+    builder.addQuad(
+      current.keel,
+      current.chineLowerStarboard,
+      next.chineLowerStarboard,
+      next.keel,
+    );
     builder.addQuad(
       current.chineLowerStarboard,
       current.chineUpperStarboard,
       next.chineUpperStarboard,
-      next.chineLowerStarboard
+      next.chineLowerStarboard,
     );
     builder.addQuad(
       current.chineUpperStarboard,
       current.railStarboard,
       next.railStarboard,
-      next.chineUpperStarboard
+      next.chineUpperStarboard,
     );
-    builder.addQuad(current.railPort, current.chineUpperPort, next.chineUpperPort, next.railPort);
+    builder.addQuad(
+      current.railPort,
+      current.chineUpperPort,
+      next.chineUpperPort,
+      next.railPort,
+    );
     builder.addQuad(
       current.chineUpperPort,
       current.chineLowerPort,
       next.chineLowerPort,
-      next.chineUpperPort
+      next.chineUpperPort,
     );
-    builder.addQuad(current.chineLowerPort, current.keel, next.keel, next.chineLowerPort);
+    builder.addQuad(
+      current.chineLowerPort,
+      current.keel,
+      next.keel,
+      next.chineLowerPort,
+    );
 
     deckBuilder.addQuad(
       current.deckCenter,
       current.railStarboard,
       next.railStarboard,
-      next.deckCenter
+      next.deckCenter,
     );
     deckBuilder.addQuad(
       current.railPort,
       current.deckCenter,
       next.deckCenter,
-      next.railPort
+      next.railPort,
     );
   }
 
@@ -429,6 +488,84 @@ function addHull(builder, deckBuilder, stations) {
   ]);
 }
 
+function addRope(builder, start, end, radius = 0.015, sag = 0) {
+  const direction = normalizeVec3(subVec3(end, start));
+  const right = normalizeVec3(
+    crossVec3(
+      direction,
+      Math.abs(direction[1]) > 0.9 ? vec3(1, 0, 0) : vec3(0, 1, 0),
+    ),
+  );
+  const up = normalizeVec3(crossVec3(direction, right));
+  const ring = (t) => {
+    const c = addVec3(start, scaleVec3(subVec3(end, start), t));
+    c[1] -= Math.sin(t * Math.PI) * sag;
+    return Array.from({ length: 6 }, (_, i) =>
+      addVec3(
+        c,
+        addVec3(
+          scaleVec3(right, Math.cos((i / 6) * Math.PI * 2) * radius),
+          scaleVec3(up, Math.sin((i / 6) * Math.PI * 2) * radius),
+        ),
+      ),
+    );
+  };
+  for (let j = 0; j < 6; j++) {
+    const a = ring(j / 6),
+      b = ring((j + 1) / 6);
+    for (let i = 0; i < 6; i++)
+      builder.addQuad(a[i], a[(i + 1) % 6], b[(i + 1) % 6], b[i]);
+  }
+}
+
+function addBillowedSail(builder, a, b, c, d) {
+  const normal = normalizeVec3(crossVec3(subVec3(b, a), subVec3(d, a)));
+  const point = (u, v) => {
+    const top = addVec3(a, scaleVec3(subVec3(b, a), u)),
+      bottom = addVec3(d, scaleVec3(subVec3(c, d), u));
+    return addVec3(
+      addVec3(top, scaleVec3(subVec3(bottom, top), v)),
+      scaleVec3(normal, Math.sin(u * Math.PI) * Math.sin(v * Math.PI) * 0.32),
+    );
+  };
+  for (let y = 0; y < 12; y++)
+    for (let x = 0; x < 16; x++) {
+      builder.addQuad(
+        point(x / 16, y / 12),
+        point((x + 1) / 16, y / 12),
+        point((x + 1) / 16, (y + 1) / 12),
+        point(x / 16, (y + 1) / 12),
+      );
+    }
+}
+
+function addShipRails(parts, length, width, deckHeight) {
+  for (const side of [-1, 1]) {
+    for (let i = 0; i < 12; i++) {
+      const z = (i / 11 - 0.5) * length;
+      const x = side * width * (0.65 + 0.35 * Math.sin((i / 11) * Math.PI));
+      addRope(
+        parts["mast-wood"] ?? parts["deck-plank"],
+        vec3(x, deckHeight, z),
+        vec3(x, deckHeight + 0.42, z),
+        0.027,
+      );
+      if (i < 11) {
+        const nz = ((i + 1) / 11 - 0.5) * length,
+          nx =
+            side * width * (0.65 + 0.35 * Math.sin(((i + 1) / 11) * Math.PI));
+        addRope(
+          parts["rigging-rope"] ?? parts["metal-dark"],
+          vec3(x, deckHeight + 0.38, z),
+          vec3(nx, deckHeight + 0.38, nz),
+          0.018,
+          0.025,
+        );
+      }
+    }
+  }
+}
+
 function addTerrainStrip(builder, sections) {
   for (let index = 0; index < sections.length - 1; index += 1) {
     const current = sections[index];
@@ -437,7 +574,7 @@ function addTerrainStrip(builder, sections) {
       vec3(current.leftX, current.y, current.z),
       vec3(current.rightX, current.y + current.camber, current.z),
       vec3(next.rightX, next.y + next.camber, next.z),
-      vec3(next.leftX, next.y, next.z)
+      vec3(next.leftX, next.y, next.z),
     );
   }
 }
@@ -464,29 +601,40 @@ function addIrregularRock(builder, options) {
       vec3(
         center[0] + cosine * radius * variance,
         center[1],
-        center[2] + sine * radius * (0.74 + variance * 0.22)
-      )
+        center[2] + sine * radius * (0.74 + variance * 0.22),
+      ),
     );
     midRing.push(
       vec3(
         center[0] + cosine * radius * variance * 0.92,
         center[1] + height * (0.44 + pseudoRandom(seed * 29 + index) * 0.12),
-        center[2] + sine * radius * variance * 0.72
-      )
+        center[2] + sine * radius * variance * 0.72,
+      ),
     );
     topRing.push(
       vec3(
         center[0] + cosine * radius * topVariance,
-        center[1] + height * (0.86 + pseudoRandom(seed * 31 + index * 5) * 0.22),
-        center[2] + sine * radius * topVariance * 0.76
-      )
+        center[1] +
+          height * (0.86 + pseudoRandom(seed * 31 + index * 5) * 0.22),
+        center[2] + sine * radius * topVariance * 0.76,
+      ),
     );
   }
 
   for (let index = 0; index < radialSegments; index += 1) {
     const next = (index + 1) % radialSegments;
-    builder.addQuad(bottomRing[index], midRing[index], midRing[next], bottomRing[next]);
-    builder.addQuad(midRing[index], topRing[index], topRing[next], midRing[next]);
+    builder.addQuad(
+      bottomRing[index],
+      midRing[index],
+      midRing[next],
+      bottomRing[next],
+    );
+    builder.addQuad(
+      midRing[index],
+      topRing[index],
+      topRing[next],
+      midRing[next],
+    );
   }
   builder.addPolygon([...topRing].reverse());
   builder.addPolygon(bottomRing);
@@ -501,6 +649,7 @@ function createBrigantineAsset() {
     "sail-canvas",
     "metal-dark",
     "warm-glass",
+    "rigging-rope",
   ]);
 
   addHull(parts["painted-hull"], parts["deck-plank"], [
@@ -513,7 +662,7 @@ function createBrigantineAsset() {
     { z: 3.9, halfWidth: 0.24, deckY: 0.78, bottomY: -0.68, camber: 0.02 },
   ]);
 
-  addBox(parts["hull-trim"], vec3(-1.48, 0.84, -2.2), vec3(1.48, 0.95, 2.4));
+  addShipRails(parts, 6.2, 1.35, 0.99);
   addBox(parts["deck-plank"], vec3(-0.68, 1.0, -2.35), vec3(0.68, 1.54, -0.6));
   addBox(parts["deck-plank"], vec3(-0.44, 1.02, 0.5), vec3(0.44, 1.38, 1.7));
   addTrapezoidPrism(parts["hull-trim"], {
@@ -542,19 +691,41 @@ function createBrigantineAsset() {
   addBox(parts["mast-wood"], vec3(-0.14, 2.4, -3.0), vec3(1.28, 2.48, -2.9));
   addBox(parts["mast-wood"], vec3(-0.04, 1.42, 3.7), vec3(0.06, 1.5, 5.05));
 
-  parts["sail-canvas"].addQuad(
+  addBillowedSail(
+    parts["sail-canvas"],
     vec3(0.08, 4.82, -0.92),
     vec3(1.86, 3.42, -0.84),
     vec3(1.54, 1.62, -0.74),
-    vec3(0.02, 2.08, -0.86)
+    vec3(0.02, 2.08, -0.86),
   );
-  parts["sail-canvas"].addQuad(
+  addBillowedSail(
+    parts["sail-canvas"],
     vec3(-0.05, 3.86, -2.96),
     vec3(1.15, 2.46, -2.86),
     vec3(0.96, 1.12, -2.78),
-    vec3(-0.08, 1.56, -2.92)
+    vec3(-0.08, 1.56, -2.92),
   );
   addBox(parts["metal-dark"], vec3(-0.96, 0.78, 1.26), vec3(0.96, 0.88, 1.44));
+  for (const z of [-0.92, -2.92]) {
+    const height = z === -0.92 ? 5.9 : 4.5;
+    for (const side of [-1, 1])
+      for (const offset of [-0.65, 0.65]) {
+        addRope(
+          parts["rigging-rope"],
+          vec3(0, height, z),
+          vec3(side * 1.28, 1.1, z + offset),
+          0.013,
+          0.08,
+        );
+      }
+    addRope(
+      parts["rigging-rope"],
+      vec3(0, height, z),
+      vec3(0, 1.5, 4.8),
+      0.018,
+      0.16,
+    );
+  }
 
   addCylinder(parts["warm-glass"], {
     center: vec3(0.72, 1.24, 0.96),
@@ -581,8 +752,23 @@ function createBrigantineAsset() {
       waterline: 0.44,
     },
     children: [
-      { name: "brigantine-hull", primitives: [parts["painted-hull"], parts["deck-plank"], parts["hull-trim"]] },
-      { name: "brigantine-rig", primitives: [parts["mast-wood"], parts["sail-canvas"], parts["metal-dark"]] },
+      {
+        name: "brigantine-hull",
+        primitives: [
+          parts["painted-hull"],
+          parts["deck-plank"],
+          parts["hull-trim"],
+        ],
+      },
+      {
+        name: "brigantine-rig",
+        primitives: [
+          parts["mast-wood"],
+          parts["sail-canvas"],
+          parts["metal-dark"],
+          parts["rigging-rope"],
+        ],
+      },
       { name: "brigantine-lanterns", primitives: [parts["warm-glass"]] },
     ],
   };
@@ -606,7 +792,11 @@ function createCutterAsset() {
     { z: 2.6, halfWidth: 0.22, deckY: 0.48, bottomY: -0.42, camber: 0.02 },
   ]);
 
-  addBox(parts["paint-white"], vec3(-0.58, 0.72, -0.72), vec3(0.58, 1.52, 0.82));
+  addBox(
+    parts["paint-white"],
+    vec3(-0.58, 0.72, -0.72),
+    vec3(0.58, 1.52, 0.82),
+  );
   addGabledRoof(parts["paint-white"], {
     minX: -0.7,
     maxX: 0.7,
@@ -617,7 +807,11 @@ function createCutterAsset() {
   });
   addBox(parts["window-glass"], vec3(-0.5, 1.0, -0.62), vec3(0.5, 1.3, -0.48));
   addBox(parts["window-glass"], vec3(-0.5, 1.0, 0.36), vec3(0.5, 1.28, 0.52));
-  addBox(parts["window-glass"], vec3(-0.64, 1.02, -0.28), vec3(-0.5, 1.28, 0.18));
+  addBox(
+    parts["window-glass"],
+    vec3(-0.64, 1.02, -0.28),
+    vec3(-0.5, 1.28, 0.18),
+  );
   addBox(parts["window-glass"], vec3(0.5, 1.02, -0.28), vec3(0.64, 1.28, 0.18));
   addCylinder(parts["metal-dark"], {
     center: vec3(0, 1.86, -0.3),
@@ -627,6 +821,7 @@ function createCutterAsset() {
     radialSegments: 18,
   });
   addBox(parts["metal-dark"], vec3(-0.9, 0.76, 0.98), vec3(0.9, 0.88, 1.12));
+  addShipRails(parts, 4.5, 0.78, 0.68);
   addCylinder(parts["warm-glass"], {
     center: vec3(0.44, 1.02, 1.18),
     height: 0.18,
@@ -646,13 +841,25 @@ function createCutterAsset() {
       waterline: 0.36,
     },
     children: [
-      { name: "cutter-hull", primitives: [parts["painted-hull"], parts["deck-plank"]] },
-      { name: "cutter-cabin", primitives: [parts["paint-white"], parts["window-glass"], parts["metal-dark"], parts["warm-glass"]] },
+      {
+        name: "cutter-hull",
+        primitives: [parts["painted-hull"], parts["deck-plank"]],
+      },
+      {
+        name: "cutter-cabin",
+        primitives: [
+          parts["paint-white"],
+          parts["window-glass"],
+          parts["metal-dark"],
+          parts["warm-glass"],
+        ],
+      },
     ],
   };
 }
 
 function createLighthouseAsset() {
+  const railing = new PrimitiveBuilder("metal-dark");
   const parts = createPrimitiveMap([
     "paint-white",
     "paint-red",
@@ -673,8 +880,8 @@ function createLighthouseAsset() {
   addCylinder(parts["paint-red"], {
     center: vec3(0, 4.7, 0),
     height: 1.2,
-    radiusTop: 1.06,
-    radiusBottom: 1.22,
+    radiusTop: 1.19,
+    radiusBottom: 1.27,
     radialSegments: 40,
     capTop: false,
     capBottom: false,
@@ -718,15 +925,37 @@ function createLighthouseAsset() {
     ridgeY: 2.36,
   });
   addBox(parts["window-glass"], vec3(-0.42, 5.3, 1.26), vec3(0.42, 6.2, 1.42));
+  for (let i = 0; i < 20; i++) {
+    const angle = (i / 20) * Math.PI * 2,
+      next = ((i + 1) / 20) * Math.PI * 2;
+    const bottom = vec3(Math.cos(angle) * 1.31, 10.5, Math.sin(angle) * 1.31);
+    const top = vec3(bottom[0], 11.22, bottom[2]);
+    addRope(railing, bottom, top, 0.028);
+    addRope(
+      railing,
+      top,
+      vec3(Math.cos(next) * 1.31, 11.22, Math.sin(next) * 1.31),
+      0.028,
+    );
+  }
 
   return {
     name: "lighthouse",
     physics: null,
     children: [
-      { name: "lighthouse-tower", primitives: [parts["paint-white"], parts["paint-red"], parts.stone, parts["metal-dark"], parts["warm-glass"]] },
+      {
+        name: "lighthouse-tower",
+        primitives: [
+          parts["paint-white"],
+          parts["paint-red"],
+          parts.stone,
+          parts["metal-dark"],
+          parts["warm-glass"],
+        ],
+      },
+      { name: "lighthouse-gallery-rail", primitives: [railing] },
       {
         name: "lighthouse-keeper-house",
-        translation: [0.8, 0, -0.3],
         primitives: [parts["roof-tiles"], parts["window-glass"]],
       },
     ],
@@ -750,11 +979,23 @@ function createHarborDockAsset() {
   addBox(parts["jetty-timber"], vec3(3.6, 0.22, -1.55), vec3(7.4, 0.42, 1.55));
 
   for (const x of [-3.8, -2, -0.2, 1.6, 4.2, 5.8, 7]) {
-    addBox(parts["jetty-timber"], vec3(x - 0.08, -1.42, -0.9), vec3(x + 0.08, 0.22, -0.74));
-    addBox(parts["jetty-timber"], vec3(x - 0.08, -1.42, 0.74), vec3(x + 0.08, 0.22, 0.9));
+    addBox(
+      parts["jetty-timber"],
+      vec3(x - 0.08, -1.42, -0.9),
+      vec3(x + 0.08, 0.22, -0.74),
+    );
+    addBox(
+      parts["jetty-timber"],
+      vec3(x - 0.08, -1.42, 0.74),
+      vec3(x + 0.08, 0.22, 0.9),
+    );
   }
 
-  addBox(parts["warehouse-plaster"], vec3(-6.3, 0.3, -1.7), vec3(-2.2, 2.4, 1.3));
+  addBox(
+    parts["warehouse-plaster"],
+    vec3(-6.3, 0.3, -1.7),
+    vec3(-2.2, 2.4, 1.3),
+  );
   addGabledRoof(parts["roof-tiles"], {
     minX: -6.6,
     maxX: -1.9,
@@ -763,8 +1004,16 @@ function createHarborDockAsset() {
     eaveY: 2.4,
     ridgeY: 3.26,
   });
-  addBox(parts["window-glass"], vec3(-5.84, 1.06, 1.32), vec3(-4.9, 1.78, 1.46));
-  addBox(parts["window-glass"], vec3(-3.58, 1.06, 1.32), vec3(-2.66, 1.78, 1.46));
+  addBox(
+    parts["window-glass"],
+    vec3(-5.84, 1.06, 1.32),
+    vec3(-4.9, 1.78, 1.46),
+  );
+  addBox(
+    parts["window-glass"],
+    vec3(-3.58, 1.06, 1.32),
+    vec3(-2.66, 1.78, 1.46),
+  );
   addBox(parts["dock-metal"], vec3(0.18, 0.42, -0.22), vec3(0.36, 2.32, -0.02));
   addBox(parts["dock-metal"], vec3(0.24, 2.06, -0.18), vec3(1.96, 2.22, -0.02));
   addBox(parts["dock-metal"], vec3(1.72, 1.36, -0.16), vec3(1.9, 2.06, 0.02));
@@ -795,11 +1044,24 @@ function createHarborDockAsset() {
     name: "harbor-dock",
     physics: null,
     children: [
-      { name: "harbor-dock-main", primitives: [parts.concrete, parts["jetty-timber"], parts["dock-metal"], parts["crate-wood"]] },
+      {
+        name: "harbor-dock-main",
+        primitives: [
+          parts.concrete,
+          parts["jetty-timber"],
+          parts["dock-metal"],
+          parts["crate-wood"],
+        ],
+      },
       {
         name: "harbor-dock-warehouse",
         translation: [0, 0, 0],
-        primitives: [parts["warehouse-plaster"], parts["roof-tiles"], parts["window-glass"], parts["warm-glass"]],
+        primitives: [
+          parts["warehouse-plaster"],
+          parts["roof-tiles"],
+          parts["window-glass"],
+          parts["warm-glass"],
+        ],
       },
     ],
   };
@@ -813,7 +1075,26 @@ function createShorelineAsset() {
     "seaweed",
     "driftwood",
     "foam-stain",
+    "headland-grass",
   ]);
+  // A continuous coastal headland replaces the old isolated strip behind the quay.
+  const landHeight = (x, z) => {
+    const inland = Math.max(0, (-z - 2) / 10);
+    return (
+      -0.12 +
+      Math.max(0, 2 - z) * 0.08 +
+      inland * (1.5 + 0.75 * Math.sin(x * 0.13) + 0.45 * Math.cos(z * 0.2)) +
+      Math.min(1, inland) * Math.sin(x * 0.73 + Math.cos(z * 0.48)) * 0.24
+    );
+  };
+  for (let z = -38; z < 2; z += 1.5)
+    for (let x = -34; x < 28; x += 1.5) {
+      const a = vec3(x, landHeight(x, z), z),
+        b = vec3(x + 1.5, landHeight(x + 1.5, z), z);
+      const c = vec3(x + 1.5, landHeight(x + 1.5, z + 1.5), z + 1.5),
+        d = vec3(x, landHeight(x, z + 1.5), z + 1.5);
+      parts["headland-grass"].addQuad(d, c, b, a);
+    }
 
   addTerrainStrip(parts["shore-sand"], [
     { leftX: -9.8, rightX: 8.8, y: -0.42, camber: 0.04, z: 4.1 },
@@ -872,7 +1153,7 @@ function createShorelineAsset() {
       vec3(x - dx - widthX, -0.26, z - dz - widthZ),
       vec3(x + dx - widthX, -0.25, z + dz - widthZ),
       vec3(x + dx + widthX, -0.22, z + dz + widthZ),
-      vec3(x - dx + widthX, -0.23, z - dz + widthZ)
+      vec3(x - dx + widthX, -0.23, z - dz + widthZ),
     );
   }
 
@@ -896,7 +1177,11 @@ function createShorelineAsset() {
     name: "shoreline",
     physics: null,
     children: [
-      { name: "shoreline-beach", primitives: [parts["shore-sand"], parts["foam-stain"], parts.seaweed] },
+      { name: "shoreline-headland", primitives: [parts["headland-grass"]] },
+      {
+        name: "shoreline-beach",
+        primitives: [parts["shore-sand"], parts["foam-stain"], parts.seaweed],
+      },
       { name: "shoreline-rocks", primitives: [parts["wet-rock"]] },
       { name: "shoreline-breakwater", primitives: [parts.stone] },
       { name: "shoreline-detail", primitives: [parts.driftwood] },
@@ -914,8 +1199,16 @@ function chunkBuffer(buffer, chunks) {
 }
 
 function computeBounds(values) {
-  const min = [Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY];
-  const max = [Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY];
+  const min = [
+    Number.POSITIVE_INFINITY,
+    Number.POSITIVE_INFINITY,
+    Number.POSITIVE_INFINITY,
+  ];
+  const max = [
+    Number.NEGATIVE_INFINITY,
+    Number.NEGATIVE_INFINITY,
+    Number.NEGATIVE_INFINITY,
+  ];
   for (let index = 0; index < values.length; index += 3) {
     min[0] = Math.min(min[0], values[index]);
     min[1] = Math.min(min[1], values[index + 1]);
@@ -934,7 +1227,9 @@ function compileAsset(assetDefinition) {
     {
       name: assetDefinition.name,
       children: [],
-      ...(assetDefinition.physics ? { extras: { physics: assetDefinition.physics } } : {}),
+      ...(assetDefinition.physics
+        ? { extras: { physics: assetDefinition.physics } }
+        : {}),
     },
   ];
 
@@ -947,7 +1242,9 @@ function compileAsset(assetDefinition) {
   }
 
   const materialOrder = [...materialNames];
-  const materialIndices = new Map(materialOrder.map((name, index) => [name, index]));
+  const materialIndices = new Map(
+    materialOrder.map((name, index) => [name, index]),
+  );
   const materials = materialOrder.map((name) => ({
     name,
     pbrMetallicRoughness: {
@@ -958,7 +1255,9 @@ function compileAsset(assetDefinition) {
     ...(MATERIAL_LIBRARY[name].emissiveFactor
       ? { emissiveFactor: MATERIAL_LIBRARY[name].emissiveFactor }
       : {}),
-    ...(MATERIAL_LIBRARY[name].baseColorFactor[3] < 1 ? { alphaMode: "BLEND" } : {}),
+    ...(MATERIAL_LIBRARY[name].baseColorFactor[3] < 1
+      ? { alphaMode: "BLEND" }
+      : {}),
   }));
 
   const bufferChunks = [];
@@ -969,7 +1268,7 @@ function compileAsset(assetDefinition) {
     const buffer = Buffer.from(
       typedArray.buffer,
       typedArray.byteOffset,
-      typedArray.byteLength
+      typedArray.byteLength,
     );
     const { byteOffset, byteLength } = chunkBuffer(buffer, bufferChunks);
     const bufferViewIndex = bufferViews.length;
@@ -1052,7 +1351,9 @@ function compileAsset(assetDefinition) {
     nodes.push({
       name: child.name,
       mesh: meshIndex,
-      ...(Array.isArray(child.translation) ? { translation: child.translation } : {}),
+      ...(Array.isArray(child.translation)
+        ? { translation: child.translation }
+        : {}),
       ...(Array.isArray(child.scale) ? { scale: child.scale } : {}),
       ...(Array.isArray(child.rotation) ? { rotation: child.rotation } : {}),
     });
@@ -1092,20 +1393,28 @@ function writeInlineModule(assetName, contents) {
   const inlineUrl = `data:application/json;base64,${Buffer.from(contents).toString("base64")}`;
   writeFileSync(
     inlineModulePath,
-    `export const INLINE_SHOWCASE_ASSET_URLS = Object.freeze({\n  ${JSON.stringify(assetName)}: ${JSON.stringify(inlineUrl)},\n});\n`
+    `export const INLINE_SHOWCASE_ASSET_URLS = Object.freeze({\n  ${JSON.stringify(assetName)}: ${JSON.stringify(inlineUrl)},\n});\n`,
   );
 }
 
-const assets = [
-  ["brigantine.gltf", compileAsset(createBrigantineAsset())],
-  ["cutter.gltf", compileAsset(createCutterAsset())],
-  ["lighthouse.gltf", compileAsset(createLighthouseAsset())],
-  ["harbor-dock.gltf", compileAsset(createHarborDockAsset())],
-  ["shoreline.gltf", compileAsset(createShorelineAsset())],
-];
-
-for (const [fileName, contents] of assets) {
-  writeAsset(fileName, `${contents}\n`);
+export function createShowcaseAssets() {
+  return [
+    ["brigantine.gltf", compileAsset(createBrigantineAsset())],
+    ["cutter.gltf", compileAsset(createCutterAsset())],
+    ["lighthouse.gltf", compileAsset(createLighthouseAsset())],
+    ["harbor-dock.gltf", compileAsset(createHarborDockAsset())],
+    ["shoreline.gltf", compileAsset(createShorelineAsset())],
+  ];
 }
 
-writeInlineModule("brigantine", `${assets[0][1]}\n`);
+if (
+  process.argv[1] &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
+  const assets = createShowcaseAssets();
+  for (const [fileName, contents] of assets) {
+    writeAsset(fileName, `${contents}\n`);
+  }
+
+  writeInlineModule("brigantine", `${assets[0][1]}\n`);
+}

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createShowcaseAssets } from "../scripts/generate-showcase-assets.mjs";
 
 const repoRoot = fileURLToPath(new URL("../", import.meta.url));
 const assetNames = [
@@ -13,6 +14,64 @@ const assetNames = [
   "shoreline.gltf",
 ];
 
+test("committed showcase assets reproduce exactly from their authored generator", () => {
+  for (const [name, contents] of createShowcaseAssets()) {
+    assert.equal(
+      `${contents}\n`,
+      readFileSync(path.join(repoRoot, "assets", name), "utf8"),
+      name,
+    );
+  }
+});
+
+test("harbour assets include curved sails, rigging, railings and a grounded coastline", () => {
+  const brigantine = loadAssetDocument("brigantine.gltf");
+  const rigging = brigantine.materials.findIndex(
+    (m) => m.name === "rigging-rope",
+  );
+  assert.ok(rigging >= 0, "standing rigging must be real scene geometry");
+  const sail = brigantine.meshes
+    .flatMap((m) => m.primitives)
+    .find((p) => brigantine.materials[p.material].name === "sail-canvas");
+  assert.ok(
+    brigantine.accessors[sail.attributes.POSITION].count > 500,
+    "sails need a curved surface rather than a four-corner card",
+  );
+  const coast = loadAssetDocument("shoreline.gltf");
+  assert.ok(
+    coast.meshes.some((m) => m.name === "shoreline-headland"),
+    "shoreline must have a continuous land mass",
+  );
+});
+
+test("warehouse roof stays over its building and closes both gable ends", () => {
+  const document = loadAssetDocument("harbor-dock.gltf");
+  const buffers = document.buffers.map((buffer) => decodeDataUri(buffer.uri));
+  const mesh = document.meshes.find(
+    (candidate) => candidate.name === "harbor-dock-warehouse",
+  );
+  const roof = mesh.primitives.find(
+    (p) => document.materials[p.material].name === "roof-tiles",
+  );
+  const geometry = getPrimitiveGeometry(document, buffers, roof);
+  const ridge = [];
+  for (let i = 0; i < geometry.positions.length; i += 3) {
+    const [x, y, z] = geometry.positions.slice(i, i + 3);
+    assert.ok(
+      x >= -6.601 && x <= -1.899,
+      "roof must not stretch outside the building footprint",
+    );
+    if (y > 3.25) ridge.push([x, z]);
+  }
+  assert.ok(ridge.length >= 4);
+  assert.ok(ridge.every(([x]) => Math.abs(x + 4.25) < 0.001));
+  assert.ok(ridge.some(([, z]) => Math.abs(z + 1.95) < 0.001));
+  assert.ok(ridge.some(([, z]) => Math.abs(z - 1.55) < 0.001));
+  forEachTriangle(geometry, ({ faceNormal }) => {
+    assert.ok(faceNormal[1] >= -0.001, "roof surfaces face outward and upward");
+  });
+});
+
 const accessorTypeSizes = Object.freeze({
   SCALAR: 1,
   VEC2: 2,
@@ -21,25 +80,46 @@ const accessorTypeSizes = Object.freeze({
 });
 
 function loadAssetDocument(assetName) {
-  return JSON.parse(readFileSync(path.join(repoRoot, "assets", assetName), "utf8"));
+  return JSON.parse(
+    readFileSync(path.join(repoRoot, "assets", assetName), "utf8"),
+  );
 }
 
 function decodeDataUri(uri) {
   const match = /^data:.*?;base64,(.+)$/i.exec(uri);
-  assert.ok(match, "showcase assets should embed their binary buffer as a data URI");
+  assert.ok(
+    match,
+    "showcase assets should embed their binary buffer as a data URI",
+  );
   return Buffer.from(match[1], "base64");
 }
 
 function getComponentArray(componentType, buffer, byteOffset, count) {
   switch (componentType) {
     case 5121:
-      return new Uint8Array(buffer.buffer, buffer.byteOffset + byteOffset, count);
+      return new Uint8Array(
+        buffer.buffer,
+        buffer.byteOffset + byteOffset,
+        count,
+      );
     case 5123:
-      return new Uint16Array(buffer.buffer, buffer.byteOffset + byteOffset, count);
+      return new Uint16Array(
+        buffer.buffer,
+        buffer.byteOffset + byteOffset,
+        count,
+      );
     case 5125:
-      return new Uint32Array(buffer.buffer, buffer.byteOffset + byteOffset, count);
+      return new Uint32Array(
+        buffer.buffer,
+        buffer.byteOffset + byteOffset,
+        count,
+      );
     case 5126:
-      return new Float32Array(buffer.buffer, buffer.byteOffset + byteOffset, count);
+      return new Float32Array(
+        buffer.buffer,
+        buffer.byteOffset + byteOffset,
+        count,
+      );
     default:
       throw new Error(`Unsupported component type ${componentType}.`);
   }
@@ -56,8 +136,8 @@ function readAccessor(document, buffers, accessorIndex) {
       accessor.componentType,
       buffers[bufferView.buffer],
       byteOffset,
-      accessor.count * componentCount
-    )
+      accessor.count * componentCount,
+    ),
   );
 }
 
@@ -93,7 +173,10 @@ function dotVec3(a, b) {
 
 function normalizeVec3(a) {
   const length = Math.hypot(a[0], a[1], a[2]);
-  assert.ok(length > 0.000001, "asset geometry should not contain degenerate normals");
+  assert.ok(
+    length > 0.000001,
+    "asset geometry should not contain degenerate normals",
+  );
   return [a[0] / length, a[1] / length, a[2] / length];
 }
 
@@ -109,10 +192,10 @@ function forEachTriangle(geometry, callback) {
       geometry.indices[index + 2],
     ];
     const points = vertexIndices.map((vertexIndex) =>
-      getVertex(geometry.positions, vertexIndex)
+      getVertex(geometry.positions, vertexIndex),
     );
     const normals = vertexIndices.map((vertexIndex) =>
-      normalizeVec3(getVertex(geometry.normals, vertexIndex))
+      normalizeVec3(getVertex(geometry.normals, vertexIndex)),
     );
 
     callback({ points, normals, faceNormal: getFaceNormal(...points) });
@@ -132,7 +215,7 @@ test("generated showcase assets keep normals aligned to triangle winding", () =>
           for (const normal of normals) {
             assert.ok(
               dotVec3(faceNormal, normal) > 0.82,
-              `${assetName}/${mesh.name}/${geometry.materialName} has normals that disagree with face winding`
+              `${assetName}/${mesh.name}/${geometry.materialName} has normals that disagree with face winding`,
             );
           }
         });
@@ -144,12 +227,20 @@ test("generated showcase assets keep normals aligned to triangle winding", () =>
 test("lighthouse cylindrical bands use outward-facing side winding", () => {
   const document = loadAssetDocument("lighthouse.gltf");
   const buffers = document.buffers.map((buffer) => decodeDataUri(buffer.uri));
-  const mesh = document.meshes.find((candidate) => candidate.name === "lighthouse-tower");
+  const mesh = document.meshes.find(
+    (candidate) => candidate.name === "lighthouse-tower",
+  );
   assert.ok(mesh, "lighthouse tower mesh should be present");
 
-  for (const materialName of ["paint-white", "paint-red", "metal-dark", "warm-glass"]) {
+  for (const materialName of [
+    "paint-white",
+    "paint-red",
+    "metal-dark",
+    "warm-glass",
+  ]) {
     const primitive = mesh.primitives.find(
-      (candidate) => document.materials[candidate.material].name === materialName
+      (candidate) =>
+        document.materials[candidate.material].name === materialName,
     );
     assert.ok(primitive, `lighthouse tower should include ${materialName}`);
 
@@ -172,27 +263,42 @@ test("lighthouse cylindrical bands use outward-facing side winding", () => {
         return;
       }
 
-      const outward = [centroid[0] / radialLength, 0, centroid[2] / radialLength];
+      const outward = [
+        centroid[0] / radialLength,
+        0,
+        centroid[2] / radialLength,
+      ];
       checkedSides += 1;
       assert.ok(
         dotVec3(faceNormal, outward) > 0.95,
-        `lighthouse tower ${materialName} side face should point outward`
+        `lighthouse tower ${materialName} side face should point outward`,
       );
     });
 
-    assert.ok(checkedSides > 0, `${materialName} should expose cylindrical side faces`);
+    assert.ok(
+      checkedSides > 0,
+      `${materialName} should expose cylindrical side faces`,
+    );
   }
 });
 
 test("lighthouse cylindrical bands expose smooth radial side normals", () => {
   const document = loadAssetDocument("lighthouse.gltf");
   const buffers = document.buffers.map((buffer) => decodeDataUri(buffer.uri));
-  const mesh = document.meshes.find((candidate) => candidate.name === "lighthouse-tower");
+  const mesh = document.meshes.find(
+    (candidate) => candidate.name === "lighthouse-tower",
+  );
   assert.ok(mesh, "lighthouse tower mesh should be present");
 
-  for (const materialName of ["paint-white", "paint-red", "metal-dark", "warm-glass"]) {
+  for (const materialName of [
+    "paint-white",
+    "paint-red",
+    "metal-dark",
+    "warm-glass",
+  ]) {
     const primitive = mesh.primitives.find(
-      (candidate) => document.materials[candidate.material].name === materialName
+      (candidate) =>
+        document.materials[candidate.material].name === materialName,
     );
     assert.ok(primitive, `lighthouse tower should include ${materialName}`);
 
@@ -220,29 +326,37 @@ test("lighthouse cylindrical bands expose smooth radial side normals", () => {
       for (let index = 0; index < normals.length; index += 1) {
         assert.ok(
           dotVec3(normals[index], radialNormals[index]) > 0.88,
-          `lighthouse tower ${materialName} side normal should follow vertex radial direction`
+          `lighthouse tower ${materialName} side normal should follow vertex radial direction`,
         );
       }
 
       const normalSpread = Math.max(
         1 - dotVec3(normals[0], normals[1]),
         1 - dotVec3(normals[1], normals[2]),
-        1 - dotVec3(normals[0], normals[2])
+        1 - dotVec3(normals[0], normals[2]),
       );
       if (normalSpread > 0.001) {
         smoothSides += 1;
       }
     });
 
-    assert.ok(checkedSides > 0, `${materialName} should expose cylindrical side faces`);
-    assert.ok(smoothSides > 0, `${materialName} should use per-vertex side normals`);
+    assert.ok(
+      checkedSides > 0,
+      `${materialName} should expose cylindrical side faces`,
+    );
+    assert.ok(
+      smoothSides > 0,
+      `${materialName} should use per-vertex side normals`,
+    );
   }
 });
 
 test("shoreline asset includes beach, wet rock, breakwater, and detail materials", () => {
   const document = loadAssetDocument("shoreline.gltf");
   const meshNames = new Set(document.meshes.map((mesh) => mesh.name));
-  const materialNames = new Set(document.materials.map((material) => material.name));
+  const materialNames = new Set(
+    document.materials.map((material) => material.name),
+  );
 
   assert.ok(meshNames.has("shoreline-beach"));
   assert.ok(meshNames.has("shoreline-rocks"));
@@ -257,6 +371,9 @@ test("shoreline asset includes beach, wet rock, breakwater, and detail materials
     "driftwood",
     "foam-stain",
   ]) {
-    assert.ok(materialNames.has(materialName), `shoreline should include ${materialName}`);
+    assert.ok(
+      materialNames.has(materialName),
+      `shoreline should include ${materialName}`,
+    );
   }
 });
