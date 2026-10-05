@@ -31,3 +31,20 @@ loader for Product Studio.
 Live PVOX catalog discoverability is controlled by the host application's
 `gpu-demo.pvox-assets.enabled` feature flag. This package receives the selected
 representation explicitly and does not reproduce the remote rollout decision.
+
+## Reproducible harbour construction detail
+
+`npm run generate:assets` authors the packaged glTF geometry and the brigantine
+inline fallback from one source. Quay courses, pier boards, structural supports,
+warehouse joinery and roof courses are geometry, so the existing native colour,
+shadow and reflection passes agree. Straight rope/strut segments use one axial
+section; sagged ropes retain subdivisions. Material factors are explicit. Dark
+warehouse glazing is opaque in the current renderer. No loader semantics change.
+
+Tests compare generated output byte-for-byte and enforce non-degenerate geometry,
+consistent winding/normals, fewer than 25,000 triangles per asset and less than
+6 MiB across the five uncompressed glTF files. See
+[harbour detail design](../design/shoreline-harbour-detail.md). Rollout inherits
+`gpu-demo.scene-fidelity.enabled` from the host and requires approved package/site
+CI/CD. This uses the published renderer 0.2.46 contract; authored texture/varnish
+adoption remains a separate pending renderer release.

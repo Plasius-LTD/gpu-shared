@@ -81,6 +81,41 @@ const MATERIAL_LIBRARY = Object.freeze({
     metallicFactor: 0,
     roughnessFactor: 0.92,
   },
+  "quay-stone": {
+    baseColorFactor: [0.28, 0.29, 0.27, 1],
+    metallicFactor: 0,
+    roughnessFactor: 0.96,
+  },
+  "quay-stone-warm": {
+    baseColorFactor: [0.34, 0.32, 0.27, 1],
+    metallicFactor: 0,
+    roughnessFactor: 0.98,
+  },
+  "quay-stone-wet": {
+    baseColorFactor: [0.12, 0.16, 0.15, 1],
+    metallicFactor: 0,
+    roughnessFactor: 0.84,
+  },
+  "roof-slate": {
+    baseColorFactor: [0.075, 0.1, 0.12, 1],
+    metallicFactor: 0,
+    roughnessFactor: 0.88,
+  },
+  "roof-slate-weathered": {
+    baseColorFactor: [0.085, 0.108, 0.127, 1],
+    metallicFactor: 0,
+    roughnessFactor: 0.93,
+  },
+  "warehouse-timber": {
+    baseColorFactor: [0.075, 0.09, 0.082, 1],
+    metallicFactor: 0,
+    roughnessFactor: 0.94,
+  },
+  "warehouse-glazing": {
+    baseColorFactor: [0.028, 0.055, 0.069, 1],
+    metallicFactor: 0,
+    roughnessFactor: 0.22,
+  },
   "roof-tiles": {
     baseColorFactor: [0.31, 0.19, 0.17, 1],
     metallicFactor: 0.04,
@@ -355,7 +390,15 @@ function addTrapezoidPrism(builder, options) {
 }
 
 function addGabledRoof(builder, options) {
-  const { minX, maxX, minZ, maxZ, eaveY, ridgeY } = options;
+  const {
+    minX,
+    maxX,
+    minZ,
+    maxZ,
+    eaveY,
+    ridgeY,
+    gableBuilder = builder,
+  } = options;
   const ridgeX = (minX + maxX) * 0.5;
   const leftFront = vec3(minX, eaveY, maxZ);
   const rightFront = vec3(maxX, eaveY, maxZ);
@@ -366,8 +409,8 @@ function addGabledRoof(builder, options) {
 
   builder.addQuad(leftBack, leftFront, ridgeFront, ridgeBack);
   builder.addQuad(ridgeBack, ridgeFront, rightFront, rightBack);
-  builder.addTriangle(leftFront, rightFront, ridgeFront);
-  builder.addTriangle(rightBack, leftBack, ridgeBack);
+  gableBuilder.addTriangle(leftFront, rightFront, ridgeFront);
+  gableBuilder.addTriangle(rightBack, leftBack, ridgeBack);
 }
 
 function addHull(builder, deckBuilder, stations) {
@@ -510,9 +553,11 @@ function addRope(builder, start, end, radius = 0.015, sag = 0) {
       ),
     );
   };
-  for (let j = 0; j < 6; j++) {
-    const a = ring(j / 6),
-      b = ring((j + 1) / 6);
+  // Straight struts/rope segments need no longitudinal subdivisions.
+  const sections = sag === 0 ? 1 : 6;
+  for (let j = 0; j < sections; j++) {
+    const a = ring(j / sections),
+      b = ring((j + 1) / sections);
     for (let i = 0; i < 6; i++)
       builder.addQuad(a[i], a[(i + 1) % 6], b[(i + 1) % 6], b[i]);
   }
@@ -962,6 +1007,308 @@ function createLighthouseAsset() {
   };
 }
 
+// These are asset-authoring helpers, executed at generation time only.
+function addRoofSlate(builder, minX, maxX, minZ, maxZ, heightAtX) {
+  const top = [
+    vec3(minX, heightAtX(minX), minZ),
+    vec3(minX, heightAtX(minX), maxZ),
+    vec3(maxX, heightAtX(maxX), maxZ),
+    vec3(maxX, heightAtX(maxX), minZ),
+  ];
+  const bottom = top.map(([x, y, z]) => vec3(x, y - 0.024, z));
+  builder.addQuad(...top);
+  builder.addQuad(...bottom.toReversed());
+  for (let i = 0; i < 4; i++) {
+    const next = (i + 1) % 4;
+    builder.addQuad(top[i], bottom[i], bottom[next], top[next]);
+  }
+}
+
+function createHarborConstructionDetail() {
+  const boards = new PrimitiveBuilder("jetty-timber");
+  const supports = new PrimitiveBuilder("jetty-timber");
+  const masonry = createPrimitiveMap([
+    "quay-stone",
+    "quay-stone-warm",
+    "quay-stone-wet",
+  ]);
+  const roof = createPrimitiveMap(["roof-slate", "roof-slate-weathered"]);
+  const joinery = createPrimitiveMap([
+    "warehouse-timber",
+    "quay-stone",
+    "dock-metal",
+  ]);
+  const fittings = createPrimitiveMap(["dock-metal", "rigging-rope"]);
+
+  // The gap is a real opening, with transverse beams visible below it.
+  for (const [start, end, halfWidth] of [
+    [-1.7, 3.6, 1.1],
+    [3.6, 7.4, 1.55],
+  ]) {
+    const count = Math.ceil((end - start) / 0.23);
+    const pitch = (end - start) / count;
+    for (let i = 0; i < count; i++) {
+      const x = start + i * pitch;
+      addBox(
+        boards,
+        vec3(x + 0.012, 0.22, -halfWidth),
+        vec3(x + pitch - 0.012, 0.42 + pseudoRandom(i + 70) * 0.012, halfWidth),
+      );
+    }
+    for (const z of [-halfWidth + 0.18, halfWidth - 0.18]) {
+      addBox(supports, vec3(start, 0.03, z - 0.08), vec3(end, 0.22, z + 0.08));
+    }
+    for (let x = start + 0.3; x < end; x += 1.4) {
+      for (const z of [-halfWidth + 0.18, halfWidth - 0.18]) {
+        addCylinder(supports, {
+          center: vec3(x, -0.46, z),
+          height: 1.68,
+          radiusTop: 0.105,
+          radiusBottom: 0.14,
+          radialSegments: 10,
+        });
+      }
+      addRope(
+        supports,
+        vec3(x, -0.8, -halfWidth + 0.18),
+        vec3(x, 0.13, halfWidth - 0.18),
+        0.065,
+      );
+    }
+  }
+
+  // Staggered wall courses, darker below the tidal line, with a projecting coping.
+  for (let row = 0; row < 4; row++) {
+    const y = -0.88 + row * 0.29;
+    for (const z of [-2.42, 2.1]) {
+      for (let column = 0; column < 12; column++) {
+        const x = -7.2 + column * 0.74 - (row % 2) * 0.37;
+        const left = Math.max(-7.2, x),
+          right = Math.min(1.2, x + 0.715);
+        if (right <= left) continue;
+        const material =
+          row < 2
+            ? "quay-stone-wet"
+            : (column + row) % 3
+              ? "quay-stone"
+              : "quay-stone-warm";
+        addBox(
+          masonry[material],
+          vec3(left, y, z),
+          vec3(right, y + 0.265, z + 0.32),
+        );
+      }
+    }
+    for (const x of [-7.24, 1.08])
+      for (let column = 0; column < 7; column++) {
+        const z = -2.1 + column * 0.6;
+        addBox(
+          masonry[row < 2 ? "quay-stone-wet" : "quay-stone"],
+          vec3(x, y, z),
+          vec3(x + 0.32, y + 0.265, z + 0.575),
+        );
+      }
+  }
+  for (let x = -7.26; x < 1.16; x += 0.66) {
+    for (const z of [-2.48, 2.03])
+      addBox(
+        masonry["quay-stone-warm"],
+        vec3(x, 0.26, z),
+        vec3(Math.min(1.34, x + 0.64), 0.38, z + 0.43),
+      );
+  }
+  for (const x of [-7.3, 1.05])
+    for (let z = -2.04; z < 2; z += 0.66) {
+      addBox(
+        masonry["quay-stone-warm"],
+        vec3(x, 0.26, z),
+        vec3(x + 0.38, 0.38, Math.min(2.03, z + 0.64)),
+      );
+    }
+
+  // Thin, overlapping slates on both slopes, retaining the closed original roof below.
+  const ridge = -4.25;
+  const heightAtX = (x) => 3.29 - Math.abs(x - ridge) * (0.86 / 2.35);
+  for (let side = 0; side < 2; side++)
+    for (let row = 0; row < 8; row++) {
+      const start = (row / 8) * 2.35,
+        end = Math.min(2.35, ((row + 1) / 8) * 2.35 + 0.055);
+      const minX = side ? ridge + start : ridge - end;
+      const maxX = side ? ridge + end : ridge - start;
+      for (let column = 0; column < 9; column++) {
+        const minZ = -1.95 + column * (3.5 / 9);
+        const material =
+          (column + row * 3 + side) % 5 === 0
+            ? "roof-slate-weathered"
+            : "roof-slate";
+        addRoofSlate(
+          roof[material],
+          minX,
+          maxX,
+          minZ + 0.006,
+          minZ + 3.5 / 9 - 0.006,
+          (x) => heightAtX(x) + row * 0.005,
+        );
+      }
+    }
+  for (let z = -1.95; z < 1.5; z += 0.35) {
+    addRoofSlate(
+      roof["roof-slate-weathered"],
+      ridge - 0.105,
+      ridge + 0.105,
+      z,
+      Math.min(1.55, z + 0.34),
+      (x) => 3.35 - Math.abs(x - ridge) * 0.42,
+    );
+  }
+
+  // Frames and mullions sit proud of the opaque dark glazing; no fake transmission.
+  for (const [left, right] of [
+    [-5.84, -4.9],
+    [-3.58, -2.66],
+  ]) {
+    for (const x of [left - 0.06, right - 0.01, (left + right) / 2 - 0.025]) {
+      addBox(
+        joinery["warehouse-timber"],
+        vec3(x, 1.01, 1.45),
+        vec3(x + 0.065, 1.84, 1.52),
+      );
+    }
+    for (const y of [1.01, 1.42, 1.78])
+      addBox(
+        joinery["warehouse-timber"],
+        vec3(left - 0.06, y, 1.45),
+        vec3(right + 0.06, y + 0.055, 1.52),
+      );
+    addBox(
+      joinery["quay-stone"],
+      vec3(left - 0.12, 0.94, 1.28),
+      vec3(right + 0.12, 1.02, 1.6),
+    );
+    addBox(
+      joinery["quay-stone"],
+      vec3(left - 0.12, 1.85, 1.28),
+      vec3(right + 0.12, 1.98, 1.47),
+    );
+  }
+  for (let plank = 0; plank < 8; plank++) {
+    const x = -4.68 + plank * 0.115;
+    addBox(
+      joinery["warehouse-timber"],
+      vec3(x, 0.36, 1.305),
+      vec3(x + 0.108, 1.91, 1.4),
+    );
+  }
+  for (const x of [-4.76, -3.76])
+    addBox(
+      joinery["quay-stone"],
+      vec3(x, 0.32, 1.3),
+      vec3(x + 0.09, 2.02, 1.49),
+    );
+  addBox(
+    joinery["quay-stone"],
+    vec3(-4.76, 2.02, 1.3),
+    vec3(-3.67, 2.16, 1.49),
+  );
+  for (const y of [0.7, 1.6])
+    addBox(
+      joinery["dock-metal"],
+      vec3(-4.65, y, 1.402),
+      vec3(-3.82, y + 0.045, 1.426),
+    );
+  addBox(
+    joinery["dock-metal"],
+    vec3(-4.08, 1.05, 1.42),
+    vec3(-4.03, 1.21, 1.48),
+  );
+  // Chimney, cap, and gutters supply architectural scale and cast real shadows.
+  addBox(
+    joinery["quay-stone"],
+    vec3(-5.48, 2.65, -1.35),
+    vec3(-5.03, 3.56, -0.88),
+  );
+  addBox(
+    joinery["quay-stone"],
+    vec3(-5.56, 3.52, -1.43),
+    vec3(-4.95, 3.65, -0.8),
+  );
+  addCylinder(joinery["dock-metal"], {
+    center: vec3(-5.25, 3.77, -1.1),
+    height: 0.25,
+    radiusTop: 0.095,
+    radialSegments: 12,
+  });
+  for (const x of [-6.59, -1.91])
+    addRope(
+      joinery["dock-metal"],
+      vec3(x, 2.38, -1.93),
+      vec3(x, 2.38, 1.53),
+      0.035,
+    );
+
+  for (const x of [0.7, 3.8, 7.05])
+    for (const side of [-1, 1]) {
+      const z = side * (x > 3.6 ? 1.3 : 0.87);
+      addCylinder(fittings["dock-metal"], {
+        center: vec3(x, 0.64, z),
+        height: 0.42,
+        radiusTop: 0.085,
+        radialSegments: 12,
+      });
+      addRope(
+        fittings["dock-metal"],
+        vec3(x - 0.16, 0.78, z),
+        vec3(x + 0.16, 0.78, z),
+        0.055,
+      );
+      for (let turn = 0; turn < 3; turn++)
+        for (let step = 0; step < 24; step++) {
+          const radius = 0.19 + turn * 0.036;
+          const point = (angle) =>
+            vec3(
+              x + Math.cos(angle) * radius,
+              0.46,
+              z + Math.sin(angle) * radius,
+            );
+          addRope(
+            fittings["rigging-rope"],
+            point((step * Math.PI) / 12),
+            point(((step + 1) * Math.PI) / 12),
+            0.014,
+          );
+        }
+    }
+  // A ladder connects the berth to the pier rather than ending at the water surface.
+  for (const x of [6.23, 6.65])
+    addRope(
+      fittings["dock-metal"],
+      vec3(x, -0.95, 1.65),
+      vec3(x, 0.8, 1.65),
+      0.032,
+    );
+  for (let y = -0.8; y < 0.5; y += 0.24)
+    addRope(
+      fittings["dock-metal"],
+      vec3(6.23, y, 1.65),
+      vec3(6.65, y, 1.65),
+      0.026,
+    );
+  return [
+    { name: "harbor-dock-pier-boards", primitives: [boards] },
+    { name: "harbor-dock-pier-supports", primitives: [supports] },
+    { name: "harbor-dock-quay-masonry", primitives: Object.values(masonry) },
+    { name: "harbor-dock-roof-courses", primitives: Object.values(roof) },
+    {
+      name: "harbor-dock-warehouse-joinery",
+      primitives: Object.values(joinery),
+    },
+    {
+      name: "harbor-dock-mooring-fittings",
+      primitives: Object.values(fittings),
+    },
+  ];
+}
+
 function createHarborDockAsset() {
   const parts = createPrimitiveMap([
     "concrete",
@@ -972,24 +1319,11 @@ function createHarborDockAsset() {
     "crate-wood",
     "window-glass",
     "warm-glass",
+    "warehouse-glazing",
   ]);
 
   addBox(parts.concrete, vec3(-7.2, -0.9, -2.4), vec3(1.2, 0.3, 2.2));
-  addBox(parts["jetty-timber"], vec3(-4.6, 0.22, -1.1), vec3(4.2, 0.44, 1.1));
-  addBox(parts["jetty-timber"], vec3(3.6, 0.22, -1.55), vec3(7.4, 0.42, 1.55));
-
-  for (const x of [-3.8, -2, -0.2, 1.6, 4.2, 5.8, 7]) {
-    addBox(
-      parts["jetty-timber"],
-      vec3(x - 0.08, -1.42, -0.9),
-      vec3(x + 0.08, 0.22, -0.74),
-    );
-    addBox(
-      parts["jetty-timber"],
-      vec3(x - 0.08, -1.42, 0.74),
-      vec3(x + 0.08, 0.22, 0.9),
-    );
-  }
+  const detail = createHarborConstructionDetail();
 
   addBox(
     parts["warehouse-plaster"],
@@ -1003,14 +1337,15 @@ function createHarborDockAsset() {
     maxZ: 1.55,
     eaveY: 2.4,
     ridgeY: 3.26,
+    gableBuilder: parts["warehouse-plaster"],
   });
   addBox(
-    parts["window-glass"],
+    parts["warehouse-glazing"],
     vec3(-5.84, 1.06, 1.32),
     vec3(-4.9, 1.78, 1.46),
   );
   addBox(
-    parts["window-glass"],
+    parts["warehouse-glazing"],
     vec3(-3.58, 1.06, 1.32),
     vec3(-2.66, 1.78, 1.46),
   );
@@ -1044,6 +1379,7 @@ function createHarborDockAsset() {
     name: "harbor-dock",
     physics: null,
     children: [
+      ...detail,
       {
         name: "harbor-dock-main",
         primitives: [
@@ -1059,7 +1395,7 @@ function createHarborDockAsset() {
         primitives: [
           parts["warehouse-plaster"],
           parts["roof-tiles"],
-          parts["window-glass"],
+          parts["warehouse-glazing"],
           parts["warm-glass"],
         ],
       },

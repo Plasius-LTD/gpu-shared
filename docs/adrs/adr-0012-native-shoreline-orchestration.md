@@ -38,3 +38,12 @@ peer range and publish gpu-shared. The site consumes released packages and uses
 its approved main production CD. Disable scene-fidelity to stop mounting the
 public demo; restoring an earlier package version requires the normal site release
 path. No production flag changes are implied by a local preview.
+
+## Harbour asset refinement
+
+The [construction-detail design](../design/shoreline-harbour-detail.md) continues
+this ownership decision: structural and architectural detail is authored once in
+the generator and reused by all native passes. No runtime dependency, additional
+asset fetch or renderer contract is introduced. Download and triangle budgets
+are tested alongside exact regeneration. Publication and site adoption remain
+subject to the release order above.

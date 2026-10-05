@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Replace harbour placeholder surfaces with supported timber boards, coursed quay
+  stonework, slate roof courses, framed windows, doors, chimney and mooring details.
+  Keep generated assets reproducible and bound geometry/download size; remove
+  redundant subdivisions from straight rigging and structural struts (#56).
+
 - Populate native Shoreline diagnostics with submission counts, render dimensions
   and scene notes so the disclosure contains no empty telemetry sections.
 
