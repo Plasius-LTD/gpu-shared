@@ -11,6 +11,11 @@ const inlineModulePath = path.join(
 );
 
 const MATERIAL_LIBRARY = Object.freeze({
+  "painted-workboat-hull": {
+    baseColorFactor: [0.32, 0.38, 0.4, 1],
+    metallicFactor: 0,
+    roughnessFactor: 0.8,
+  },
   "painted-hull": {
     baseColorFactor: [0.14, 0.052, 0.025, 1],
     metallicFactor: 0.08,
@@ -903,6 +908,312 @@ function createCutterAsset() {
   };
 }
 
+function createWorkboatAsset(name) {
+  const specs = {
+    tug: {
+      length: 3.1,
+      beam: 1.05,
+      cabinZ: 0.15,
+      cabinHeight: 1.65,
+      feature: "towing-gear",
+    },
+    "fishing-boat": {
+      length: 3.7,
+      beam: 1.15,
+      cabinZ: 1.05,
+      cabinHeight: 1.4,
+      feature: "fishing-gantry",
+    },
+    "pilot-launch": {
+      length: 2.7,
+      beam: 0.76,
+      cabinZ: -0.1,
+      cabinHeight: 0.8,
+      feature: "low-wheelhouse",
+    },
+    coaster: {
+      length: 4.6,
+      beam: 1.25,
+      cabinZ: -2.8,
+      cabinHeight: 1.9,
+      feature: "cargo-hold",
+    },
+  };
+  const spec = specs[name];
+  const parts = createPrimitiveMap([
+    "painted-workboat-hull",
+    "deck-plank",
+    "paint-white",
+    "warehouse-glazing",
+    "metal-dark",
+    "metal-brass",
+    "crate-wood",
+    "rigging-rope",
+  ]);
+  const detail = new PrimitiveBuilder("metal-dark");
+  const L = spec.length,
+    B = spec.beam;
+  addHull(parts["painted-workboat-hull"], parts["deck-plank"], [
+    { z: -L, halfWidth: B * 0.65, deckY: 0.65, bottomY: -0.46, camber: 0.02 },
+    {
+      z: -L * 0.6,
+      halfWidth: B * 0.95,
+      deckY: 0.7,
+      bottomY: -0.64,
+      camber: 0.035,
+    },
+    { z: 0, halfWidth: B, deckY: 0.72, bottomY: -0.68, camber: 0.04 },
+    {
+      z: L * 0.65,
+      halfWidth: B * 0.73,
+      deckY: 0.72,
+      bottomY: -0.54,
+      camber: 0.03,
+    },
+    { z: L, halfWidth: B * 0.16, deckY: 0.84, bottomY: -0.3, camber: 0.01 },
+  ]);
+  const cabinWidth = B * 0.67,
+    front = spec.cabinZ + 0.82,
+    back = spec.cabinZ - 0.82,
+    top = 0.78 + spec.cabinHeight;
+  addBox(
+    parts["paint-white"],
+    vec3(-cabinWidth, 0.78, back),
+    vec3(cabinWidth, top, front),
+  );
+  addBox(
+    parts["metal-dark"],
+    vec3(-cabinWidth - 0.08, top, back - 0.08),
+    vec3(cabinWidth + 0.08, top + 0.08, front + 0.08),
+  );
+  for (const side of [-1, 1]) {
+    const x = side * (cabinWidth + 0.014);
+    for (let panel = 0; panel < 3; panel++) {
+      const z = back + 0.12 + panel * 0.48;
+      addBox(
+        parts["warehouse-glazing"],
+        vec3(x - 0.02, top - 0.47, z),
+        vec3(x + 0.02, top - 0.12, z + 0.39),
+      );
+    }
+  }
+  for (const x of [-cabinWidth + 0.08, 0.035]) {
+    addBox(
+      parts["warehouse-glazing"],
+      vec3(x, top - 0.47, front + 0.006),
+      vec3(x + cabinWidth - 0.11, top - 0.12, front + 0.04),
+    );
+  }
+  addShipRails(
+    { ...parts, "mast-wood": parts["metal-dark"] },
+    L * 1.6,
+    B * 0.9,
+    0.75,
+  );
+  addCylinder(parts["metal-dark"], {
+    center: vec3(0, top + 0.7, spec.cabinZ - 0.5),
+    height: 1.25,
+    radiusTop: 0.027,
+    radialSegments: 10,
+  });
+  addRope(
+    parts["metal-dark"],
+    vec3(-0.33, top + 1.05, spec.cabinZ - 0.5),
+    vec3(0.33, top + 1.05, spec.cabinZ - 0.5),
+    0.025,
+  );
+  if (name === "tug") {
+    addCylinder(detail, {
+      center: vec3(0, 1.4, -1.4),
+      height: 1.25,
+      radiusTop: 0.2,
+      radiusBottom: 0.27,
+      radialSegments: 18,
+    });
+    addBox(detail, vec3(-0.52, 0.75, -2.4), vec3(0.52, 1.0, -1.75));
+    addRope(detail, vec3(-0.55, 1.02, -2.04), vec3(0.55, 1.02, -2.04), 0.11);
+    for (const side of [-1, 1])
+      for (const z of [-2.1, -0.8, 0.6, 1.5]) {
+        addCylinder(detail, {
+          center: vec3(side * B * 0.99, 0.48, z),
+          height: 0.44,
+          radiusTop: 0.16,
+          radialSegments: 12,
+        });
+      }
+  } else if (name === "fishing-boat") {
+    for (const x of [-0.9, 0.9])
+      addRope(detail, vec3(x, 0.76, -1.65), vec3(x, 3.1, -1.65), 0.055);
+    addRope(detail, vec3(-1.15, 3.1, -1.65), vec3(1.15, 3.1, -1.65), 0.065);
+    for (const x of [-0.9, 0.9])
+      addRope(
+        parts["rigging-rope"],
+        vec3(x, 3.1, -1.65),
+        vec3(x, 0.85, -2.95),
+        0.02,
+        0.12,
+      );
+    for (const x of [-0.6, 0.1])
+      for (const z of [-2.7, -1.8])
+        addBox(
+          parts["crate-wood"],
+          vec3(x, 0.76, z),
+          vec3(x + 0.5, 1.05, z + 0.55),
+        );
+    addCylinder(detail, {
+      center: vec3(0, 1.1, -0.85),
+      height: 0.35,
+      radiusTop: 0.4,
+      radialSegments: 18,
+    });
+  } else if (name === "pilot-launch") {
+    addBox(detail, vec3(-0.47, 1.6, -1.1), vec3(0.47, 1.68, 0.85));
+    addRope(
+      parts["metal-brass"],
+      vec3(0, 1.7, -0.2),
+      vec3(0, 2.2, -0.2),
+      0.022,
+    );
+    addBox(
+      parts["paint-white"],
+      vec3(-0.55, 0.76, 1.1),
+      vec3(0.55, 0.91, 1.65),
+    );
+  } else {
+    addBox(detail, vec3(-0.97, 0.77, -1.5), vec3(0.97, 0.9, 2.45));
+    for (const z of [-1.2, -0.3, 0.6, 1.5]) {
+      addBox(
+        parts["crate-wood"],
+        vec3(-0.82, 0.9, z),
+        vec3(0.82, 1.6, z + 0.72),
+      );
+      for (const x of [-0.65, 0.65])
+        addBox(detail, vec3(x, 1.59, z), vec3(x + 0.05, 1.63, z + 0.72));
+    }
+    addCylinder(detail, {
+      center: vec3(0, 1.8, 2.9),
+      height: 2.1,
+      radiusTop: 0.05,
+      radiusBottom: 0.09,
+      radialSegments: 12,
+    });
+    addRope(detail, vec3(0, 2.7, 2.9), vec3(0, 2.15, 0.8), 0.055);
+  }
+  return {
+    name,
+    physics: {
+      shape: "box",
+      halfExtents: [B + 0.2, 4.2, L],
+      mass: name === "coaster" ? 6200 : 1800,
+      waterline:
+        name === "pilot-launch" ? 0.26 : name === "coaster" ? 0.4 : 0.34,
+      linearDamping: 0.05,
+      angularDamping: 0.1,
+      restitution: 0.15,
+    },
+    children: [
+      {
+        name: `${name}-hull`,
+        primitives: [parts["painted-workboat-hull"], parts["deck-plank"]],
+      },
+      {
+        name: `${name}-wheelhouse`,
+        primitives: [
+          parts["paint-white"],
+          parts["warehouse-glazing"],
+          parts["metal-dark"],
+          parts["metal-brass"],
+        ],
+      },
+      {
+        name: `${name}-${spec.feature}`,
+        primitives: [detail, parts["crate-wood"], parts["rigging-rope"]],
+      },
+    ],
+  };
+}
+
+function createHarbourBerthsAsset() {
+  const quay = createPrimitiveMap([
+    "quay-stone",
+    "quay-stone-warm",
+    "concrete",
+  ]);
+  const fittings = createPrimitiveMap([
+    "dock-metal",
+    "jetty-timber",
+    "crate-wood",
+  ]);
+  addBox(quay.concrete, vec3(-30, -1.8, -3.5), vec3(30, 0.5, 3.82));
+  for (let row = 0; row < 4; row++) {
+    for (let x = -30 - (row % 2) * 0.6; x < 30; x += 1.2) {
+      const left = Math.max(-30, x),
+        right = Math.min(30, x + 1.18);
+      if (right - left < 0.01) continue;
+      addBox(
+        quay[row % 2 ? "quay-stone-warm" : "quay-stone"],
+        vec3(left, -1.1 + row * 0.4, 3.81),
+        vec3(right, -0.72 + row * 0.4, 3.98),
+      );
+    }
+  }
+  for (let x = -30; x < 30; x += 1.4)
+    addBox(
+      quay["quay-stone-warm"],
+      vec3(x, 0.48, 3.25),
+      vec3(Math.min(30, x + 1.38), 0.68, 4.02),
+    );
+  for (const centre of [-20, -6, 8, 22]) {
+    for (const x of [centre - 3.8, centre + 3.8]) {
+      addCylinder(fittings["dock-metal"], {
+        center: vec3(x, 0.88, 3.35),
+        height: 0.45,
+        radiusTop: 0.12,
+        radialSegments: 12,
+      });
+      addRope(
+        fittings["dock-metal"],
+        vec3(x - 0.22, 1.0, 3.35),
+        vec3(x + 0.22, 1.0, 3.35),
+        0.075,
+      );
+      addBox(
+        fittings["jetty-timber"],
+        vec3(x - 0.11, -0.75, 4.0),
+        vec3(x + 0.11, 0.48, 4.18),
+      );
+    }
+    for (const x of [centre - 0.25, centre + 0.25])
+      addRope(
+        fittings["dock-metal"],
+        vec3(x, -0.85, 4.03),
+        vec3(x, 0.85, 4.03),
+        0.035,
+      );
+    for (let y = -0.7; y < 0.7; y += 0.26)
+      addRope(
+        fittings["dock-metal"],
+        vec3(centre - 0.25, y, 4.03),
+        vec3(centre + 0.25, y, 4.03),
+        0.028,
+      );
+    for (let i = 0; i < 3; i++)
+      addBox(
+        fittings["crate-wood"],
+        vec3(centre - 2 + i * 0.9, 0.5, 0.5),
+        vec3(centre - 1.2 + i * 0.9, 1.12 + (i % 2) * 0.35, 1.3),
+      );
+  }
+  return {
+    name: "harbour-berths",
+    physics: null,
+    children: [
+      { name: "harbour-berths-quay", primitives: Object.values(quay) },
+      { name: "harbour-berths-fittings", primitives: Object.values(fittings) },
+    ],
+  };
+}
+
 function createLighthouseAsset() {
   const railing = new PrimitiveBuilder("metal-dark");
   const parts = createPrimitiveMap([
@@ -1740,6 +2051,11 @@ export function createShowcaseAssets() {
     ["lighthouse.gltf", compileAsset(createLighthouseAsset())],
     ["harbor-dock.gltf", compileAsset(createHarborDockAsset())],
     ["shoreline.gltf", compileAsset(createShorelineAsset())],
+    ["harbour-berths.gltf", compileAsset(createHarbourBerthsAsset())],
+    ...["tug", "fishing-boat", "pilot-launch", "coaster"].map((name) => [
+      `${name}.gltf`,
+      compileAsset(createWorkboatAsset(name)),
+    ]),
   ];
 }
 

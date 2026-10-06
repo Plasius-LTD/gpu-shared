@@ -6,6 +6,8 @@ export const gpuSharedTranslationKeys = Object.freeze({
   statusBooting: "gpuShared.showcase.status.booting",
   statusLive: "gpuShared.showcase.status.live",
   statusPaused: "gpuShared.showcase.status.paused",
+  trafficSummary: "gpuShared.showcase.traffic.summary",
+  trafficVisits: "gpuShared.showcase.traffic.visits",
   detailsNative: "gpuShared.showcase.details.native",
   detailsBooting: "gpuShared.showcase.details.booting",
   detailsPhysics: "gpuShared.showcase.details.physics",

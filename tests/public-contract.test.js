@@ -41,6 +41,7 @@ test("package exports keep the public gpu-shared runtime surface stable", () => 
   assert.equal(packageJson.exports["./assets/lighthouse.gltf"], "./assets/lighthouse.gltf");
   assert.equal(packageJson.exports["./assets/harbor-dock.gltf"], "./assets/harbor-dock.gltf");
   assert.equal(packageJson.exports["./assets/shoreline.gltf"], "./assets/shoreline.gltf");
+  for(const name of ["tug","fishing-boat","pilot-launch","coaster","harbour-berths"]) assert.equal(packageJson.exports[`./assets/${name}.gltf`],`./assets/${name}.gltf`);
 });
 
 test("readme documents package-surface imports for browser demos", () => {

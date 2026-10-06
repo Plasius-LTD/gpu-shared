@@ -107,9 +107,14 @@ export interface LoadPvoxModelOptions {
 export type ShowcaseAssetName =
   | "brigantine"
   | "cutter"
+  | "tug"
+  | "fishing-boat"
+  | "pilot-launch"
+  | "coaster"
   | "lighthouse"
   | "harbor-dock"
-  | "shoreline";
+  | "shoreline"
+  | "harbour-berths";
 
 export type ShowcaseFocusMode =
   | "integrated"
@@ -341,6 +346,8 @@ export const gpuSharedTranslationKeys: Readonly<{
   statusBooting: "gpuShared.showcase.status.booting";
   statusLive: "gpuShared.showcase.status.live";
   statusPaused: "gpuShared.showcase.status.paused";
+  trafficSummary: "gpuShared.showcase.traffic.summary";
+  trafficVisits: "gpuShared.showcase.traffic.visits";
   detailsNative: "gpuShared.showcase.details.native";
   detailsBooting: "gpuShared.showcase.details.booting";
   detailsPhysics: "gpuShared.showcase.details.physics";

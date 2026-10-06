@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  __testOnlyTransformShowcasePoint,
+  __testOnlyTransformShowcaseDirection,
   __testOnlyAdvanceShowcaseClothSimulationState,
   __testOnlyBuildClothSurface,
   __testOnlyBuildShorelineFoamSegments,
@@ -283,4 +285,19 @@ test("scene lighting separates water reflections from direct glow sources", () =
   });
   assert.ok(noReflections.directLights.length > 0);
   assert.equal(noReflections.reflectionLights.length, 0);
+});
+
+
+test("vessel bows, surfaces and light attachments share yaw, pitch and roll", () => {
+  const transform = {position:{x:7,y:0.4,z:12}, rotationY:-Math.PI/2, pitch:0.04, roll:-0.03, scale:0.95};
+  const origin = __testOnlyTransformShowcasePoint({x:0,y:0,z:0},transform);
+  const bow = __testOnlyTransformShowcasePoint({x:0,y:0,z:1},transform);
+  const direction = __testOnlyTransformShowcaseDirection({x:0,y:0,z:1},transform);
+  assert.deepEqual(origin,transform.position);
+  assert.ok(bow.x>origin.x, "negative quarter-turn points the bow east");
+  assert.ok(bow.y<origin.y, "positive pitch lowers the bow");
+  const length=distanceBetween(bow,origin);
+  for(const axis of ['x','y','z']) assert.ok(Math.abs((bow[axis]-origin[axis])/length-direction[axis])<1e-12);
+  const up = __testOnlyTransformShowcaseDirection({x:0,y:1,z:0},transform);
+  assert.ok(Math.abs(up.x*direction.x+up.y*direction.y+up.z*direction.z)<1e-12);
 });

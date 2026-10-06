@@ -666,6 +666,13 @@ test("native showcase submits world geometry, freezes on pause and disposes rend
     assert.ok(draws[0].vertices.length>0);
     assert.ok(draws[0].vertices.every(Number.isFinite),`nonfinite component ${draws[0].vertices.findIndex(v=>!Number.isFinite(v))}: ${draws[0].vertices.slice(108,144)}`);
     assert.equal(draws[0].vertices.length%36,0);
+    const initialTraffic=JSON.parse(globalThis.window.render_game_to_text());
+    assert.equal(initialTraffic.ships.length,8);
+    assert.equal(initialTraffic.assetCatalog.shipKeys.length,6);
+    assert.equal(initialTraffic.ships.filter(ship=>ship.phase==='moored').length,4);
+    assert.equal(draws[0].wakes.length,4);
+    assert.ok(initialTraffic.ships.every(ship=>Number.isFinite(ship.pitch)&&Number.isFinite(ship.roll)));
+    assert.match(harness.elements['#demoDetails'].textContent,/8 vessels/);
     const eye=draws[0].camera.eye;
     assert.equal(harness.ctx.operations.length,0);
     assert.match(harness.elements['#debugMetrics'].innerHTML,/Submitted frames: 2/);
@@ -674,6 +681,7 @@ test("native showcase submits world geometry, freezes on pause and disposes rend
     harness.listenerRegistry.get('pauseButton:click')();
     frames.shift()(48); frames.shift()(64);
     assert.equal(draws.length,2);
+    assert.deepEqual(JSON.parse(globalThis.window.render_game_to_text()).ships,initialTraffic.ships);
     assert.equal(JSON.parse(globalThis.window.render_game_to_text()).renderer.backend,'webgpu-raster');
     harness.elements['#focusMode'].value='cloth';
     harness.listenerRegistry.get('focusMode:change')();
@@ -682,6 +690,52 @@ test("native showcase submits world geometry, freezes on pause and disposes rend
     assert.notDeepEqual(draws[2].camera.eye,eye);
     showcase.destroy();showcase.destroy();assert.equal(destroyed,1);
   } finally { Object.assign(globalThis,originals); }
+});
+
+for (const condition of ["reduced-motion", "hidden-tab", "device-loss", "missing-fleet-asset", "webgpu-unavailable"]) test(`harbour traffic honours ${condition}`, async () => {
+  const originals=Object.fromEntries(['document','window','fetch','requestAnimationFrame','cancelAnimationFrame'].map(key=>[key,globalThis[key]]));
+  const harness=createSceneHarness(), frames=[];
+  const document=createTriangleGltfDocument().document;
+  let loseDevice;
+  if(condition==='reduced-motion') harness.windowStub.matchMedia=()=>({matches:true});
+  if(condition==='hidden-tab') harness.documentStub.hidden=true;
+  Object.assign(globalThis,{
+    document:harness.documentStub,window:harness.windowStub,
+    fetch:async url=>{
+      if(condition==='missing-fleet-asset'&&String(url).endsWith('tug.gltf')) throw new Error('fleet unavailable');
+      return {ok:true,json:async()=>document};
+    },
+    requestAnimationFrame:callback=>{frames.push(callback);return frames.length;},cancelAnimationFrame:()=>{},
+  });
+  try {
+    const showcase=await mountGpuShowcase({root:harness.root,__navigator:condition==='webgpu-unavailable'?{}:{gpu:{}},
+      __featureFlags:{'gpu-demo.scene-fidelity.enabled':true},
+      __nativeRendererLoader:async()=>({createNativeSceneRenderer:async({onUnavailable})=>{
+        loseDevice=onUnavailable;
+        return {render:frame=>({backend:'webgpu-raster',vertexCount:frame.vertices.length/12,submittedFrames:1,width:1280,height:720}),destroy(){}};
+      }}),
+    });
+    if(condition==='device-loss') loseDevice('GPU unavailable; reload');
+    const initial=JSON.parse(globalThis.window.render_game_to_text());
+    frames.shift()(16);frames.shift()(32);
+    const later=JSON.parse(globalThis.window.render_game_to_text());
+    if(condition==='webgpu-unavailable') {
+      assert.equal(later.ships.length,2);
+      assert.equal(later.assetCatalog.shipKeys.length,2);
+      assert.equal(later.renderer.backend,'canvas-2d');
+    } else if(condition==='missing-fleet-asset') {
+      assert.equal(later.assetCatalog.mode,'legacy-fallback');
+      assert.equal(later.ships.length,2);
+      assert.match(later.assetCatalog.fallbackReason,/fleet unavailable/);
+      assert.doesNotMatch(harness.elements['#demoDetails'].textContent,/8 vessels/);
+    } else {
+      assert.equal(later.ships.length,8);
+      assert.deepEqual(later.ships,initial.ships);
+    }
+    if(condition==='reduced-motion') assert.equal(harness.elements['#pauseButton'].textContent,'Resume');
+    if(condition==='device-loss') assert.equal(harness.elements['#pauseButton'].disabled,true);
+    showcase.destroy();
+  } finally {Object.assign(globalThis,originals);}
 });
 
 test("mountGpuShowcase fails fast when a 2D canvas context is unavailable", async () => {

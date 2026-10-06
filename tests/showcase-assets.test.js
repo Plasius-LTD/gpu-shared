@@ -12,6 +12,11 @@ const assetNames = [
   "lighthouse.gltf",
   "harbor-dock.gltf",
   "shoreline.gltf",
+  "harbour-berths.gltf",
+  "tug.gltf",
+  "fishing-boat.gltf",
+  "pilot-launch.gltf",
+  "coaster.gltf",
 ];
 
 test("committed showcase assets reproduce exactly from their authored generator", () => {
@@ -478,4 +483,51 @@ test("detailed harbour assets remain within explicit geometry and download budge
         });
       }
   }
+});
+
+test("working harbour vessel families have distinct structures and conservative physics bounds", () => {
+  const models = new Map(createShowcaseAssets());
+  const features = {
+    tug: "towing-gear",
+    "fishing-boat": "fishing-gantry",
+    "pilot-launch": "low-wheelhouse",
+    coaster: "cargo-hold",
+  };
+  for (const [name, feature] of Object.entries(features)) {
+    assert.ok(
+      models.has(`${name}.gltf`),
+      `${name} must be a real generated model`,
+    );
+    const document = JSON.parse(models.get(`${name}.gltf`));
+    assert.ok(document.meshes.some((mesh) => mesh.name.includes(feature)));
+    const physics = document.nodes[0].extras.physics;
+    assert.ok(physics.halfExtents.every((value) => value > 0));
+    for (const mesh of document.meshes)
+      for (const primitive of mesh.primitives) {
+        const bounds = document.accessors[primitive.attributes.POSITION];
+        for (let axis = 0; axis < 3; axis++)
+          assert.ok(
+            Math.max(Math.abs(bounds.min[axis]), Math.abs(bounds.max[axis])) <=
+              physics.halfExtents[axis] + 0.001,
+            `${name} physics extent ${axis} encloses geometry`,
+          );
+      }
+    assert.ok(physics.waterline > 0 && physics.waterline < 0.5);
+  }
+});
+
+test("traffic quay has one continuous sheltered edge alongside all four berths", () => {
+  const document = loadAssetDocument("harbour-berths.gltf");
+  assert.ok(
+    document.meshes.some((mesh) => mesh.name === "harbour-berths-fittings"),
+  );
+  const edge = document.meshes.find(
+    (mesh) => mesh.name === "harbour-berths-quay",
+  );
+  const bounds = edge.primitives.map(
+    (p) => document.accessors[p.attributes.POSITION],
+  );
+  assert.ok(Math.min(...bounds.map((b) => b.min[0])) <= -29);
+  assert.ok(Math.max(...bounds.map((b) => b.max[0])) >= 29);
+  assert.ok(bounds.every((b) => b.max[2] <= 4.05));
 });

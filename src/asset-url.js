@@ -3,9 +3,14 @@ import { INLINE_SHOWCASE_ASSET_URLS } from "./showcase-inline-assets.js";
 const SHOWCASE_ASSET_FILES = Object.freeze({
   brigantine: "brigantine.gltf",
   cutter: "cutter.gltf",
+  tug: "tug.gltf",
+  "fishing-boat": "fishing-boat.gltf",
+  "pilot-launch": "pilot-launch.gltf",
+  coaster: "coaster.gltf",
   lighthouse: "lighthouse.gltf",
   "harbor-dock": "harbor-dock.gltf",
   shoreline: "shoreline.gltf",
+  "harbour-berths": "harbour-berths.gltf",
 });
 
 function createInlineShowcaseAssetUrl(assetName) {
