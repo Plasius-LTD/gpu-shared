@@ -32,7 +32,12 @@
     "./assets/lighthouse.gltf": "./assets/lighthouse.gltf",
     "./assets/harbor-dock.gltf": "./assets/harbor-dock.gltf",
     "./assets/shoreline.gltf": "./assets/shoreline.gltf",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./assets/tug.gltf": "./assets/tug.gltf",
+    "./assets/fishing-boat.gltf": "./assets/fishing-boat.gltf",
+    "./assets/pilot-launch.gltf": "./assets/pilot-launch.gltf",
+    "./assets/coaster.gltf": "./assets/coaster.gltf",
+    "./assets/harbour-berths.gltf": "./assets/harbour-berths.gltf"
   },
   "scripts": {
     "build": "tsup",

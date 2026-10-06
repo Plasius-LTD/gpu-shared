@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   packShowcaseSurfaces,
+  writeTransformedShowcaseSurfaces,
   loadNativeShowcaseRenderer,
 } from "../src/native-showcase.js";
 
@@ -62,4 +63,28 @@ test("native initialization errors remain visible and cannot silently report a f
     }),
     /native surface/i,
   );
+});
+
+test("cached fleet geometry transforms positions and normals without changing material data", () => {
+  const source = new Float32Array([0, 0, 2, 0, 0, 1, 0.2, 0.3, 0.4, 0.8, 0, 1]);
+  const copy = source.slice(),
+    target = new Float32Array(24).fill(-1);
+  const basis = [
+    { x: 0, y: 0, z: -1 },
+    { x: 0, y: 1, z: 0 },
+    { x: 1, y: 0, z: 0 },
+  ];
+  const end = writeTransformedShowcaseSurfaces(
+    source,
+    target,
+    12,
+    basis,
+    { x: 3, y: 1, z: 7 },
+    0.5,
+  );
+  assert.equal(end, 24);
+  assert.deepEqual([...target.slice(0, 12)], Array(12).fill(-1));
+  assert.deepEqual([...target.slice(12, 18)], [4, 1, 7, 1, 0, 0]);
+  assert.deepEqual(target.slice(18), source.slice(6));
+  assert.deepEqual(source, copy);
 });

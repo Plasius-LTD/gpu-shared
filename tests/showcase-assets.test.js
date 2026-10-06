@@ -12,6 +12,11 @@ const assetNames = [
   "lighthouse.gltf",
   "harbor-dock.gltf",
   "shoreline.gltf",
+  "harbour-berths.gltf",
+  "tug.gltf",
+  "fishing-boat.gltf",
+  "pilot-launch.gltf",
+  "coaster.gltf",
 ];
 
 test("committed showcase assets reproduce exactly from their authored generator", () => {
@@ -376,4 +381,153 @@ test("shoreline asset includes beach, wet rock, breakwater, and detail materials
       `shoreline should include ${materialName}`,
     );
   }
+});
+
+function generatedHarbourMesh(name) {
+  const contents = createShowcaseAssets().find(
+    ([file]) => file === "harbor-dock.gltf",
+  )[1];
+  const document = JSON.parse(contents);
+  const mesh = document.meshes.find((candidate) => candidate.name === name);
+  assert.ok(mesh, `${name} must be authored geometry`);
+  const buffers = document.buffers.map((buffer) => decodeDataUri(buffer.uri));
+  return mesh.primitives.map((primitive) =>
+    getPrimitiveGeometry(document, buffers, primitive),
+  );
+}
+
+test("harbour pier has separate boards carried by supports below the waterline", () => {
+  const boards = generatedHarbourMesh("harbor-dock-pier-boards");
+  const xValues = [
+    ...new Set(
+      boards.flatMap(({ positions }) =>
+        positions.filter((_, i) => i % 3 === 0),
+      ),
+    ),
+  ].sort((a, b) => a - b);
+  assert.ok(xValues.length > 60, "pier needs individual board edges");
+  const gaps = xValues.slice(1).map((x, i) => x - xValues[i]);
+  assert.ok(
+    gaps.filter((gap) => gap > 0.01 && gap < 0.035).length > 20,
+    "separated boards have narrow real gaps",
+  );
+  const supports = generatedHarbourMesh("harbor-dock-pier-supports");
+  const heights = supports.flatMap(({ positions }) =>
+    positions.filter((_, i) => i % 3 === 1),
+  );
+  assert.ok(Math.min(...heights) < -1, "piles reach below the waterline");
+  assert.ok(Math.max(...heights) >= 0.22, "beams reach the boards");
+});
+
+test("harbour has masonry joints, layered roof courses and window/door joinery", () => {
+  const masonry = generatedHarbourMesh("harbor-dock-quay-masonry");
+  assert.ok(
+    masonry.reduce((count, part) => count + part.indices.length / 3, 0) > 500,
+    "retaining wall uses individual blocks",
+  );
+  const roof = generatedHarbourMesh("harbor-dock-roof-courses");
+  assert.ok(
+    roof.reduce((count, part) => count + part.indices.length / 3, 0) > 500,
+    "roof uses overlapping courses",
+  );
+  for (const part of roof) {
+    for (let i = 0; i < part.positions.length; i += 3) {
+      const [x, y, z] = part.positions.slice(i, i + 3);
+      assert.ok(
+        x >= -6.61 && x <= -1.89 && z >= -1.96 && z <= 1.56,
+        "slates stay on the roof",
+      );
+      assert.ok(y >= 2.39 && y < 3.4, "roof detail follows the eaves/ridge");
+    }
+  }
+  const joinery = generatedHarbourMesh("harbor-dock-warehouse-joinery");
+  const timber = joinery.find(
+    (part) => part.materialName === "warehouse-timber",
+  );
+  assert.ok(
+    timber && timber.indices.length > 300,
+    "frames, mullions and doors have depth",
+  );
+});
+
+test("detailed harbour assets remain within explicit geometry and download budgets", () => {
+  const assets = createShowcaseAssets();
+  assert.ok(
+    assets.reduce((bytes, [, source]) => bytes + Buffer.byteLength(source), 0) <
+      6 * 1024 * 1024,
+  );
+  for (const [name, source] of assets) {
+    const document = JSON.parse(source);
+    const triangles = document.meshes
+      .flatMap((mesh) => mesh.primitives)
+      .reduce(
+        (count, primitive) =>
+          count + document.accessors[primitive.indices].count / 3,
+        0,
+      );
+    assert.ok(
+      triangles < 25000,
+      `${name}: ${triangles} triangles exceeds budget`,
+    );
+    const buffers = document.buffers.map((buffer) => decodeDataUri(buffer.uri));
+    for (const mesh of document.meshes)
+      for (const primitive of mesh.primitives) {
+        const geometry = getPrimitiveGeometry(document, buffers, primitive);
+        assert.ok(geometry.positions.every(Number.isFinite));
+        forEachTriangle(geometry, ({ faceNormal, normals }) => {
+          for (const normal of normals)
+            assert.ok(
+              dotVec3(faceNormal, normal) > 0.82,
+              `${name}/${mesh.name}: inconsistent winding`,
+            );
+        });
+      }
+  }
+});
+
+test("working harbour vessel families have distinct structures and conservative physics bounds", () => {
+  const models = new Map(createShowcaseAssets());
+  const features = {
+    tug: "towing-gear",
+    "fishing-boat": "fishing-gantry",
+    "pilot-launch": "low-wheelhouse",
+    coaster: "cargo-hold",
+  };
+  for (const [name, feature] of Object.entries(features)) {
+    assert.ok(
+      models.has(`${name}.gltf`),
+      `${name} must be a real generated model`,
+    );
+    const document = JSON.parse(models.get(`${name}.gltf`));
+    assert.ok(document.meshes.some((mesh) => mesh.name.includes(feature)));
+    const physics = document.nodes[0].extras.physics;
+    assert.ok(physics.halfExtents.every((value) => value > 0));
+    for (const mesh of document.meshes)
+      for (const primitive of mesh.primitives) {
+        const bounds = document.accessors[primitive.attributes.POSITION];
+        for (let axis = 0; axis < 3; axis++)
+          assert.ok(
+            Math.max(Math.abs(bounds.min[axis]), Math.abs(bounds.max[axis])) <=
+              physics.halfExtents[axis] + 0.001,
+            `${name} physics extent ${axis} encloses geometry`,
+          );
+      }
+    assert.ok(physics.waterline > 0 && physics.waterline < 0.5);
+  }
+});
+
+test("traffic quay has one continuous sheltered edge alongside all four berths", () => {
+  const document = loadAssetDocument("harbour-berths.gltf");
+  assert.ok(
+    document.meshes.some((mesh) => mesh.name === "harbour-berths-fittings"),
+  );
+  const edge = document.meshes.find(
+    (mesh) => mesh.name === "harbour-berths-quay",
+  );
+  const bounds = edge.primitives.map(
+    (p) => document.accessors[p.attributes.POSITION],
+  );
+  assert.ok(Math.min(...bounds.map((b) => b.min[0])) <= -29);
+  assert.ok(Math.max(...bounds.map((b) => b.max[0])) >= 29);
+  assert.ok(bounds.every((b) => b.max[2] <= 4.05));
 });

@@ -84,3 +84,35 @@ export function appendShowcaseFlagPole(triangles, origin) {
       });
   }
 }
+
+// The published native renderer consumes world-space vertices. Reuse authored
+// local geometry and transform it into one bounded frame buffer without creating
+// per-triangle objects for every vessel on every frame.
+export function writeTransformedShowcaseSurfaces(
+  source,
+  target,
+  offset,
+  basis,
+  position,
+  scale,
+) {
+  const [right, up, forward] = basis;
+  for (let i = 0; i < source.length; i += 12) {
+    const x = source[i] * scale,
+      y = source[i + 1] * scale,
+      z = source[i + 2] * scale;
+    const nx = source[i + 3],
+      ny = source[i + 4],
+      nz = source[i + 5];
+    target[offset] = position.x + right.x * x + up.x * y + forward.x * z;
+    target[offset + 1] = position.y + right.y * x + up.y * y + forward.y * z;
+    target[offset + 2] = position.z + right.z * x + up.z * y + forward.z * z;
+    target[offset + 3] = right.x * nx + up.x * ny + forward.x * nz;
+    target[offset + 4] = right.y * nx + up.y * ny + forward.y * nz;
+    target[offset + 5] = right.z * nx + up.z * ny + forward.z * nz;
+    for (let field = 6; field < 12; field++)
+      target[offset + field] = source[i + field];
+    offset += 12;
+  }
+  return offset;
+}

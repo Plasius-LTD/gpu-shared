@@ -11,7 +11,19 @@ which exports `createNativeSceneRenderer`.
 
 The scene includes curved sails, standing rigging, boat and lighthouse railings,
 continuous coastal terrain, a smaller animated flag, filtered cast shadows and
-water reflections. These are authored procedural showcase assets, not game footage.
+water reflections. The harbour has a coursed stone quay, separated timber pier
+boards and structural supports, mooring ropes and ladder, overlapping slate roof
+courses, a chimney, framed windows and a timber entrance. These are authored
+procedural showcase assets, not game footage.
+With native scene fidelity and realistic models enabled, six vessel families serve
+four furnished berths: brigantines, cutters, tugs, fishing boats, pilot launches and
+cargo coasters. Eight vessels establish the scene, with up to four underway.
+Each vessel has one continuous visit, then leaves permanently; fresh identities
+arrive to sustain traffic. Model families can recur. Boats travel bow-first along
+smooth lanes, yield to traffic, slow at berths, and follow the water with restrained
+heave, pitch and roll. Wakes start astern and stop when the vessel stops.
+
+This is authored demonstration traffic, not a maritime-navigation simulator.
 This raster pass does not claim ray tracing, photorealism or finished game art.
 
 At the library boundary, a missing/disabled decision or unavailable WebGPU retains
@@ -19,11 +31,21 @@ the Canvas2D compatibility path. The public site's disabled decision instead
 prevents mounting any demo and shows its existing managed-disabled panel.
 Native setup errors remain visible. Device loss pauses the scene and requires a
 reload. Reduced motion starts paused; pause stops GPU resubmission until the view
-changes. Static harbour geometry is cached, render size and buffers are bounded,
+changes. Static harbour geometry and local vessel vertices are cached; a reusable
+world-space frame buffer updates moving transforms. Render size and buffers are bounded,
 and teardown releases GPU resources. Frame intervals are measured, not synthesized.
+The diagnostics disclosure reports native submission counts, render size and the
+scene's actual rendering techniques alongside its geometry and quality budgets.
 
 See [ADR-0012](docs/adrs/adr-0012-native-shoreline-orchestration.md) for rollout and
-the package/site release order.
+the package/site release order, and the [harbour detail design](docs/design/shoreline-harbour-detail.md)
+for geometry/download budgets and verification. Windows use opaque dark glazing;
+this pass does not provide glass transmission or interior lighting. The
+[one-visit traffic design](docs/design/harbour-traffic.md) describes scheduling,
+bounds and long-run checks. Five extra fleet/quay assets are fetched only with
+native fidelity, realistic models and WebGPU available. Failed fleet loading
+reports the compatibility fallback; disabling native fidelity restores the existing
+library scene. This adds no account, capability or telemetry collection.
 
 [![npm version](https://img.shields.io/npm/v/@plasius/gpu-shared.svg)](https://www.npmjs.com/package/@plasius/gpu-shared)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/Plasius-LTD/gpu-shared/ci.yml?branch=main&label=build&style=flat)](https://github.com/Plasius-LTD/gpu-shared/actions/workflows/ci.yml)
@@ -55,7 +77,8 @@ npm install @plasius/gpu-shared
 - Preserves one shared fix point for cloth motion, visible water continuity, and
   occluded harbor-light reflections across GPU demo consumers.
 - Ships a package-owned showcase asset catalog with distinct brigantine,
-  cutter, lighthouse, harbor-dock, and shoreline models instead of relying on
+  cutter, tug, fishing boat, pilot launch, coaster, lighthouse, harbour berths,
+  harbor-dock, and shoreline models instead of relying on
   one tiny hull mesh plus placeholder box geometry.
 - Converts Product Studio GLTF primitives into triangle mesh inputs for the
   renderer-owned mesh-BVH wavefront path instead of customer-visible analytic

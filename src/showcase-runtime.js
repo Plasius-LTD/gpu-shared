@@ -1,6 +1,7 @@
 import { resolveShowcaseAssetUrl } from "./asset-url.js";
 import { loadGltfModel } from "./gltf-loader.js";
-import { appendShowcaseFlagPole, loadNativeShowcaseRenderer, packShowcaseSurfaces } from "./native-showcase.js";
+import { advanceHarbourTraffic, boatForward, createHarbourTraffic, trafficWakes } from "./harbour-traffic.js";
+import { appendShowcaseFlagPole, loadNativeShowcaseRenderer, packShowcaseSurfaces, writeTransformedShowcaseSurfaces } from "./native-showcase.js";
 import { GPU_SHOWCASE_REALISTIC_MODELS_FEATURE } from "./feature-flags.js";
 import {
   createGpuSharedTranslator,
@@ -846,6 +847,7 @@ const LEGACY_HARBOR_LAYOUT = Object.freeze([
 ]);
 
 const SHOWCASE_ENVIRONMENT_LAYOUT = Object.freeze([
+  Object.freeze({ assetKey: "harbour-berths", position: Object.freeze({ x: 0, y: 0, z: 0 }), rotationY: 0, scale: 1, accent: 0.04 }),
   Object.freeze({
     assetKey: "shoreline",
     position: Object.freeze({ x: 1.8, y: -0.04, z: 0.48 }),
@@ -1279,7 +1281,8 @@ function reflectVec3(vector, normal) {
 }
 
 function directionFromYaw(yaw) {
-  return normalizeVec3(vec3(Math.sin(yaw), 0, Math.cos(yaw)));
+  const forward = boatForward(yaw);
+  return vec3(forward.x, 0, forward.z);
 }
 
 function perpendicularOnWater(direction) {
@@ -1296,13 +1299,44 @@ function rotateY(point, angle) {
   );
 }
 
+function rotateVessel(point, transform) {
+  const pitch = transform.pitch ?? 0;
+  const roll = transform.roll ?? 0;
+  const [cp, sp, cr, sr, cy, sy] = transform.rotationCoefficients ?? [
+    Math.cos(pitch), Math.sin(pitch), Math.cos(roll), Math.sin(roll),
+    Math.cos(transform.rotationY), Math.sin(transform.rotationY),
+  ];
+  const py = point.y * cp - point.z * sp;
+  const pz = point.y * sp + point.z * cp;
+  const rx = point.x * cr - py * sr;
+  const ry = point.x * sr + py * cr;
+  return vec3(rx * cy - pz * sy, ry, rx * sy + pz * cy);
+}
+
+function shipTransform(ship) {
+  return {
+    position: ship.position,
+    rotationY: ship.rotationY,
+    pitch: ship.pitch ?? 0,
+    roll: ship.roll ?? 0,
+    scale: ship.scale ?? SHIP_SCALE,
+  };
+}
+
+function applyFocusCamera(state) {
+  const preset = state.traffic && ["integrated", "performance", "debug"].includes(state.focus)
+    ? { yaw: -0.25, pitch: 0.5, distance: 48, target: [0, 1.5, 14] }
+    : CAMERA_PRESETS[state.focus] ?? CAMERA_PRESETS.integrated;
+  Object.assign(state.camera, { ...preset, target: vec3(...preset.target) });
+}
+
 function transformPoint(point, transform) {
   const scale =
     typeof transform.scale === "number"
       ? { x: transform.scale, y: transform.scale, z: transform.scale }
       : transform.scale;
   const scaled = vec3(point.x * scale.x, point.y * scale.y, point.z * scale.z);
-  const rotated = rotateY(scaled, transform.rotationY);
+  const rotated = rotateVessel(scaled, transform);
   return addVec3(rotated, transform.position);
 }
 
@@ -1312,7 +1346,7 @@ function transformDirection(direction, transform) {
       ? { x: transform.scale, y: transform.scale, z: transform.scale }
       : transform.scale;
   const scaled = vec3(direction.x * scale.x, direction.y * scale.y, direction.z * scale.z);
-  return normalizeVec3(rotateY(scaled, transform.rotationY));
+  return normalizeVec3(rotateVessel(scaled, transform));
 }
 
 function projectPoint(point, camera, viewport) {
@@ -1542,6 +1576,11 @@ function buildTrianglesFromMesh(
   triangles,
   options = {}
 ) {
+  transform = { ...transform, rotationCoefficients: [
+    Math.cos(transform.pitch ?? 0), Math.sin(transform.pitch ?? 0),
+    Math.cos(transform.roll ?? 0), Math.sin(transform.roll ?? 0),
+    Math.cos(transform.rotationY), Math.sin(transform.rotationY),
+  ] };
   const primitives = getMeshPrimitives(mesh);
   for (const primitive of primitives) {
     const resolvedColor = tintPrimitiveColor(primitive.material, colorOverride);
@@ -1666,7 +1705,7 @@ function normalizeAssetCatalogFailureReason(error) {
   return "showcase asset loading failed";
 }
 
-async function loadShowcaseAssetCatalog({ includeSecondaryShip = true } = {}) {
+async function loadShowcaseAssetCatalog({ includeSecondaryShip = true, includeTrafficFleet = false } = {}) {
   const [brigantine, lighthouse, harborDock, shoreline] = await Promise.all([
     loadGltfModel(resolveShowcaseAssetUrl("brigantine")),
     loadGltfModel(resolveShowcaseAssetUrl("lighthouse")),
@@ -1676,19 +1715,23 @@ async function loadShowcaseAssetCatalog({ includeSecondaryShip = true } = {}) {
   const ships = {
     brigantine,
   };
+  const environment = { lighthouse, "harbor-dock": harborDock, shoreline };
 
   if (includeSecondaryShip) {
     ships.cutter = await loadGltfModel(resolveShowcaseAssetUrl("cutter"));
   }
 
+  if (includeSecondaryShip && includeTrafficFleet) {
+    const names = ["tug", "fishing-boat", "pilot-launch", "coaster"];
+    const models = await Promise.all(names.map(name => loadGltfModel(resolveShowcaseAssetUrl(name))));
+    names.forEach((name, index) => { ships[name] = models[index]; });
+    environment["harbour-berths"] = await loadGltfModel(resolveShowcaseAssetUrl("harbour-berths"));
+  }
+
   return createShowcaseAssetCatalog({
     mode: includeSecondaryShip ? "modeled-rich" : "modeled-baseline",
     ships,
-    environment: {
-      lighthouse,
-      "harbor-dock": harborDock,
-      shoreline,
-    },
+    environment,
   });
 }
 
@@ -1704,9 +1747,9 @@ async function createLegacyShowcaseAssetCatalog(error = null) {
   });
 }
 
-async function loadShowcaseAssetCatalogWithFallback({ includeSecondaryShip = true } = {}) {
+async function loadShowcaseAssetCatalogWithFallback(options = {}) {
   try {
-    return await loadShowcaseAssetCatalog({ includeSecondaryShip });
+    return await loadShowcaseAssetCatalog(options);
   } catch (error) {
     return createLegacyShowcaseAssetCatalog(error);
   }
@@ -2819,7 +2862,7 @@ function createSceneState(options, featureAdapters) {
         modelKey: "brigantine",
         position: vec3(-7.8, 0, 11.2),
         velocity: vec3(1.08, 0, -0.18),
-        rotationY: 1.38,
+        rotationY: -1.38,
         angularVelocity: 0.025,
         tint: { r: 0.62, g: 0.39, b: 0.23 },
         massScale: 1.42,
@@ -2836,7 +2879,7 @@ function createSceneState(options, featureAdapters) {
         modelKey: "cutter",
         position: vec3(6.8, 0, 5.4),
         velocity: vec3(-0.82, 0, 0.14),
-        rotationY: -1.34,
+        rotationY: 1.34,
         angularVelocity: -0.035,
         tint: { r: 0.58, g: 0.24, b: 0.16 },
         massScale: 0.84,
@@ -3127,7 +3170,7 @@ function pushHarborGeometry(camera, viewport, triangles, state) {
 }
 
 function renderShipRigging(ctx, ship, camera, viewport) {
-  const transform = { position: ship.position, rotationY: ship.rotationY, scale: SHIP_SCALE };
+  const transform = shipTransform(ship);
   const layout =
     ship.modelKey === "cutter"
       ? {
@@ -3389,7 +3432,7 @@ function getShipHalfExtents(ship, shipModel) {
   const physicsHalfExtents = Array.isArray(shipModel.physics.halfExtents)
     ? shipModel.physics.halfExtents
     : [1.35, 0.95, 3.9];
-  const scale = SHIP_SCALE * readVisualNumber(ship.collisionRadiusScale, 1);
+  const scale = (ship.scale ?? SHIP_SCALE) * readVisualNumber(ship.collisionRadiusScale, 1);
   return {
     x: physicsHalfExtents[0] * scale,
     y: physicsHalfExtents[1] * scale,
@@ -3468,7 +3511,7 @@ function updateShipMotion(state, ship, dt, shipModel) {
   const forward = directionFromYaw(ship.rotationY);
   const lateral = perpendicularOnWater(forward);
   const routeTarget = resolveShipRoute(ship, state, radius);
-  const desiredHeading = Math.atan2(routeTarget.x - ship.position.x, routeTarget.z - ship.position.z);
+  const desiredHeading = Math.atan2(ship.position.x - routeTarget.x, routeTarget.z - ship.position.z);
   const headingError = Math.atan2(
     Math.sin(desiredHeading - ship.rotationY),
     Math.cos(desiredHeading - ship.rotationY)
@@ -3633,6 +3676,13 @@ function resolveShipCollision(state, a, b, shipModelA, shipModelB) {
 }
 
 function updateShips(state, dt, shipModel) {
+  if (state.traffic) {
+    advanceHarbourTraffic(state.traffic, dt, (x, z, time) => sampleWave(state, x, z, time) * 0.24);
+    state.ships = state.traffic.ships;
+    state.contactCount = 0;
+    state.collisionFlash = Math.max(0, state.collisionFlash - dt * 1.7);
+    return;
+  }
   let collided = false;
   state.contactCount = 0;
 
@@ -3779,7 +3829,7 @@ function renderFlagPole(ctx, camera, viewport) {
 function renderShipShadow(ctx, shipModel, ship, state, camera, viewport, lightDir, shadowStrength) {
   const bounds = shipModel.bounds;
   const keelY = (shipModel.physics.waterline ?? 0.42) - 0.28;
-  const transform = { position: ship.position, rotationY: ship.rotationY, scale: SHIP_SCALE };
+  const transform = shipTransform(ship);
   const hullCorners = [
     vec3(bounds.min[0], keelY, bounds.min[2]),
     vec3(bounds.max[0], keelY, bounds.min[2]),
@@ -3852,7 +3902,7 @@ function collectSceneLightSources(state, visuals) {
     for (const lantern of lanterns) {
       const point = transformPoint(
         vec3(lantern.x, lantern.y, lantern.z),
-        { position: ship.position, rotationY: ship.rotationY, scale: SHIP_SCALE }
+        shipTransform(ship)
       );
       pushLight(
         point,
@@ -4227,7 +4277,7 @@ function renderScene(
       state.nativeStaticTriangles = [];
       pushHarborGeometry(camera, viewport, state.nativeStaticTriangles, state);
     }
-    sceneTriangles.push(...state.nativeStaticTriangles);
+    state.nativeStaticVertices ??= packShowcaseSurfaces(state.nativeStaticTriangles);
   } else pushHarborGeometry(camera, viewport, sceneTriangles, state);
   const cloth = buildClothSurface(
     state,
@@ -4267,9 +4317,17 @@ function renderScene(
 
   for (const ship of state.ships) {
     const activeShipModel = resolveShipModel(state, ship, shipModel);
+    if (viewport.native) {
+      if (!ship.nativeLocalVertices) {
+        const localTriangles = [];
+        buildTrianglesFromMesh(activeShipModel, { position: vec3(0, 0, 0), rotationY: 0, scale: 1 }, ship.tint, camera, viewport, localTriangles);
+        ship.nativeLocalVertices = packShowcaseSurfaces(localTriangles);
+      }
+      continue;
+    }
     buildTrianglesFromMesh(
       activeShipModel,
-      { position: ship.position, rotationY: ship.rotationY, scale: SHIP_SCALE },
+      shipTransform(ship),
       ship.tint,
       camera,
       viewport,
@@ -4284,16 +4342,41 @@ function renderScene(
 
   if (viewport.native) {
     appendShowcaseFlagPole(sceneTriangles, FLAG_LAYOUT.origin);
+    const dynamicVertices = packShowcaseSurfaces(sceneTriangles);
+    const vertexLength = state.nativeStaticVertices.length + dynamicVertices.length + state.ships.reduce((total, ship) => total + ship.nativeLocalVertices.length, 0);
+    if (state.nativeFrameVertices?.length !== vertexLength) state.nativeFrameVertices = new Float32Array(vertexLength);
+    const vertices = state.nativeFrameVertices;
+    vertices.set(state.nativeStaticVertices);
+    vertices.set(dynamicVertices, state.nativeStaticVertices.length);
+    let offset = state.nativeStaticVertices.length + dynamicVertices.length;
+    for (const ship of state.ships) {
+      const transform = shipTransform(ship);
+      const basis = [vec3(1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1)].map(axis => rotateVessel(axis, transform));
+      offset = writeTransformedShowcaseSurfaces(ship.nativeLocalVertices, vertices, offset, basis, ship.position, transform.scale);
+    }
     state.nativeRenderer = ctx.render({
-      vertices: packShowcaseSurfaces(sceneTriangles),
+      vertices,
       camera: { eye: [camera.eye.x, camera.eye.y, camera.eye.z], target: [camera.target.x, camera.target.y, camera.target.z], fov: camera.fov },
       time: state.time,
-      wakes: state.ships.slice(0, 4).map(ship => [ship.position.x, ship.position.z, ship.rotationY]),
+      wakes: trafficWakes(state.ships.map(ship => ({ ...ship, halfLength: ship.halfLength ?? getShipHalfExtents(ship, resolveShipModel(state, ship, shipModel)).z }))),
     });
     setListContent(dom.sceneMetrics, ["Renderer: native WebGPU raster", `Geometry: ${state.nativeRenderer.vertexCount / 3} triangles`, "Lighting: directional sun and atmospheric sky"]);
     setListContent(dom.qualityMetrics, ["Antialiasing: 4 samples", "Shadows: filtered 2048px depth map", "Water: animated surface with planar reflection", `Frame interval: ${state.lastDecision.metrics.averageFrameTimeMs.toFixed(2)} ms`]);
+    setListContent(dom.debugMetrics, [
+      `Submitted frames: ${state.nativeRenderer.submittedFrames}`,
+      `Render target: ${state.nativeRenderer.width} × ${state.nativeRenderer.height}`,
+      "Frame timing: browser callback intervals",
+      ...(state.traffic ? [state.translate(gpuSharedTranslationKeys.trafficVisits, { departed: state.traffic.retiredCount })] : []),
+    ]);
+    setListContent(dom.sceneNotes, [
+      "Technology demonstration: procedural harbour assets",
+      "Water: analytic waves, moving wakes and a planar reflection",
+      "Surface lighting: directional sun, atmospheric sky and filtered shadows",
+    ]);
     dom.status.textContent = state.paused ? state.translate(gpuSharedTranslationKeys.statusPaused) : state.translate(gpuSharedTranslationKeys.statusLive, { fps: state.lastDecision.metrics.fps.toFixed(1) });
-    dom.details.textContent = state.translate(gpuSharedTranslationKeys.detailsNative);
+    dom.details.textContent = state.traffic
+      ? state.translate(gpuSharedTranslationKeys.trafficSummary, { active: state.ships.length, underway: state.ships.filter(ship => ship.phase !== "moored").length })
+      : state.translate(gpuSharedTranslationKeys.detailsNative);
     return;
   }
   drawTriangles(ctx, waterTriangles, lightDir, reflectionStrength, camera, shadowStrength);
@@ -4455,6 +4538,10 @@ function syncTextState(state, shipModel, featureAdapters) {
         vz: Number(ship.velocity.z.toFixed(2)),
         massKg: Math.round(getShipMass(ship, resolvedShipModel)),
         lanterns: Array.isArray(ship.lanterns) ? ship.lanterns.length : 0,
+        phase: ship.phase ?? "legacy",
+        yaw: ship.rotationY,
+        pitch: ship.pitch ?? 0,
+        roll: ship.roll ?? 0,
       };
     }),
     assetCatalog: {
@@ -4521,13 +4608,21 @@ export async function mountGpuShowcase(options = {}, featureFlags = null) {
     },
     featureAdapters
   );
+  const nativeEnabled = isFeatureEnabled(featureFlags, "gpu-demo.scene-fidelity.enabled", false);
+  const trafficEnabled = nativeEnabled && Boolean((options.__navigator ?? globalThis.navigator)?.gpu);
   const assetCatalog = await loadShowcaseAssetCatalogWithFallback({
     includeSecondaryShip: state.showcaseRealisticModelsEnabled,
+    includeTrafficFleet: trafficEnabled,
   });
   const shipModel = assetCatalog.ships[assetCatalog.primaryShipKey];
 
   state.assetCatalog = assetCatalog;
   state.shipModel = shipModel;
+  if (trafficEnabled && ["brigantine", "cutter", "tug", "fishing-boat", "pilot-launch", "coaster"].every(name => assetCatalog.ships[name])) {
+    state.traffic = createHarbourTraffic();
+    state.ships = state.traffic.ships;
+    applyFocusCamera(state);
+  }
   state.packageState =
     typeof options.createState === "function" ? options.createState() : undefined;
   updatePhysicsSnapshot(state, shipModel, featureAdapters.physics);
@@ -4535,7 +4630,6 @@ export async function mountGpuShowcase(options = {}, featureFlags = null) {
   state.demoDescription = resolveSceneDescription(state, options, shipModel).description;
   syncTextState(state, shipModel, featureAdapters);
 
-  const nativeEnabled = isFeatureEnabled(featureFlags, "gpu-demo.scene-fidelity.enabled", false);
   const nativeRenderer = await loadNativeShowcaseRenderer({
     enabled: nativeEnabled,
     canvas: dom.canvas,
@@ -4613,10 +4707,7 @@ export async function mountGpuShowcase(options = {}, featureFlags = null) {
   };
   const handleFocusChange = () => {
     state.focus = dom.focusMode.value;
-    Object.assign(state.camera, {
-      ...CAMERA_PRESETS[state.focus],
-      target: vec3(...CAMERA_PRESETS[state.focus].target),
-    });
+    applyFocusCamera(state);
   };
 
   dom.pauseButton.addEventListener("click", handlePauseClick);
@@ -4700,6 +4791,8 @@ function updatePhysicsSnapshot(state, shipModel, physicsFeatures) {
 }
 
 export {
+  transformPoint as __testOnlyTransformShowcasePoint,
+  transformDirection as __testOnlyTransformShowcaseDirection,
   advanceShowcaseClothSimulationState as __testOnlyAdvanceShowcaseClothSimulationState,
   buildClothSurface as __testOnlyBuildClothSurface,
   buildShorelineFoamSegments as __testOnlyBuildShorelineFoamSegments,

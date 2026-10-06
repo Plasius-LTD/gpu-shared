@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Replace repeating native boat routes with bounded harbour traffic: six vessel
+  families, four furnished berths, bow-first motion, smooth turns, yielding,
+  water-following attitude and wakes aligned with travel. Each vessel makes one
+  visit before retiring, with new arrivals maintaining activity. Cache vessel
+  geometry and reuse the native frame buffer. Preserve rollout, pause, reduced
+  motion and compatibility behaviour; add 20-minute traffic regressions (#56).
+
+- Replace harbour placeholder surfaces with supported timber boards, coursed quay
+  stonework, slate roof courses, framed windows, doors, chimney and mooring details.
+  Keep generated assets reproducible and bound geometry/download size; remove
+  redundant subdivisions from straight rigging and structural struts (#56).
+
+- Populate native Shoreline diagnostics with submission counts, render dimensions
+  and scene notes so the disclosure contains no empty telemetry sections.
+
 - **Added**
   - (placeholder)
 

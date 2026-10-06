@@ -286,6 +286,7 @@ test("showcase asset resolution can target the richer shared asset catalog", () 
   assert.equal(url.href, "file:///tmp/assets/lighthouse.gltf");
   assert.match(cutterUrl.href, /cutter\.gltf$/);
   assert.match(shorelineUrl.href, /shoreline\.gltf$/);
+  for(const name of ["tug","fishing-boat","pilot-launch","coaster","harbour-berths"]) assert.ok(resolveShowcaseAssetUrl(name).href.endsWith(`/assets/${name}.gltf`));
 });
 
 test("showcase asset resolution falls back to an inline asset when the base URL is invalid", () => {
@@ -947,6 +948,7 @@ test("showcase flag-off baseline still loads modeled harbor assets", async () =>
     );
     const snapshot = JSON.parse(globalThis.window.render_game_to_text());
 
+    assert.equal(harness.fetchCalls.some(href=> /(?:tug|fishing-boat|pilot-launch|coaster|harbour-berths)\.gltf$/u.test(href)),false);
     assert.equal(snapshot.assetCatalog.mode, "modeled-baseline");
     assert.deepEqual(snapshot.assetCatalog.shipKeys, ["brigantine"]);
     assert.deepEqual(snapshot.assetCatalog.environmentKeys, [
