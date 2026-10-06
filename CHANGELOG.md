@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.1.5] - 2026-10-06
+
 - Replace repeating native boat routes with bounded harbour traffic: six vessel
   families, four furnished berths, bow-first motion, smooth turns, yielding,
   water-following attitude and wakes aligned with travel. Each vessel makes one
@@ -725,3 +739,4 @@ All notable changes to this project will be documented in this file.
 [1.1.2]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.2
 [1.1.3]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.3
 [1.1.4]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.4
+[1.1.5]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.5
