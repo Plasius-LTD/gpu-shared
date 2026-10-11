@@ -541,7 +541,12 @@ export function resolveShowcaseAssetUrl(
   assetName?: ShowcaseAssetName
 ): URL;
 
-export function loadGltfModel(url: string | URL): Promise<GltfModel>;
+export interface GltfLoadOptions {
+  signal?: AbortSignal;
+  /** Absolute URL to Subresource Integrity digest; when supplied, unlisted resources fail closed. */
+  integrity?: Readonly<Record<string, string>>;
+}
+export function loadGltfModel(url: string | URL, options?: GltfLoadOptions): Promise<GltfModel>;
 
 export function isPvoxAssetUrl(value: unknown): boolean;
 

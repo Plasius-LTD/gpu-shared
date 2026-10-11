@@ -37,7 +37,12 @@
     "./assets/fishing-boat.gltf": "./assets/fishing-boat.gltf",
     "./assets/pilot-launch.gltf": "./assets/pilot-launch.gltf",
     "./assets/coaster.gltf": "./assets/coaster.gltf",
-    "./assets/harbour-berths.gltf": "./assets/harbour-berths.gltf"
+    "./assets/harbour-berths.gltf": "./assets/harbour-berths.gltf",
+    "./material-study": {
+      "types": "./src/material-study.d.ts",
+      "import": "./dist/material-study.js",
+      "require": "./dist/material-study.cjs"
+    }
   },
   "scripts": {
     "build": "tsup",
@@ -73,11 +78,13 @@
   "author": "Plasius LTD <development@plasius.co.uk>",
   "license": "Apache-2.0",
   "dependencies": {
-    "@plasius/schema": "^1.4.3"
+    "@plasius/schema": "^1.4.3",
+    "@plasius/gpu-camera": "^0.1.18",
+    "@plasius/gpu-camera-controls": "^0.1.1"
   },
   "peerDependencies": {
     "@plasius/gpu-model-voxel": "^0.1.0",
-    "@plasius/gpu-renderer": "^0.2.46",
+    "@plasius/gpu-renderer": "^0.2.48",
     "@plasius/translations": "^1.0.23"
   },
   "peerDependenciesMeta": {
@@ -100,7 +107,8 @@
     "globals": "^17.11.0",
     "react": "^19.2.8",
     "tsup": "^8.5.1",
-    "typescript": "^7.0.2"
+    "typescript": "^7.0.2",
+    "@plasius/gpu-renderer": "^0.2.48"
   },
   "repository": {
     "type": "git",
@@ -124,7 +132,7 @@
     }
   ],
   "overrides": {
-    "brace-expansion": "^5.0.9",
+    "brace-expansion": "^5.0.12",
     "esbuild": "^0.28.1",
     "minimatch": "^10.2.1"
   },

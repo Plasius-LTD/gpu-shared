@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Add the isolated material-ageing study with reviewed wood-only varnish, structured rope fray, direct mouse/touch/keyboard camera input, bounded lifecycle and preserved transferred tests (#140).
+- Correct omitted glTF PBR factors and support abortable, integrity-checked asset loading for the production study (#140).
+
 - **Added**
   - (placeholder)
 
