@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.1.6] - 2026-10-11
+
 - Add the isolated material-ageing study with reviewed wood-only varnish, structured rope fray, direct mouse/touch/keyboard camera input, bounded lifecycle and preserved transferred tests (#140).
 - Correct omitted glTF PBR factors and support abortable, integrity-checked asset loading for the production study (#140).
 
@@ -743,3 +757,4 @@ All notable changes to this project will be documented in this file.
 [1.1.3]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.3
 [1.1.4]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.4
 [1.1.5]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.5
+[1.1.6]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.6
