@@ -211,9 +211,9 @@ function sliceBufferView(document, bufferViewIndex, buffers) {
   return buffer.slice(start, end);
 }
 
-async function loadImageResource(document, image, index, buffers, baseUrl) {
+async function loadImageResource(document, image, index, buffers, baseUrl, options) {
   if (typeof image?.uri === "string") {
-    const response = await fetch(new URL(image.uri, baseUrl));
+    const response = await fetchGltfResource(new URL(image.uri, baseUrl), options);
     if (!response.ok) {
       throw new Error(`Failed to load glTF texture: ${response.status} ${response.statusText}`);
     }
@@ -376,7 +376,7 @@ function getMaterialTexture(document, textureRef, imageResources) {
 function getMaterialInfo(document, primitive, imageResources) {
   const material = document.materials?.[primitive.material] ?? null;
   const pbr = material?.pbrMetallicRoughness ?? null;
-  const factor = pbr?.baseColorFactor ?? [0.56, 0.33, 0.22, 1];
+  const factor = pbr?.baseColorFactor ?? [1, 1, 1, 1];
   const emissive = Array.isArray(material?.emissiveFactor) ? material.emissiveFactor : [0, 0, 0];
   const extensions = material?.extensions ?? {};
   const specular = extensions.KHR_materials_specular ?? null;
@@ -400,11 +400,11 @@ function getMaterialInfo(document, primitive, imageResources) {
     roughness:
       typeof pbr?.roughnessFactor === "number"
         ? pbr.roughnessFactor
-        : 0.92,
+        : 1,
     metallic:
       typeof pbr?.metallicFactor === "number"
         ? pbr.metallicFactor
-        : 0.08,
+        : 1,
     opacity: factor[3] ?? 1,
     emissive: Object.freeze({
       r: emissive[0] ?? 0,
@@ -875,8 +875,15 @@ function collectScenePrimitives(document, buffers, imageResources) {
   };
 }
 
-async function loadGltfDocument(url) {
-  const response = await fetch(url);
+async function fetchGltfResource(url, { signal, integrity } = {}) {
+  signal?.throwIfAborted();
+  const digest = integrity?.[String(url)];
+  if (integrity && !digest) throw new Error("glTF resource is missing from the integrity manifest.");
+  return fetch(url, { signal, ...(digest ? { integrity: digest } : {}) });
+}
+
+async function loadGltfDocument(url, options) {
+  const response = await fetchGltfResource(url, options);
   if (!response.ok) {
     throw new Error(`Failed to load glTF asset: ${response.status} ${response.statusText}`);
   }
@@ -902,7 +909,7 @@ async function loadInlineShowcaseDocument() {
   return loadGltfDocument(new URL(module.INLINE_SHOWCASE_ASSET_URLS.brigantine));
 }
 
-async function buildGltfModel(document, baseUrl, embeddedBuffers = []) {
+async function buildGltfModel(document, baseUrl, embeddedBuffers = [], options) {
   const buffers = await Promise.all(
     (document.buffers ?? []).map(async (buffer, index) => {
       if (typeof buffer.uri !== "string" && embeddedBuffers[index]) {
@@ -914,7 +921,7 @@ async function buildGltfModel(document, baseUrl, embeddedBuffers = []) {
       if (buffer.uri.startsWith("data:")) {
         return decodeDataUri(buffer.uri);
       }
-      const nested = await fetch(new URL(buffer.uri, baseUrl));
+      const nested = await fetchGltfResource(new URL(buffer.uri, baseUrl), options);
       if (!nested.ok) {
         throw new Error(`Failed to load glTF buffer: ${nested.status} ${nested.statusText}`);
       }
@@ -925,7 +932,7 @@ async function buildGltfModel(document, baseUrl, embeddedBuffers = []) {
   const imageResources = new Map();
   await Promise.all(
     (document.images ?? []).map(async (image, index) => {
-      const pixels = await loadImageResource(document, image, index, buffers, baseUrl);
+      const pixels = await loadImageResource(document, image, index, buffers, baseUrl, options);
       if (pixels) {
         imageResources.set(index, pixels);
       }
@@ -963,16 +970,16 @@ function shouldRetryWithInlineShowcaseFallback(url, error) {
   return error instanceof TypeError || /^Failed to load glTF asset:/u.test(error.message);
 }
 
-export async function loadGltfModel(url) {
+export async function loadGltfModel(url, options = {}) {
   try {
-    const { document, baseUrl, buffers } = await loadGltfDocument(url);
-    return buildGltfModel(document, baseUrl, buffers);
+    const { document, baseUrl, buffers } = await loadGltfDocument(url, options);
+    return buildGltfModel(document, baseUrl, buffers, options);
   } catch (error) {
-    if (!shouldRetryWithInlineShowcaseFallback(url, error)) {
+    if (options.signal?.aborted || options.integrity || !shouldRetryWithInlineShowcaseFallback(url, error)) {
       throw error;
     }
 
     const { document, baseUrl, buffers } = await loadInlineShowcaseDocument();
-    return buildGltfModel(document, baseUrl, buffers);
+    return buildGltfModel(document, baseUrl, buffers, options);
   }
 }

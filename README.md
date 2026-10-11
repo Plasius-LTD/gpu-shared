@@ -1,5 +1,43 @@
 # @plasius/gpu-shared
 
+## Material ageing study
+
+Load the reviewed chest on demand through the isolated entry, after the host confirms
+its GPU-demo capability and `gpu-demo.scene-fidelity.enabled` rollout:
+
+```js
+const { createMaterialStudy } = await import('@plasius/gpu-shared/material-study');
+const study = await createMaterialStudy({
+  canvas,
+  modelUrl: new URL('/models/material-study/wooden_crate_01.gltf', location.href),
+  signal: abortController.signal,
+  onHintChange: visible => showGestureGuide(visible),
+});
+await study.update({ varnishWear: 1, ropeFray: 0.3 });
+study.resize(); // Call when the canvas container changes size.
+study.destroy(); // Also abort pending initialization when leaving the view.
+```
+
+Install the compatible renderer peer. Supply the unmodified Poly Haven Wooden Crate
+01 1K glTF/binary/textures (James Ray Cock, CC0), self-hosted alongside the model URL.
+The runtime enforces its SHA-256 SRI manifest and topology; changed or missing files
+fail closed. The host owns translated loading/error/retry states, attribution,
+focusable canvas, permanent keyboard instructions and the transient guide. Its root
+import does not load the material study. `update` rejects overlapping changes; disable
+or debounce host controls while awaiting it. Aborting or destroying releases input,
+timers and GPU resources, including resources created after pending initialization.
+
+The weathered preset uses 30% rope fray / 90% wood varnish wear. Full wear is bare
+wood, rope and metal are never coated. Drag/one-finger orbit follows the grabbed
+surface; Shift/right drag trucks, Alt-drag pans, focused wheel dollies and Shift-wheel
+changes the lens. Two-finger move/pinch, arrows, Shift-arrows, modes 1–5, +/- and Home
+are supported. Focus shows guidance for five seconds; ? repeats and Escape dismisses.
+These are static authoring approximations, not gameplay or structural-damage claims.
+
+`loadGltfModel(url, { signal, integrity })` supports cancellation and optional strict
+absolute-URL/SRI-digest manifests. Without these options existing callers retain their
+loading/fallback contract. Omitted PBR factors follow glTF white/metallic 1/roughness 1.
+
 ## Native Shoreline rendering
 
 The harbour can use `@plasius/gpu-renderer` native surface drawing when its caller

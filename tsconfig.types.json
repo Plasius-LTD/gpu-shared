@@ -9,5 +9,5 @@
     "strict": true,
     "target": "ES2022"
   },
-  "include": ["tests/feedback-diagnostics.types.ts"]
+  "include": ["tests/feedback-diagnostics.types.ts", "tests/material-study.types.ts"]
 }
