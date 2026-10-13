@@ -541,3 +541,9 @@ state. Rollback disables `cd.yml` or the affected distribution channel and
 removes temporary runner admission, without restoring the administrative path
 or a token-based publication path. See
 [ADR-0011](docs/adrs/adr-0011-trusted-ci-and-confirmed-release-merges.md).
+
+## Reviewed model inspection
+
+The lazy `@plasius/gpu-shared/model-inspection` entry exports `createModelInspection({ canvas, modelUrl, integrity, enabled, signal, width, height, onHintChange, onError })`. Supply an absolute HTTP(S) glTF/GLB URL and an integrity map from every absolute resource URL to its SHA-256 SRI value. Acquire and review bounded fixtures before mounting. Pass the positive `gpu-demo.scene-fidelity.enabled` evaluation, or an explicit documented local fixture override.
+
+The returned handle exposes `triangleCount`, `primitiveCount`, `draw()`, `reset()` and idempotent `destroy()`. The host owns canvas accessibility, credits, failure messages and viewport sizing; remount at a new bounded render resolution after resizing. Mouse, touch and keyboard camera gestures match the material study. Initialization is bounded to sixty seconds. This is a static inspection path: skinning, source animation playback and per-model ageing authoring are not provided. See ADR 0014.

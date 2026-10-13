@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - **Added**
-  - (placeholder)
+  - Lazy model inspection with integrity-checked assets, shared camera gestures, bounded GPU resources and explicit lifecycle cleanup.
 
 - **Changed**
   - (placeholder)

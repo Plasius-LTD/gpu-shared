@@ -42,6 +42,11 @@
       "types": "./src/material-study.d.ts",
       "import": "./dist/material-study.js",
       "require": "./dist/material-study.cjs"
+    },
+    "./model-inspection": {
+      "types": "./src/model-inspection.d.ts",
+      "import": "./dist/model-inspection.js",
+      "require": "./dist/model-inspection.cjs"
     }
   },
   "scripts": {
