@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Require the released renderer 0.2.49 progressive API for model inspection; keep unqualified adaptive integration outside this release.
+
 - Admit native UHD model inspection up to 3840 × 2160 pixels with bounded dimensions and pre-allocation pixel-budget validation.
 
 - Model-inspection quality controls, GPU-completed sample progress, bounded idle refinement, hidden-tab pause and camera-preserving quality changes.
