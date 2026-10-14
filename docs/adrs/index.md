@@ -13,3 +13,7 @@
 - [ADR-0011 Trusted CI and confirmed release merges](./adr-0011-trusted-ci-and-confirmed-release-merges.md)
 - [ADR-0012 Native Shoreline orchestration](./adr-0012-native-shoreline-orchestration.md)
 - [ADR-0013 Isolated production material study](./adr-0013-isolated-material-study.md)
+
+- [ADR 0014: Reusable model inspection](adr-0014-reusable-model-inspection.md)
+
+- [ADR 0015: Progressive inspection quality](adr-0015-progressive-inspection-quality.md)
