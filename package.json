@@ -42,6 +42,11 @@
       "types": "./src/material-study.d.ts",
       "import": "./dist/material-study.js",
       "require": "./dist/material-study.cjs"
+    },
+    "./model-inspection": {
+      "types": "./src/model-inspection.d.ts",
+      "import": "./dist/model-inspection.js",
+      "require": "./dist/model-inspection.cjs"
     }
   },
   "scripts": {
@@ -85,7 +90,8 @@
   "peerDependencies": {
     "@plasius/gpu-model-voxel": "^0.1.0",
     "@plasius/gpu-renderer": "^0.2.48",
-    "@plasius/translations": "^1.0.23"
+    "@plasius/translations": "^1.0.23",
+    "@plasius/gpu-lighting": "^0.2.14"
   },
   "peerDependenciesMeta": {
     "@plasius/gpu-model-voxel": {
@@ -95,6 +101,9 @@
       "optional": true
     },
     "@plasius/translations": {
+      "optional": true
+    },
+    "@plasius/gpu-lighting": {
       "optional": true
     }
   },

@@ -541,3 +541,19 @@ state. Rollback disables `cd.yml` or the affected distribution channel and
 removes temporary runner admission, without restoring the administrative path
 or a token-based publication path. See
 [ADR-0011](docs/adrs/adr-0011-trusted-ci-and-confirmed-release-merges.md).
+
+## Reviewed model inspection
+
+The lazy `@plasius/gpu-shared/model-inspection` entry exports `createModelInspection({ canvas, modelUrl, integrity, enabled, signal, width, height, quality, onProgress, onHintChange, onError })`. Supply an absolute HTTP(S) glTF/GLB URL and an integrity map from every absolute resource URL to its SHA-256 SRI value. Acquire and review bounded fixtures before mounting. Pass the positive `gpu-demo.scene-fidelity.enabled` evaluation, or an explicit documented local fixture override.
+
+The returned handle exposes `triangleCount`, `primitiveCount`, `draw()`, `setQuality(partial)`, `setPaused(boolean)`, `reset()` and idempotent `destroy()`. The host owns canvas accessibility, credits, failure messages and viewport sizing; call `setQuality({ width, height })` after resizing. Mouse, touch and keyboard camera gestures match the material study. Initialization is bounded to sixty seconds. This is a static inspection path: skinning, source animation playback and per-model ageing authoring are not provided. See ADR 0014.
+
+Inspection defaults to a 64-sample target, six bounces and denoising. It displays one sample promptly, then refines in batches of up to four once the camera has been still for 200ms. `onProgress` reports GPU-completed samples and actual dimensions. `setQuality({ samplesPerPixel, maxDepth, denoise, width, height })` preserves the camera and loaded model while resetting history; forward document visibility through `setPaused(document.hidden)`. Targets are bounded to 256 samples, 12 fixed-mode bounces and 3840 pixels per dimension, capped at 3840×2160 total pixels. It stops at the target and releases resources on failure/teardown. See [quality contract](docs/tdrs/tdr-0004-inspection-quality.md). This entrypoint requires the progressive renderer release; local source overrides are not published dependency replacements.
+
+Model inspection accepts native UHD (3840 × 2160) dimensions, with a maximum of 8,294,400 pixels and 3840 pixels per dimension. Oversized requests fail before allocation. See [UHD inspection design](docs/model-inspection-uhd.md).
+
+### Experimental adaptive inspection
+
+Pass `adaptiveEnabled:true` and `quality:{samplingMode:'adaptive',samplesPerPixel:32,maxDepth:6}` to use the radial implementation from the linked sampling work. Defaults remain `samplingMode:'fixed'`. Adaptive ceilings range 1–256, with up to 20 bounces. Supply the host's positive `renderer.sampling.adaptivePerPixel.enabled` decision rather than a production constant. The local workshop is an explicit development override.
+
+After a one-SPP interaction preview, the idle adaptive pass reports completed tiles and actual final mean/min/max SPP. Camera changes cancel and restart the pass; fixed mode retains progressive uniform accumulation. Adaptive output is spatially resolved once per tile and does not reuse denoised history. `gpu-renderer/adaptive` and `gpu-lighting/radial-sampling` are lazy optional peers. Their new APIs must be released and dependency pins reconciled before publishing this draft; current local source overrides are for inspection only. See [ADR0016](docs/adrs/adr-0016-adaptive-inspection-lifecycle.md).
