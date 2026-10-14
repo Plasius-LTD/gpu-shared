@@ -106,7 +106,12 @@ export async function createInspectionRuntime({ canvas, modelUrl, integrity, ena
       onChange:()=>{void draw().catch(()=>{});}});
     await draw();combined.throwIfAborted();
     return Object.freeze({triangleCount,primitiveCount:model.primitives.length,draw,
-      async setQuality(patch){if(disposed)return;desired=inspectionQuality(patch,desired);await draw();},
+      async setQuality(patch){
+        if(disposed)return;
+        const next=inspectionQuality(patch,desired);
+        if(Object.keys(next).every(key=>next[key]===desired[key]))return;
+        desired=next;await draw();
+      },
       setPaused(value){
         if(disposed)return;paused=value===true;clearTimeout(timer);
         if(paused)progress('paused');else{progress(samples>=desired.samplesPerPixel?'complete':'refining');schedule();}

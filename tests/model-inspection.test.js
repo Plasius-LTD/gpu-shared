@@ -133,3 +133,26 @@ test('rapid quality changes reuse loaded meshes and keep the most recent setting
   assert.equal(loads,1);assert.equal(f.calls.filter(c=>c?.meshes).at(-1).maxDepth,12);
   runtime.destroy();
 });
+
+test('UHD renders native pixels while oversized and over-budget targets fail before allocation',async()=>{
+  const f=fixture();
+  const runtime=await createInspectionRuntime({...options(),width:3840,height:2160,quality:{samplesPerPixel:1}},f.deps);
+  const allocation=f.calls.find(c=>c?.meshes);
+  assert.equal(allocation.width,3840);assert.equal(allocation.height,2160);
+  for(const patch of [{width:3841},{width:3840,height:2161},{width:3000,height:3000}]) {
+    await assert.rejects(runtime.setQuality(patch),/quality|pixel budget/);
+  }
+  assert.equal(f.calls.filter(c=>c?.meshes).length,1);
+  await runtime.setQuality({width:2160,height:3840});
+  assert.equal(f.calls.filter(c=>c?.meshes).at(-1).height,3840);
+  runtime.destroy();
+});
+
+test('identical quality changes preserve completed history without rendering again',async()=>{
+  const f=fixture(),runtime=await createInspectionRuntime({...options(),width:3840,height:2160,quality:{samplesPerPixel:1}},f.deps);
+  const renders=f.calls.filter(c=>c==='render').length,resets=f.calls.filter(c=>c==='reset').length;
+  await runtime.setQuality({width:3840,height:2160,samplesPerPixel:1,maxDepth:6,denoise:true});
+  assert.equal(f.calls.filter(c=>c==='render').length,renders);
+  assert.equal(f.calls.filter(c=>c==='reset').length,resets);
+  runtime.destroy();
+});
