@@ -1,4 +1,5 @@
 export interface ModelInspectionQuality {
+  samplingMode: 'fixed' | 'adaptive';
   samplesPerPixel: number;
   maxDepth: number;
   width: number;
@@ -6,6 +7,12 @@ export interface ModelInspectionQuality {
   denoise: boolean;
 }
 export interface ModelInspectionProgress {
+  samplingMode: 'fixed' | 'adaptive';
+  meanSpp?: number;
+  minimumSpp?: number;
+  maximumSpp?: number;
+  completedTiles?: number;
+  totalTiles?: number;
   phase: 'rendering' | 'refining' | 'complete' | 'paused';
   samples: number;
   target: number;
@@ -19,6 +26,7 @@ export interface ModelInspectionOptions {
   modelUrl: string | URL;
   integrity: Record<string, string>;
   enabled: boolean;
+  adaptiveEnabled?: boolean;
   signal?: AbortSignal;
   width?: number;
   height?: number;

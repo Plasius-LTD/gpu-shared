@@ -10,3 +10,7 @@
 - First batch is one sample, subsequent batches at most four. Camera rest debounce 200ms; no permanent render loop after completion. Waits and allocation are bounded to 60 seconds.
 
 Tests cover strict input bounds, exact target completion, coalescing, camera reset, changing settings while busy, pause/resume, failure, timeout, cancellation and disposal. Parent flag: `gpu-demo.scene-fidelity.enabled`; local preview override only. GPU accumulation is supplied by renderer Task #241.
+
+## Adaptive mode
+
+`quality.samplingMode` is `fixed` (default) or `adaptive`. Adaptive requires `adaptiveEnabled:true`, allows 1–20 bounces and interprets `samplesPerPixel` as the radial ceiling. `onProgress` also supplies `samplingMode`, `completedTiles`, `totalTiles`, `meanSpp`, `minimumSpp` and `maximumSpp` when available. Until completion, mean is the full-frame planned mean and min/max describe completed tiles; the final mean is calculated from verified GPU counts. The preview does not count towards the adaptive budget. Pausing cancels the current adaptive pass and resuming restarts it; fixed completed history is retained. Cancellation waits for submitted tile work before mutation. See ADR0016.

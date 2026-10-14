@@ -156,3 +156,47 @@ test('identical quality changes preserve completed history without rendering aga
   assert.equal(f.calls.filter(c=>c==='reset').length,resets);
   runtime.destroy();
 });
+
+test('experimental mode uses the canonical adaptive API and reports actual mean counts',async(t)=>{
+ t.mock.timers.enable({apis:['setTimeout','Date']});
+ const f=fixture(),progress=[],jobs=[];
+ f.renderer.renderAdaptiveFrame=async o=>{jobs.push(o);const p={completedTiles:1,totalTiles:1,completedSamples:100,meanSpp:5.95,minimumSpp:1,maximumSpp:32};o.onProgress(p);return p;};
+ f.deps.adaptive=async()=>({renderer:f.deps.renderer,createPlan:()=>({budgets:new Uint8Array([1,32])})});
+ await assert.rejects(createInspectionRuntime({...options(),quality:{samplingMode:'adaptive'}},f.deps),/enabled/);
+ const runtime=await createInspectionRuntime({...options(),adaptiveEnabled:true,quality:{samplingMode:'adaptive',samplesPerPixel:32,maxDepth:20},onProgress:p=>progress.push(p)},f.deps);
+ assert.equal(jobs.length,0);t.mock.timers.tick(200);for(let i=0;i<25;i++)await Promise.resolve();
+ assert.equal(jobs.length,1);assert.equal(progress.at(-1).phase,'complete');assert.equal(progress.at(-1).meanSpp,5.95);
+ assert.equal(f.calls.find(c=>c?.meshes).samplesPerPixel,32);
+ runtime.destroy();
+});
+
+test('adaptive ceiling one still verifies per-pixel completion after the preview',async(t)=>{
+ t.mock.timers.enable({apis:['setTimeout','Date']});
+ const f=fixture(),progress=[];let jobs=0;
+ f.renderer.renderAdaptiveFrame=async()=>{jobs++;return {meanSpp:1,completedTiles:1,totalTiles:1};};
+ f.deps.adaptive=async()=>({renderer:f.deps.renderer,createPlan:()=>({budgets:new Uint8Array([1])})});
+ const runtime=await createInspectionRuntime({...options(),adaptiveEnabled:true,quality:{samplingMode:'adaptive',samplesPerPixel:1},onProgress:p=>progress.push(p)},f.deps);
+ assert.notEqual(progress.at(-1).phase,'complete');
+ t.mock.timers.tick(200);for(let i=0;i<25;i++)await Promise.resolve();
+ assert.equal(jobs,1);assert.equal(progress.at(-1).phase,'complete');
+ t.mock.timers.tick(1000);for(let i=0;i<25;i++)await Promise.resolve();assert.equal(jobs,1);
+ runtime.destroy();
+});
+
+test('camera and mode changes cancel adaptive work, suppress stale progress and retain the fixed path',async(t)=>{
+ t.mock.timers.enable({apis:['setTimeout','Date']});
+ const f=fixture(),progress=[],jobs=[];
+ f.deps.adaptive=async()=>({renderer:f.deps.renderer,createPlan:()=>({budgets:new Uint8Array([1])})});
+ f.renderer.renderAdaptiveFrame=o=>new Promise((resolve,reject)=>{jobs.push(o);o.signal.addEventListener('abort',()=>reject(o.signal.reason),{once:true});});
+ const runtime=await createInspectionRuntime({...options(),adaptiveEnabled:true,quality:{samplingMode:'adaptive'},onProgress:p=>progress.push(p)},f.deps);
+ const flush=async()=>{for(let i=0;i<40;i++)await Promise.resolve();};
+ t.mock.timers.tick(200);await flush();assert.equal(jobs.length,1);
+ await runtime.draw();assert.equal(jobs[0].signal.aborted,true);
+ jobs[0].onProgress({meanSpp:999});assert.notEqual(progress.at(-1).meanSpp,999);
+ t.mock.timers.tick(200);await flush();assert.equal(jobs.length,2);
+ runtime.setPaused(true);await flush();assert.equal(jobs[1].signal.aborted,true);assert.equal(progress.at(-1).phase,'paused');
+ runtime.setPaused(false);t.mock.timers.tick(200);await flush();assert.equal(jobs.length,3);
+ await runtime.setQuality({samplingMode:'fixed',samplesPerPixel:1});
+ assert.equal(jobs[2].signal.aborted,true);assert.equal(progress.at(-1).phase,'complete');assert.equal(progress.at(-1).samplingMode,'fixed');
+ assert.equal(f.calls.filter(c=>c?.meshes).at(-1).progressive,true);runtime.destroy();
+});
