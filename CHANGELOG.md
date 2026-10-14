@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Model-inspection quality controls, GPU-completed sample progress, bounded idle refinement, hidden-tab pause and camera-preserving quality changes.
+
 - **Added**
   - Lazy model inspection with integrity-checked assets, shared camera gestures, bounded GPU resources and explicit lifecycle cleanup.
 

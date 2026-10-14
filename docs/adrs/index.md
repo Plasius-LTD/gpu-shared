@@ -15,3 +15,5 @@
 - [ADR-0013 Isolated production material study](./adr-0013-isolated-material-study.md)
 
 - [ADR 0014: Reusable model inspection](adr-0014-reusable-model-inspection.md)
+
+- [ADR 0015: Progressive inspection quality](adr-0015-progressive-inspection-quality.md)
