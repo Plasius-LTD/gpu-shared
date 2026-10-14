@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.1.7] - 2026-10-14
+
 - Require the released renderer 0.2.49 progressive API for model inspection; keep unqualified adaptive integration outside this release.
 
 - Admit native UHD model inspection up to 3840 × 2160 pixels with bounded dimensions and pre-allocation pixel-budget validation.
@@ -764,3 +778,4 @@ All notable changes to this project will be documented in this file.
 [1.1.4]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.4
 [1.1.5]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.5
 [1.1.6]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.6
+[1.1.7]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.7
