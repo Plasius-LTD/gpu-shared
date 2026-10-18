@@ -560,3 +560,5 @@ The glTF loader resolves each authored material once per model load. Repeated
 mesh primitives share its immutable material and texture descriptors, allowing
 the renderer to reuse atlas tiles. Separate materials, slot transforms and
 independent model loads remain separate. See [material reuse design](docs/model-material-reuse.md).
+
+The glTF loader honours `EXT_texture_webp.source` for original WebP material maps, preferring the extension over an optional core fallback. Invalid declared WebP image references fail visibly; existing integrity checks, browser decoding and texture transforms still apply. See [WebP import](docs/gltf-webp-import.md).
