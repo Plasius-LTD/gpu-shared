@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.1.8] - 2026-10-18
+
 - Reuse authored glTF materials and texture descriptors within each model load to prevent repeated meshes from multiplying renderer atlas tiles.
 
 - **Added**
@@ -781,3 +795,4 @@ All notable changes to this project will be documented in this file.
 [1.1.5]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.5
 [1.1.6]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.6
 [1.1.7]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.7
+[1.1.8]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.8
