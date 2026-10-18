@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Reuse authored glTF materials and texture descriptors within each model load to prevent repeated meshes from multiplying renderer atlas tiles.
+
 - **Added**
   - (placeholder)
 
