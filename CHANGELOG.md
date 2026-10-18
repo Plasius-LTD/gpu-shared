@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.1.9] - 2026-10-18
+
 - Bind original glTF WebP textures through EXT_texture_webp, preserving material maps and rejecting invalid declared image sources.
 
 - **Added**
@@ -798,3 +812,4 @@ All notable changes to this project will be documented in this file.
 [1.1.6]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.6
 [1.1.7]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.7
 [1.1.8]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.8
+[1.1.9]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.9
