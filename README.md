@@ -553,3 +553,10 @@ Inspection defaults to a 64-sample target, six bounces and denoising. It display
 Model inspection accepts native UHD (3840 × 2160) dimensions, with a maximum of 8,294,400 pixels and 3840 pixels per dimension. Oversized requests fail before allocation. See [UHD inspection design](docs/model-inspection-uhd.md).
 
 Progressive model inspection requires `@plasius/gpu-renderer` 0.2.49 or newer. This release exposes fixed sampling through native UHD; the experimental adaptive sampler is a separate, unreleased integration. See [release qualification](docs/model-inspection-release.md).
+
+### Shared materials in imported models
+
+The glTF loader resolves each authored material once per model load. Repeated
+mesh primitives share its immutable material and texture descriptors, allowing
+the renderer to reuse atlas tiles. Separate materials, slot transforms and
+independent model loads remain separate. See [material reuse design](docs/model-material-reuse.md).

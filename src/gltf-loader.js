@@ -768,6 +768,8 @@ function collectScenePrimitives(document, buffers, imageResources) {
   }
 
   const results = [];
+  // Keep authored material and texture identity stable within this model load.
+  const materials = new Map();
   let modelName = null;
   let physics = null;
 
@@ -831,7 +833,10 @@ function collectScenePrimitives(document, buffers, imageResources) {
           typeof primitive.indices === "number"
             ? readAccessor(document, primitive.indices, buffers).map((value) => Number(value))
             : Array.from({ length: transformedPositions.length / 3 }, (_, index) => index);
-        const material = getMaterialInfo(document, primitive, imageResources);
+        if (!materials.has(primitive.material)) {
+          materials.set(primitive.material, getMaterialInfo(document, primitive, imageResources));
+        }
+        const material = materials.get(primitive.material);
         const primitiveName =
           `${node.name ?? mesh.name ?? "mesh"}-${primitiveIndex}`;
 
