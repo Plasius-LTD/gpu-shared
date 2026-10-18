@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Bind original glTF WebP textures through EXT_texture_webp, preserving material maps and rejecting invalid declared image sources.
+
 - **Added**
   - (placeholder)
 

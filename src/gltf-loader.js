@@ -352,7 +352,11 @@ function getMaterialTexture(document, textureRef, imageResources) {
     return null;
   }
   const texture = document.textures?.[textureRef.index] ?? null;
-  const sourceIndex = texture?.source;
+  const webp = texture?.extensions?.EXT_texture_webp;
+  const sourceIndex = webp === undefined ? texture?.source : webp?.source;
+  if (webp !== undefined && (!Number.isInteger(sourceIndex) || sourceIndex < 0 || !imageResources.get(sourceIndex))) {
+    throw new Error("WebP texture source must refer to a decoded glTF image.");
+  }
   if (typeof sourceIndex !== "number") {
     return null;
   }
