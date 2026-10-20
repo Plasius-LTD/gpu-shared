@@ -1,90 +1,5 @@
 # @plasius/gpu-shared
 
-## Material ageing study
-
-Load the reviewed chest on demand through the isolated entry, after the host confirms
-its GPU-demo capability and `gpu-demo.scene-fidelity.enabled` rollout:
-
-```js
-const { createMaterialStudy } = await import('@plasius/gpu-shared/material-study');
-const study = await createMaterialStudy({
-  canvas,
-  modelUrl: new URL('/models/material-study/wooden_crate_01.gltf', location.href),
-  signal: abortController.signal,
-  onHintChange: visible => showGestureGuide(visible),
-});
-await study.update({ varnishWear: 1, ropeFray: 0.3 });
-study.resize(); // Call when the canvas container changes size.
-study.destroy(); // Also abort pending initialization when leaving the view.
-```
-
-Install the compatible renderer peer. Supply the unmodified Poly Haven Wooden Crate
-01 1K glTF/binary/textures (James Ray Cock, CC0), self-hosted alongside the model URL.
-The runtime enforces its SHA-256 SRI manifest and topology; changed or missing files
-fail closed. The host owns translated loading/error/retry states, attribution,
-focusable canvas, permanent keyboard instructions and the transient guide. Its root
-import does not load the material study. `update` rejects overlapping changes; disable
-or debounce host controls while awaiting it. Aborting or destroying releases input,
-timers and GPU resources, including resources created after pending initialization.
-
-The weathered preset uses 30% rope fray / 90% wood varnish wear. Full wear is bare
-wood, rope and metal are never coated. Drag/one-finger orbit follows the grabbed
-surface; Shift/right drag trucks, Alt-drag pans, focused wheel dollies and Shift-wheel
-changes the lens. Two-finger move/pinch, arrows, Shift-arrows, modes 1–5, +/- and Home
-are supported. Focus shows guidance for five seconds; ? repeats and Escape dismisses.
-These are static authoring approximations, not gameplay or structural-damage claims.
-
-`loadGltfModel(url, { signal, integrity })` supports cancellation and optional strict
-absolute-URL/SRI-digest manifests. Without these options existing callers retain their
-loading/fallback contract. Omitted PBR factors follow glTF white/metallic 1/roughness 1.
-
-## Native Shoreline rendering
-
-The harbour can use `@plasius/gpu-renderer` native surface drawing when its caller
-explicitly supplies the remote `gpu-demo.scene-fidelity.enabled` decision in
-`__featureFlags`. This remains separate from route access capabilities. The native
-path dynamically loads the renderer and supplies world geometry, camera, cloth and
-wakes; unrelated pages do not load it. It requires renderer 0.2.46 or later,
-which exports `createNativeSceneRenderer`.
-
-The scene includes curved sails, standing rigging, boat and lighthouse railings,
-continuous coastal terrain, a smaller animated flag, filtered cast shadows and
-water reflections. The harbour has a coursed stone quay, separated timber pier
-boards and structural supports, mooring ropes and ladder, overlapping slate roof
-courses, a chimney, framed windows and a timber entrance. These are authored
-procedural showcase assets, not game footage.
-With native scene fidelity and realistic models enabled, six vessel families serve
-four furnished berths: brigantines, cutters, tugs, fishing boats, pilot launches and
-cargo coasters. Eight vessels establish the scene, with up to four underway.
-Each vessel has one continuous visit, then leaves permanently; fresh identities
-arrive to sustain traffic. Model families can recur. Boats travel bow-first along
-smooth lanes, yield to traffic, slow at berths, and follow the water with restrained
-heave, pitch and roll. Wakes start astern and stop when the vessel stops.
-
-This is authored demonstration traffic, not a maritime-navigation simulator.
-This raster pass does not claim ray tracing, photorealism or finished game art.
-
-At the library boundary, a missing/disabled decision or unavailable WebGPU retains
-the Canvas2D compatibility path. The public site's disabled decision instead
-prevents mounting any demo and shows its existing managed-disabled panel.
-Native setup errors remain visible. Device loss pauses the scene and requires a
-reload. Reduced motion starts paused; pause stops GPU resubmission until the view
-changes. Static harbour geometry and local vessel vertices are cached; a reusable
-world-space frame buffer updates moving transforms. Render size and buffers are bounded,
-and teardown releases GPU resources. Frame intervals are measured, not synthesized.
-The diagnostics disclosure reports native submission counts, render size and the
-scene's actual rendering techniques alongside its geometry and quality budgets.
-
-See [ADR-0012](docs/adrs/adr-0012-native-shoreline-orchestration.md) for rollout and
-the package/site release order, and the [harbour detail design](docs/design/shoreline-harbour-detail.md)
-for geometry/download budgets and verification. Windows use opaque dark glazing;
-this pass does not provide glass transmission or interior lighting. The
-[one-visit traffic design](docs/design/harbour-traffic.md) describes scheduling,
-bounds and long-run checks. Five extra fleet/quay assets are fetched only with
-native fidelity, realistic models and WebGPU available. Failed fleet loading
-reports the compatibility fallback; disabling native fidelity restores the existing
-library scene. This adds no account, capability or telemetry collection.
-
 [![npm version](https://img.shields.io/npm/v/@plasius/gpu-shared.svg)](https://www.npmjs.com/package/@plasius/gpu-shared)
 [![Build Status](https://img.shields.io/github/actions/workflow/status/Plasius-LTD/gpu-shared/ci.yml?branch=main&label=build&style=flat)](https://github.com/Plasius-LTD/gpu-shared/actions/workflows/ci.yml)
 [![coverage](https://img.shields.io/codecov/c/github/Plasius-LTD/gpu-shared)](https://codecov.io/gh/Plasius-LTD/gpu-shared)
@@ -93,407 +8,191 @@ library scene. This adds no account, capability or telemetry collection.
 [![Security Policy](https://img.shields.io/badge/security%20policy-yes-orange.svg)](./SECURITY.md)
 [![Changelog](https://img.shields.io/badge/changelog-md-blue.svg)](./CHANGELOG.md)
 
-Shared browser-safe demo runtime and asset helpers for the Plasius `gpu-*`
-package family.
+Browser scene orchestration, model loading and inspection tools for the Plasius
+GPU packages. Embed the harbour showcase, inspect your own glTF/GLB models, or
+use the asset helpers with a renderer of your choice. WebGPU rendering is supplied
+by `@plasius/gpu-renderer`; this package manages loading, scene setup and interaction.
 
-Apache-2.0. ESM + CJS builds.
+Apache-2.0 · ESM and CommonJS · TypeScript declarations included.
 
 ## Install
 
-```bash
+```sh
 npm install @plasius/gpu-shared
 ```
 
-## What It Solves
+For model inspection, material studies, Product Studio or native harbour rendering,
+also install the optional renderer peer:
 
-- Moves shared 3D showcase/demo runtime ownership out of `gpu-demo-viewer`.
-- Provides one package home for GLTF loading and harbor/showcase mounting.
-- Coordinates cloth, fluid, lighting, performance, debug, and physics integration
-  through explicit feature adapters supplied by family packages at mount time.
-- Keeps package demos aligned on the same family-owned scene contract instead of
-  carrying duplicated runtime copies.
-- Preserves one shared fix point for cloth motion, visible water continuity, and
-  occluded harbor-light reflections across GPU demo consumers.
-- Ships a package-owned showcase asset catalog with distinct brigantine,
-  cutter, tug, fishing boat, pilot launch, coaster, lighthouse, harbour berths,
-  harbor-dock, and shoreline models instead of relying on
-  one tiny hull mesh plus placeholder box geometry.
-- Converts Product Studio GLTF primitives into triangle mesh inputs for the
-  renderer-owned mesh-BVH wavefront path instead of customer-visible analytic
-  scene objects.
-- Preserves Product Studio UVs, decoded glTF material textures, and core
-  `KHR_materials_*` factors so renderer-owned leather, wood, chrome, and
-  transmissive surface response can be driven from the source asset.
-- Adds `animation-adventure` mode for the GPU Animation demo, loading Peasant
-  Girl plus selected clips, generating deterministic farm props, and delegating
-  autoplay route/blend/camera playback to `@plasius/gpu-renderer`.
-- Provides the closed, consent-required diagnostics vocabulary used by approved
-  in-game bug-report surfaces without capturing pixels, DOM, identities, URLs,
-  filenames, exact measurements, adapter details, or free text.
-
-## Usage
-
-The package remains feature-contract neutral at install time; family packages
-inject domain contracts through `__showcaseFeatureLoaders` so `gpu-shared` does
-not hard-reference package-private imports.
-
-```js
-import { mountGpuShowcase } from "@plasius/gpu-shared";
-
-const showcase = await mountGpuShowcase({
-  root: document.getElementById("app"),
-  packageName: "@plasius/gpu-demo-viewer",
-  title: "Flag by the Sea",
-  subtitle: "Shared 3D validation scene for the gpu-* family.",
-});
-
-// Teardown is safe to call repeatedly from a route/page cleanup.
-showcase.destroy();
+```sh
+npm install @plasius/gpu-renderer
 ```
 
-### Privacy-Safe Bug Diagnostics
+The renderer peer must satisfy `^0.2.49`. Use a WebGPU-capable browser over HTTPS
+or localhost for those GPU paths. The default harbour has a Canvas2D compatibility
+path. Optional PVOX loading needs `@plasius/gpu-model-voxel`; external translation
+integration may use `@plasius/translations`. Neither is needed for the basic example.
 
-Approved renderer and viewer packages can validate an already bucketed
-diagnostic observation before attaching it to a bug submission:
+## Quick start
 
-```js
-import {
-  feedbackGameDiagnosticSurfaceRegistrations,
-  parseFeedbackGameDiagnostics,
-} from "@plasius/gpu-shared/feedback-diagnostics";
-
-const diagnostics = parseFeedbackGameDiagnostics({
-  type: "feedback-game-diagnostics",
-  version: "1.0.0",
-  surfaceId: "site.gpu-demo",
-  consentConfirmed: true,
-  provenanceContractId:
-    feedbackGameDiagnosticSurfaceRegistrations["site.gpu-demo"]
-      .provenanceContractId,
-  renderer: "webgpu",
-  backend: "worker",
-  viewportBucket: "large-landscape",
-  frameRateBucket: "60-plus",
-  frameTimeBucket: "under-17ms",
-  featureIds: ["renderer.frame-loop"],
-  counters: [{ code: "frame-drop", count: 2 }],
-  errorCodes: [],
-});
-```
-
-The parser accepts only the two registered surfaces, rejects unknown fields and
-requires explicit consent. `/player-system` is intentionally not registered.
-Its closed vocabulary, numeric bounds and correlated TypeScript type come
-directly from the lightweight
-`@plasius/schema/feedback-diagnostics-vocabulary` entrypoint, and parity tests
-validate accepted output against the full runtime schema.
-Public asset-set identifiers remain trusted server-side reconstruction
-metadata; they are never copied into a diagnostic packet. Other package modules
-load public assets and render canvases, but this diagnostics module never
-captures user pixels or performs diagnostic storage, logging, analytics, or
-network transport.
-
-The contract consumes the protected-CD-published `@plasius/schema ^1.4.0`
-dependency recorded in this package's manifest and lock. Parity, type, bundle
-and privacy tests validate it against that published artifact.
-
-Publishing the contract does not enable collection. Production callers must
-also receive the remotely evaluated, default-off
-`feedback.game-diagnostics.enabled` flag and
-`feedback.game-diagnostics.attach` capability. Disabling the flag omits
-diagnostics while ordinary structured bug reporting remains available.
-
-```js
-await mountGpuShowcase({
-  packageName: "@plasius/gpu-cloth",
-  __showcaseFeatureLoaders: {
-    cloth: () => import("@plasius/gpu-cloth/dist/index.js"),
-  },
-});
-```
-
-Promoted PVOX assets use the same Product Studio surface and are loaded only
-when the host selects the `pvox` representation supplied by its remotely
-controlled catalog:
-
-```js
-await mountGpuShowcase({
-  root: document.getElementById("app"),
-  demoMode: "product-studio",
-  productAssetUrl: "/api/gpu-demo/assets/pvox-demo/assets/table/hash/model.pvox",
-  productAssetRepresentation: "pvox",
-  productAssetSha256: "<immutable 64-character artifact hash>",
-});
-```
-
-The package dynamically loads optional `@plasius/gpu-model-voxel`, bounds the
-response, validates the complete PVOX artifact against the catalog hash, and
-derives a disposable surface-property-grouped triangle cache for the current
-mesh-BVH Product Studio renderer. PVOX remains the asset of record; this
-compatibility cache is not persisted and is not native PVOX promotion
-evidence. There is no GLTF fallback after a PVOX asset is selected.
-
-### Showcase Translations
-
-The shared showcase owns its display keys and bundled `en-GB` defaults without
-making the browser runtime React-bound. Consumers that already use
-`@plasius/translations` can register the package dictionary and pass a
-translator into `mountGpuShowcase`:
-
-```js
-import { createI18n } from "@plasius/translations";
-import {
-  gpuSharedTranslationKeys,
-  gpuSharedTranslations,
-  mountGpuShowcase,
-} from "@plasius/gpu-shared";
-
-const i18n = createI18n({
-  language: "en-GB",
-  fallback: "en-GB",
-  translations: gpuSharedTranslations,
-});
-
-await mountGpuShowcase({
-  root: document.getElementById("app"),
-  translate: (key, args) => i18n.t(key, args),
-});
-
-console.log(i18n.t(gpuSharedTranslationKeys.debugMainColorBuffer));
-```
-
-### Product Studio Mode
-
-Consumers can route the shared showcase entrypoint to Product Studio by passing
-`demoMode: "product-studio"` and a Product Studio glTF URL. This mode loads
-JSON `.gltf` documents and binary `.glb` containers with the shared glTF loader
-and delegates GPU execution to
-`@plasius/gpu-renderer`.
-Product Studio submits source triangle mesh data to the renderer. Display-quality
-path tracing anywhere in the project requires the renderer mesh BVH path so ray
-hits use source triangles, barycentric data, geometric normals, and interpolated
-vertex normals for bounce decisions.
-When `@plasius/gpu-lighting` exposes `createWavefrontEnvironmentLightingOptions`,
-Product Studio uses the lighting-owned `product-studio` environment preset;
-older installed lighting packages fall back to the previous local colours.
-The shared Product Studio adapter defaults to 8 samples per pixel for the
-Eames-quality benchmark render and uses a rough studio floor so the current
-single-frame preview is not dominated by unresolved low-sample reflection
-noise. The Product Studio canvas preserves a 16:9 presentation ratio inside
-flexible host layouts so the rendered product is not stretched by non-16:9
-containers.
-Renderer feature flags passed to `mountGpuShowcase(...)` through
-`featureFlags` are forwarded into the Product Studio wavefront renderer. This
-includes `renderer.transport.strictPhysicalLowSppLighting` plus the independent
-strict-transport experiment booleans used to compare stable sample routing,
-strict zero overflow, deferred low-SPP Russian roulette, deterministic direct
-lighting, deterministic low-SPP indirect transport, Product Studio environment
-importance, and transport telemetry. Renderer frame stats are preserved on the
-returned Product Studio state, including direct, cached-indirect, residual, zero
-termination, and deterministic checksum diagnostics when the renderer reports
-them.
-Product Studio also forwards `presentationOutput: "tone-mapped" | "linear"` to
-the renderer so validation hosts can compare the default tone-mapped
-presentation with a linear presented output.
-
-```js
-import { mountGpuShowcase } from "@plasius/gpu-shared";
-
-await mountGpuShowcase({
-  root: document.getElementById("app"),
-  demoMode: "product-studio",
-  productAssetUrl:
-    "/data/models/eames-lounge-chair-ottoman/Eames_Lounge_Chair_Ottoman.gltf",
-  samplesPerPixel: 8,
-});
-```
-
-The legacy analytic proxy scene-object path is disabled and is not a customer
-visible fallback. Stale callers must move to `createProductStudioMeshes(...)`
-or `mountGpuShowcase({ demoMode: "product-studio" })`, both of which use mesh
-inputs for renderer-owned BVH construction. For compatibility with older demo
-pages and validation harnesses, the package also re-exports
-`buildProductStudioSceneObjects(...)` as an alias of
-`createProductStudioMeshes(...)`.
-
-Install `@plasius/gpu-renderer` alongside `@plasius/gpu-shared` when Product
-Studio or Animation Adventure mode is used. Install optional
-`@plasius/gpu-model-voxel` when Product Studio can receive PVOX catalog rows.
-Harbor-only consumers do not need either peer.
-
-### Animation Adventure Mode
-
-`demoMode: "animation-adventure"` mounts an autoplay farm-adventure scene. The
-mode is gated by `gpu-demo.animation-adventure.enabled`, accepts an
-`animationAdventure` manifest with Peasant Girl, clip refs, route points,
-scripted beats, prop seed, and camera defaults, then submits the scene to the
-renderer-owned animated scene surface. The shared runtime loads the model and
-clip GLB bytes, passes those buffers to `@plasius/gpu-renderer`, and returns
-renderer snapshot fields that distinguish loaded payloads from skinned model
-renderability.
-Before playback starts, the shared runtime validates every scripted beat
-against the selected clip `movementProfile`. Travel and jump beats require
-root-authored or calibrated stride distance, stationary beats reject unexpected
-root drift, and invalid manifests throw a beat/clip-specific movement
-validation error instead of silently forcing route movement.
-
-Professional Animation Adventure mode is controlled by
-`gpu-demo.animation-adventure.professional.enabled` or by a manifest with
-`renderMode: "webgpu-pbr"` and `motionPolicy: "root-motion-required"`. In this
-mode, `gpu-shared` loads Peasant Girl, root-motion clips, and textured
-environment GLBs, then mounts `@plasius/gpu-renderer` through
-`createProfessionalAnimatedSceneRenderer`. Generated 2D farm props are not used
-in the professional primary path; deterministic placement comes from
-`environmentAssets` plus `environmentInstances`. Travel and jump beats reject
-calibrated in-place clips and require authored root translation.
-
-Camera modes are a separate rollout surface controlled by
-`gpu-demo.camera-modes.enabled`. With the flag enabled, the
-`animationAdventure.camera` object may request `viewMode: "editor"`,
-`"spectator"`, `"third-person"`, or `"first-person"` plus camera constraints
-and head-look settings. With the flag disabled, the shared runtime keeps
-legacy `lagged-follow` callers on spectator behavior and only advertises
-`["spectator"]` as available.
-
-For browser-only demos served without a bundler, keep the import surface on the
-published package name and resolve it with an import map rather than importing a
-viewer-private or workspace-private source file:
+Add a container to your page:
 
 ```html
-<script type="importmap">
-  {
-    "imports": {
-      "@plasius/gpu-shared": "../node_modules/@plasius/gpu-shared/dist/index.js"
-    }
-  }
-</script>
+<div id="app"></div>
 ```
 
-## Asset Helpers
+Then run this module through your browser bundler:
+
+```js
+import { mountGpuShowcase } from "@plasius/gpu-shared";
+
+const root = document.getElementById("app");
+if (!root) throw new Error("Missing #app container");
+
+const showcase = await mountGpuShowcase({ root });
+
+// Call this from your route or component cleanup.
+export function dispose() {
+  showcase.destroy();
+}
+```
+
+This mounts the default harbour and its controls. Importing the package alone does
+not mount a scene. If you serve browser modules without a bundler, use an import map
+for the package and its dependencies; do not import workspace-private source files.
+
+## Choose an entry point
+
+| Entry | Use it for |
+| --- | --- |
+| `@plasius/gpu-shared` | Harbour/Product Studio/animation mounting, glTF loading, mesh conversion and translations |
+| `@plasius/gpu-shared/model-inspection` | Your own integrity-checked static models with camera and progressive quality controls |
+| `@plasius/gpu-shared/material-study` | The supplied Wooden Crate 01 varnish and rope-fray study |
+| `@plasius/gpu-shared/feedback-diagnostics` | Validating consented, structured diagnostic packets |
+
+Import the inspection and material-study entries on demand so unrelated pages do
+not load their renderer code. Model assets download when the selected view mounts.
+
+## Inspect a model
+
+`createModelInspection` requires a canvas, an absolute HTTP(S) `modelUrl`, an explicit
+`enabled: true` decision, and an `integrity` map. Each map key is an absolute URL
+for the model or one of its external buffers/images; each value is a
+`sha256-<base64 digest>` SRI string. Generate it from the exact files you serve.
+Missing or mismatched resources fail instead of substituting another model.
+
+The following helper mounts the inspection and wires document visibility to pause
+further GPU work. Pass your host's options, including an AbortSignal if initialization
+must be cancellable when navigating away.
+
+```js
+import { createModelInspection } from "@plasius/gpu-shared/model-inspection";
+
+/** @param {import("@plasius/gpu-shared/model-inspection").ModelInspectionOptions} options */
+export async function mountInspection(options) {
+  const inspection = await createModelInspection(options);
+  const syncVisibility = () => inspection.setPaused(document.hidden);
+  document.addEventListener("visibilitychange", syncVisibility);
+  syncVisibility();
+
+  return {
+    inspection,
+    dispose() {
+      document.removeEventListener("visibilitychange", syncVisibility);
+      inspection.destroy();
+    },
+  };
+}
+```
+
+`onProgress` receives `{ phase, samples, target, width, height, maxDepth, denoise }`.
+Samples count GPU-completed work. `onError` reports failures after initialization;
+initialization errors reject the returned promise. `onHintChange` controls a brief
+camera hint; the host supplies permanent accessible instructions and error/retry UI.
+
+| Setting | Default | Supported values |
+| --- | --- | --- |
+| `quality.samplesPerPixel` | 64 | Integer 1–256 |
+| `quality.maxDepth` | 6 | Integer 1–12 |
+| `quality.denoise` | `true` | Boolean |
+| `width`, `height` | 800 × 600 | Integer 1–3840 per axis, at most 8,294,400 pixels in total |
+
+Use `inspection.setQuality({ samplesPerPixel, maxDepth, denoise, width, height })`
+to change settings; only supplied fields change. Native 1920×1080, 2560×1440 and
+3840×2160 targets are supported independently of CSS display size. Device limits
+and model resources can still prevent allocation; 4K availability is not a promise
+of real-time performance.
+
+The first pass uses one sample. After 200ms of camera stillness, batches of up to
+four refine toward the target. Moving the camera or changing quality resets history;
+identical settings preserve it. `setPaused()` retains completed history, `reset()`
+restarts refinement, and `destroy()` is safe to call more than once. Resize the
+render target explicitly through `setQuality`; keep the displayed aspect ratio.
+
+Inspection accepts 1–500,000 triangles and bounds initialization/GPU waits to
+60 seconds. It renders static poses: source skinning/animation playback and adaptive
+per-pixel sampling are not part of this entry. Mouse, touch and keyboard gestures
+are described in the [camera guide](https://github.com/Plasius-LTD/gpu-shared/blob/main/docs/guides/material-study.md#camera-and-accessibility).
+
+## Asset helpers
 
 ```js
 import {
   createProductStudioMeshes,
   loadGltfModel,
   resolveShowcaseAssetUrl,
-  showcaseFocusModes,
 } from "@plasius/gpu-shared";
 
-const shipUrl = resolveShowcaseAssetUrl();
 const lighthouseUrl = resolveShowcaseAssetUrl("lighthouse");
-const shipModel = await loadGltfModel(shipUrl);
-const lighthouseModel = await loadGltfModel(lighthouseUrl);
-
-console.log(showcaseFocusModes);
-console.log(shipModel.physics);
-console.log(shipModel.primitives.length, lighthouseModel.primitives.length);
-
-const productMeshes = createProductStudioMeshes(lighthouseModel);
-console.log(productMeshes.length);
+const model = await loadGltfModel(lighthouseUrl);
+const meshes = createProductStudioMeshes(model);
+console.log(model.primitives.length, meshes.length);
 ```
 
-## Demo
+The public `loadGltfModel(url)` convenience function accepts one argument and retains
+legacy fallback behaviour. Cancellation and strict resource integrity are supplied
+by the dedicated inspection/study runtimes; do not pass unsupported options to the
+root loader. The loader handles glTF/GLB, shares authored materials within each load,
+and honours `EXT_texture_webp` image sources. Models and texture resources must be
+servable by your host; asset licences and attribution remain your responsibility.
 
-```bash
-npm run demo
-```
+## Other integrations
 
-Then open `http://localhost:8000/gpu-shared/demo/`.
+- [Harbour, Product Studio, PVOX, animation and translation integration](https://github.com/Plasius-LTD/gpu-shared/blob/main/docs/guides/showcase-integration.md).
+- [Material ageing study and camera gestures](https://github.com/Plasius-LTD/gpu-shared/blob/main/docs/guides/material-study.md).
+- [Feedback diagnostics and consent contract](https://github.com/Plasius-LTD/gpu-shared/blob/main/docs/guides/feedback-diagnostics.md).
+- Public declarations: [root APIs](https://github.com/Plasius-LTD/gpu-shared/blob/main/src/index.d.ts), [inspection](https://github.com/Plasius-LTD/gpu-shared/blob/main/src/model-inspection.d.ts), [material study](https://github.com/Plasius-LTD/gpu-shared/blob/main/src/material-study.d.ts).
 
-This package demo mounts the integrated harbor showcase so the shared runtime
-can be validated independently of `gpu-demo-viewer`.
-
-The harbor showcase uses a render-first canvas layout with compact pause,
-stress, and focus controls plus a collapsed runtime diagnostics drawer. The
-older always-visible hero, status, metrics, notes, and validation footer panels
-are no longer part of the default viewport, so consumers can embed the runtime
-inside production showcase pages without debug copy occupying the render area.
-
-The integrated scene now includes a persistent flag cloth state, subdued ship
-wakes and waterline ripples, and water reflections that are occluded by later
-ship geometry instead of being painted through hulls. The harbor surface reads
-the banded `@plasius/gpu-fluid` continuity envelope directly, so the default
-camera keeps finite, visibly animated near-band water motion instead of
-flattening or dropping the shared water mesh. The near shoreline band now
-includes denser water geometry, broken foam segments tied to modeled rocks, and
-lower-contrast ripple highlights, while the flag cloth carries subtle material
-cues for weave, folds, and pinned-edge continuity.
-
-The default showcase asset set now uses a multi-primitive brigantine, a
-distinct cutter profile, a modeled lighthouse, a dock/warehouse scene, and a
-generated rocky shoreline/breakwater so the harbor reads closer to a believable
-coastal night view on high-end machines.
-
-If `gpu_showcase_realistic_models_v1` is disabled, the harbor keeps the modeled
-lighthouse/dock/shoreline environment and falls back only to a brigantine-only
-ship catalog instead of reverting to placeholder harbor blocks.
-
-For slide-deck screenshots or video capture, open the route with
-`?capture=1&renderScale=1`. Capture mode hides the validation chrome, fills the
-viewport with the scene canvas, and caps the backing buffer at 1080p by default
-so recording stays smooth on local machines.
-
-## Current Boundary
-
-`@plasius/gpu-shared` owns the shared browser/demo orchestration surface. It
-does not replace `@plasius/gpu-renderer` as the long-term runtime renderer API.
-The current showcase still centralizes scene drawing here because
-`@plasius/gpu-renderer` does not yet expose a reusable scene/mesh submission
-surface for these family demos.
-
-## API
-
-- `mountGpuShowcase(options)`
-  - Returns `{ state, shipModel, canvas, destroy() }`
-  - Product Studio mode defaults to a host-safe `640x360` wavefront render at
-    `maxDepth: 2`; callers can raise `width`, `height`, or `maxDepth`
-    deliberately for capture or high-end review hardware.
-  - `captureMode: true` enables fullscreen scene-only presentation for local
-    screenshots and video capture.
-  - `renderScale` overrides the canvas backing scale when a capture workflow
-    needs a specific quality/performance balance.
-- `mountGpuProductStudio(options)`
-  - Returns `{ state, model, productModel, meshes, canvas, renderer, destroy() }`
-  - Uses `@plasius/gpu-renderer` display-quality mesh BVH input and
-    `@plasius/gpu-lighting` environment options.
-- `createProductStudioMeshes(model, options)`
-  - Converts GLTF primitives plus the Product Studio environment into renderer
-    mesh records with positions, indices, normals, material kind, roughness,
-    metallic, opacity, and emission.
-- `loadGltfModel(url)`
-  - Loads JSON `.gltf` assets with external or data URI buffers, and binary
-    `.glb` assets with embedded GLB BIN chunks.
-- `resolveShowcaseAssetUrl(baseUrlOrAssetName?, assetName?)`
-- `showcaseFocusModes`
-
-`resolveShowcaseAssetUrl()` keeps consumers on package-owned showcase asset
-URLs and still defaults to the brigantine for backward compatibility. If a host
-cannot actually serve that asset, `loadGltfModel()` lazily activates the
-built-in inline fallback instead of eagerly parsing that payload in the
-top-level package entrypoint.
+`gpuSharedTranslations` contains the bundled `en-GB` dictionary for integration
+with `@plasius/translations` or another host translator. The library evaluates
+supplied decisions; it does not connect to a Plasius account or feature service.
+Production hosts retain responsibility for access, rollout and diagnostics consent.
 
 ## Development
 
-```bash
+From a repository checkout, use Node.js 24 and npm:
+
+```sh
 npm ci
 npm run lint
 npm run typecheck
 npm test
 npm run build
+npm run pack:check
 ```
+
+`npm run demo` also requires Python 3. It serves the parent directory; with the
+checkout named `gpu-shared`, open `http://localhost:8000/gpu-shared/demo/`.
+See [contributing](https://github.com/Plasius-LTD/gpu-shared/blob/main/CONTRIBUTING.md)
+and [release operations](https://github.com/Plasius-LTD/gpu-shared/blob/main/docs/maintainers/releasing.md).
 
 ## Zero-Three architecture invariant
 
-This GPU-native package permanently prohibits Three.js and every package whose
-dependency, peer, or optional graph reaches it. The prohibition covers source,
-public declarations, tests, tooling, manifests, lockfiles, installed graphs,
-bundles, npm tarballs, SBOMs, and active documentation. There is no compatibility
-mode, waiver, or renderer fallback.
-
-Run `npm run zero-three:source` before installation and `npm run zero-three`
-after building to generate the immutable package evidence consumed by site
-release-integrity validation. `npm run zero-three:test` exercises the fail-closed
-negative fixtures.
+Three.js and dependency paths reaching it remain prohibited across runtime,
+tooling and published artifacts. Run `npm run zero-three:source` before installing
+and `npm run build && npm run zero-three` for package evidence. See the repository's
+[architecture records](https://github.com/Plasius-LTD/gpu-shared/tree/main/docs/adrs)
+for implementation decisions.
 
 <!-- BEGIN PLASIUS RELEASE INTEGRITY -->
 ## Release integrity
@@ -511,54 +210,3 @@ there is no npm write-token fallback. Production publication remains gated by
 the npm trusted-publisher binding and the protected-branch-only GitHub
 production environment.
 <!-- END PLASIUS RELEASE INTEGRITY -->
-
-
-### CI admission and release merge confirmation
-
-The quarantined runner group restricts both repositories and workflow refs.
-Before admitting a review or generated release branch, inspect its exact commit
-and workflow, lock the branch with admin enforcement, deny force pushes,
-deletions and fork syncing, and retain empty push allowances. Verify its SHA
-again, then admit only
-`Plasius-LTD/gpu-shared/.github/workflows/ci.yml@refs/heads/<locked-branch>`.
-Remove temporary admission before unlocking or updating a branch; a reviewed
-SHA string alone may not match the workflow ref used by runner scheduling.
-Keep `ci.yml@refs/heads/main` and the main-only `npm-audit-fix.yml` admission;
-preserve all unrelated group restrictions. Do not add hosted CI fallbacks.
-Node dependency caching is disabled before source admission.
-
-Release preparation waits for the PR API to report `MERGED`, including when a
-successful merge command only queues the request. It fails closed on closed
-PRs, API errors, unexpected states or the bounded merge timeout. The generated
-release branch needs the same review and locked-ref admission before its
-required CI can execute. Continue through the ordinary protected merge and
-`cd.yml` exact-main/production OIDC gates, and verify the published version and
-provenance. Never reuse a removed version.
-
-The inherited `platform.public-artifact-integrity.enabled` flag controls staged
-public distribution; mandatory integrity checks remain enforced in either flag
-state. Rollback disables `cd.yml` or the affected distribution channel and
-removes temporary runner admission, without restoring the administrative path
-or a token-based publication path. See
-[ADR-0011](docs/adrs/adr-0011-trusted-ci-and-confirmed-release-merges.md).
-
-## Reviewed model inspection
-
-The lazy `@plasius/gpu-shared/model-inspection` entry exports `createModelInspection({ canvas, modelUrl, integrity, enabled, signal, width, height, quality, onProgress, onHintChange, onError })`. Supply an absolute HTTP(S) glTF/GLB URL and an integrity map from every absolute resource URL to its SHA-256 SRI value. Acquire and review bounded fixtures before mounting. Pass the positive `gpu-demo.scene-fidelity.enabled` evaluation, or an explicit documented local fixture override.
-
-The returned handle exposes `triangleCount`, `primitiveCount`, `draw()`, `setQuality(partial)`, `setPaused(boolean)`, `reset()` and idempotent `destroy()`. The host owns canvas accessibility, credits, failure messages and viewport sizing; call `setQuality({ width, height })` after resizing. Mouse, touch and keyboard camera gestures match the material study. Initialization is bounded to sixty seconds. This is a static inspection path: skinning, source animation playback and per-model ageing authoring are not provided. See ADR 0014.
-
-Inspection defaults to a 64-sample target, six bounces and denoising. It displays one sample promptly, then refines in batches of up to four once the camera has been still for 200ms. `onProgress` reports GPU-completed samples and actual dimensions. `setQuality({ samplesPerPixel, maxDepth, denoise, width, height })` preserves the camera and loaded model while resetting history; forward document visibility through `setPaused(document.hidden)`. Targets are bounded to 256 samples, 12 bounces and 1440 pixels per dimension. It stops at the target and releases resources on failure/teardown. See [quality contract](docs/tdrs/tdr-0004-inspection-quality.md). This entrypoint requires the progressive renderer release; local source overrides are not published dependency replacements.
-
-Model inspection accepts native UHD (3840 × 2160) dimensions, with a maximum of 8,294,400 pixels and 3840 pixels per dimension. Oversized requests fail before allocation. See [UHD inspection design](docs/model-inspection-uhd.md).
-
-Progressive model inspection requires `@plasius/gpu-renderer` 0.2.49 or newer. This release exposes fixed sampling through native UHD; the experimental adaptive sampler is a separate, unreleased integration. See [release qualification](docs/model-inspection-release.md).
-
-### Shared materials in imported models
-
-The glTF loader resolves each authored material once per model load. Repeated
-mesh primitives share its immutable material and texture descriptors, allowing
-the renderer to reuse atlas tiles. Separate materials, slot transforms and
-independent model loads remain separate. See [material reuse design](docs/model-material-reuse.md).
-
-The glTF loader honours `EXT_texture_webp.source` for original WebP material maps, preferring the extension over an optional core fallback. Invalid declared WebP image references fail visibly; existing integrity checks, browser decoding and texture transforms still apply. See [WebP import](docs/gltf-webp-import.md).
