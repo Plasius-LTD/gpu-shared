@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Restore consumer-first package documentation, checked public-API examples and accurate inspection limits; move detailed integrations and release operations into linked guides.
+
 - **Added**
   - (placeholder)
 
