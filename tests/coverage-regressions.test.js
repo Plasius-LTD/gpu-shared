@@ -956,3 +956,23 @@ test("loadGltfModel rejects missing default scenes", async () => {
     globalThis.fetch = originalFetch;
   }
 });
+
+test('actual harbour catalog uses the remote adapter decision and never downgrades validation failures',async t=>{
+  // Initialize the real validator before installing this deliberately partial
+  // DOM harness; a browser's Window constructors are covered by browser smoke.
+  await import('gltf-validator');
+  const {readFileSync}=await import('node:fs');
+  const originals=Object.fromEntries(['document','window','requestAnimationFrame','cancelAnimationFrame'].map(k=>[k,globalThis[k]]));
+  const bytes=readFileSync(new URL('../assets/brigantine.gltf',import.meta.url));
+  t.after(()=>Object.assign(globalThis,originals));
+  let corrupt=false;
+  t.mock.method(globalThis,'fetch',async()=>new Response(corrupt?'{}':bytes,{headers:{'content-type':'model/gltf+json'}}));
+  for(const enabled of [true,false]){
+    const harness=createSceneHarness();Object.assign(globalThis,{document:harness.documentStub,window:harness.windowStub,requestAnimationFrame:()=>1,cancelAnimationFrame(){}});
+    const result=await mountGpuShowcase({root:harness.root,__featureFlags:{'gpu.model.conversion.enabled':enabled}});
+    assert.equal(result.shipModel.importProfile,enabled?'gltf-static-resources-v1':undefined);
+    assert.ok(result.state.assetCatalog.environment.lighthouse.primitives.length>0);result.destroy();
+  }
+  corrupt=true;const harness=createSceneHarness();Object.assign(globalThis,{document:harness.documentStub,window:harness.windowStub});
+  await assert.rejects(mountGpuShowcase({root:harness.root,__featureFlags:{'gpu.model.conversion.enabled':true}}));
+});

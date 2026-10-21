@@ -1,3 +1,4 @@
+import { isModelConversionEnabled } from "./feature-flags.js";
 import { loadGltfModel } from "./gltf-loader.js";
 import { isPvoxAssetUrl, loadPvoxModel } from "./pvox-loader.js";
 
@@ -472,7 +473,11 @@ export async function mountGpuProductStudio(options = {}, featureFlags = null) {
         moduleLoader: options.__voxelLoader,
         maximumFaces: options.productMaximumSurfaceFaces,
       })
-    : await modelLoader(assetUrl);
+    : await modelLoader(assetUrl, {
+        ...options.gltfLoadOptions,
+        signal: options.signal ?? options.gltfLoadOptions?.signal,
+        conversionEnabled: isModelConversionEnabled(featureFlags),
+      });
   const meshes = createProductStudioMeshes(model, {
     targetCenter: options.targetCenter,
     targetSize: options.targetSize,

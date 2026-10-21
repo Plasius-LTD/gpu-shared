@@ -136,10 +136,20 @@ function readAccessor(document, accessorIndex, buffers) {
   return values;
 }
 
-async function decodeImagePixels(blob, urlLabel = "glTF texture") {
+function admitProjectionImage(width, height, budget) {
+  if (!budget) return;
+  const bytes = width * height * 4;
+  if (!Number.isSafeInteger(bytes) || width < 1 || height < 1 || width > budget.maxDimension || height > budget.maxDimension || bytes > budget.remaining) {
+    throw new Error("glTF compatibility image exceeds the decoded image budget.");
+  }
+  budget.remaining -= bytes;
+}
+
+async function decodeImagePixels(blob, urlLabel = "glTF texture", budget) {
   if (typeof createImageBitmap === "function") {
     const bitmap = await createImageBitmap(blob);
     try {
+      admitProjectionImage(bitmap.width, bitmap.height, budget);
       const canvas =
         typeof OffscreenCanvas === "function"
           ? new OffscreenCanvas(bitmap.width, bitmap.height)
@@ -177,6 +187,7 @@ async function decodeImagePixels(blob, urlLabel = "glTF texture") {
       element.onerror = () => reject(new Error(`Failed to decode ${urlLabel}.`));
       element.src = objectUrl;
     });
+    admitProjectionImage(image.naturalWidth || image.width, image.naturalHeight || image.height, budget);
     const canvas = Object.assign(document.createElement("canvas"), {
       width: image.naturalWidth || image.width,
       height: image.naturalHeight || image.height,
@@ -219,7 +230,8 @@ async function loadImageResource(document, image, index, buffers, baseUrl, optio
     }
     return decodeImagePixels(
       await response.blob(),
-      `glTF texture ${index}${image.uri ? ` (${image.uri})` : ""}`
+      `glTF texture ${index}${image.uri ? ` (${image.uri})` : ""}`,
+      options?.__imageBudget
     );
   }
 
@@ -227,7 +239,8 @@ async function loadImageResource(document, image, index, buffers, baseUrl, optio
     const bytes = sliceBufferView(document, image.bufferView, buffers);
     return decodeImagePixels(
       new Blob([bytes], { type: image.mimeType ?? "application/octet-stream" }),
-      `glTF texture ${index}`
+      `glTF texture ${index}`,
+      options?.__imageBudget
     );
   }
 
@@ -884,11 +897,11 @@ function collectScenePrimitives(document, buffers, imageResources) {
   };
 }
 
-async function fetchGltfResource(url, { signal, integrity } = {}) {
+async function fetchGltfResource(url, { signal, integrity, __resourceFetch } = {}) {
   signal?.throwIfAborted();
   const digest = integrity?.[String(url)];
   if (integrity && !digest) throw new Error("glTF resource is missing from the integrity manifest.");
-  return fetch(url, { signal, ...(digest ? { integrity: digest } : {}) });
+  return __resourceFetch ? __resourceFetch(url) : fetch(url, { signal, ...(digest ? { integrity: digest } : {}) });
 }
 
 async function loadGltfDocument(url, options) {
@@ -913,14 +926,24 @@ async function loadGltfDocument(url, options) {
   };
 }
 
-async function loadInlineShowcaseDocument() {
+async function loadInlineShowcaseDocument(options) {
   const module = await import("./showcase-inline-assets.js");
-  return loadGltfDocument(new URL(module.INLINE_SHOWCASE_ASSET_URLS.brigantine));
+  return loadGltfDocument(new URL(module.INLINE_SHOWCASE_ASSET_URLS.brigantine), options);
+}
+
+async function mapProjectionResources(values, load, options) {
+  if (!options?.__imageBudget) return Promise.all(values.map(load));
+  const result = [];
+  for (let i = 0; i < values.length; i++) {
+    options.signal?.throwIfAborted();
+    result.push(await load(values[i], i));
+  }
+  return result;
 }
 
 async function buildGltfModel(document, baseUrl, embeddedBuffers = [], options) {
-  const buffers = await Promise.all(
-    (document.buffers ?? []).map(async (buffer, index) => {
+  const buffers = await mapProjectionResources(
+    document.buffers ?? [], async (buffer, index) => {
       if (typeof buffer.uri !== "string" && embeddedBuffers[index]) {
         return embeddedBuffers[index];
       }
@@ -935,17 +958,17 @@ async function buildGltfModel(document, baseUrl, embeddedBuffers = [], options) 
         throw new Error(`Failed to load glTF buffer: ${nested.status} ${nested.statusText}`);
       }
       return nested.arrayBuffer();
-    })
+    }, options
   );
 
   const imageResources = new Map();
-  await Promise.all(
-    (document.images ?? []).map(async (image, index) => {
+  await mapProjectionResources(
+    document.images ?? [], async (image, index) => {
       const pixels = await loadImageResource(document, image, index, buffers, baseUrl, options);
       if (pixels) {
         imageResources.set(index, pixels);
       }
-    })
+    }, options
   );
 
   const scene = collectScenePrimitives(document, buffers, imageResources);
@@ -979,7 +1002,7 @@ function shouldRetryWithInlineShowcaseFallback(url, error) {
   return error instanceof TypeError || /^Failed to load glTF asset:/u.test(error.message);
 }
 
-export async function loadGltfModel(url, options = {}) {
+async function loadLegacyGltfModel(url, options = {}) {
   try {
     const { document, baseUrl, buffers } = await loadGltfDocument(url, options);
     return buildGltfModel(document, baseUrl, buffers, options);
@@ -991,4 +1014,22 @@ export async function loadGltfModel(url, options = {}) {
     const { document, baseUrl, buffers } = await loadInlineShowcaseDocument();
     return buildGltfModel(document, baseUrl, buffers, options);
   }
+}
+
+/** The host supplies its remote conversion decision; absent/false retains compatibility. */
+export async function loadGltfModel(url, options = {}) {
+  if (options.conversionEnabled !== undefined && typeof options.conversionEnabled !== "boolean") {
+    throw new TypeError("glTF conversion decision must be a boolean.");
+  }
+  if (options.conversionEnabled !== true) return loadLegacyGltfModel(url, options);
+  const { loadAdapterGltfModel } = await import("./gltf-adapter.js");
+  return loadAdapterGltfModel(resolveFetchBaseUrl(url), options, async (bytes, baseUrl, projectionOptions) => {
+    const { document, buffers } = parseGlbDocument(bytes);
+    // Normalized images/buffers are embedded: projection cannot perform
+    // external acquisition or change the original resource identity/SRI policy.
+    return buildGltfModel(document, baseUrl, buffers, projectionOptions);
+  }, loadLegacyGltfModel, shouldUseInlineShowcaseFallback(url) ? async requestOptions => {
+    const { document, baseUrl, buffers } = await loadInlineShowcaseDocument(requestOptions);
+    return buildGltfModel(document, baseUrl, buffers, requestOptions);
+  } : null);
 }

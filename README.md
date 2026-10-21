@@ -141,6 +141,34 @@ For larger scenes, export a glTF/GLB file instead of building a base64 buffer in
 JavaScript. The small in-memory geometry above is just a self-contained starting
 point. Normals are omitted to use flat facets.
 
+
+## Adopt the glTF adapter
+
+Existing `loadGltfModel(url)` calls keep their compatibility behaviour. Pass the
+host's remotely evaluated `gpu.model.conversion.enabled` decision as
+`conversionEnabled` to use the lazy `@plasius/gpu-model-gltf` importer. The adapter
+validates JSON/GLB and nested resources; the shared renderer projection preserves
+source coordinates, materials, textures and physics. `timeoutMs` and
+`maxInputBytes` can tighten its 30-second deadline and 16 MiB entry ceiling.
+
+The showcase and Product Studio consume the same decision from their existing
+feature-flag snapshot. Their `gltfLoadOptions` option forwards cancellation,
+integrity and tighter budgets; the remote snapshot owns the conversion decision.
+Disabling the remote flag selects the existing loader on the next load. There is
+no persistent conversion cache; each load reacquires external resource revisions.
+
+Adapter results expose `importProfile: "gltf-static-resources-v1"`. Explicitly
+unsupported features such as WebP retain the bounded compatibility projection
+and report `importProfile: "legacy"` with `compatibilityReason`. The existing
+approved brigantine network fallback also reports its reason. Malformed input,
+validation, byte budgets, cancellation and integrity failures never downgrade to
+another scene. An integrity manifest must list every external resource; embedded
+normalized resources retain the admitted source identity.
+
+See [the migration contract](docs/tdrs/tdr-0007-gltf-adapter-migration.md) for
+limits, source/canonical coordinate differences, fallback and release guidance.
+
+
 ## Make the scene yours
 
 | Change | Where to edit |

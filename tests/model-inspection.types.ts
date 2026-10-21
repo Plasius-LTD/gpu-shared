@@ -12,3 +12,13 @@ void qualityContract;
 const scene: Promise<SceneInspection> = createSceneInspection({ canvas, enabled: true,
   models: [{ modelUrl: 'https://example.test/scene.gltf', integrity: {}, anchor: [0, 0, 0], size: 2 }] });
 void scene;
+
+// The loader's migration policy remains available without a renderer import.
+import { loadGltfModel as migrationLoader } from "../src/index.js";
+void migrationLoader(new URL("https://example.test/model.gltf"), {
+  conversionEnabled: true, timeoutMs: 10_000, maxInputBytes: 1024 * 1024,
+}).then(model => {
+  const profile: "gltf-static-resources-v1" | "legacy" | undefined = model.importProfile;
+  const reason: "unsupported-gltf-feature" | "showcase-network-unavailable" | undefined = model.compatibilityReason;
+  return { profile, reason };
+});
