@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.1.11] - 2026-10-21
+
 - Teach original scene creation with a self-contained material-gallery example; separate authored-scene inspection and prebuilt showcase integrations into linked guides.
 
 - **Added**
@@ -832,3 +846,4 @@ All notable changes to this project will be documented in this file.
 [1.1.8]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.8
 [1.1.9]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.9
 [1.1.10]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.10
+[1.1.11]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.11
