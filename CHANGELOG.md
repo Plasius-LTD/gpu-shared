@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - **Added**
-  - (placeholder)
+  - `createSceneInspection` composes up to six integrity-checked models with explicit placement, retained authored materials, shared ground, camera and progressive quality controls.
 
 - **Changed**
   - (placeholder)

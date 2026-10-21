@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createInspectionRuntime } from '../src/model-inspection-runtime.js';
-import { createModelInspection } from '../src/model-inspection.js';
+import { createModelInspection, createSceneInspection } from '../src/model-inspection.js';
 
 const url = 'http://localhost/models/door/scene.gltf';
 const options = () => ({canvas:{width:640,height:480},modelUrl:url,
@@ -24,6 +24,7 @@ test('disabled or invalid fixtures cannot allocate renderer resources',async()=>
   }
   assert.equal(calls.length,0);
   await assert.rejects(createModelInspection(),/enabled/);
+  await assert.rejects(createSceneInspection(),/1–6 models/);
 });
 test('preserves model materials, reuses camera and releases exactly once',async()=>{
   const {deps,calls}=fixture();const abort=new AbortController();

@@ -17,3 +17,4 @@
 - [ADR 0014: Reusable model inspection](adr-0014-reusable-model-inspection.md)
 
 - [ADR 0015: Progressive inspection quality](adr-0015-progressive-inspection-quality.md)
+- [ADR 0016: Composite model inspection](adr-0016-composite-model-inspection.md)
