@@ -24,6 +24,7 @@ test("fresh npm tarball preserves public ESM and CJS request policy", (t) => {
     // export map are read from the fresh tarball, outside the source checkout.
     symlinkSync(join(root, "node_modules"), join(packaged, "node_modules"), "dir");
     copyFileSync(join(root, "tests/helpers/public-gltf-request-contract.js"), join(packaged, "request-contract.mjs"));
+    copyFileSync(join(root, "tests/helpers/gltf-adapter-contract.js"), join(packaged, "adapter-contract.mjs"));
     copyFileSync(join(root, "tests/helpers/packed-gltf-request-runner.mjs"), join(packaged, "request-runner.mjs"));
     t.diagnostic(run(process.execPath, ["--test", "request-runner.mjs"], packaged));
   } finally {

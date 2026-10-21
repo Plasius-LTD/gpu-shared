@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - **Added**
-  - (placeholder)
+  - Lazy, remotely gated glTF adapter loading with bounded runtime resource acquisition, source-coordinate renderer projection, explicit compatibility metadata and fail-closed request policy.
 
 - **Changed**
   - (placeholder)

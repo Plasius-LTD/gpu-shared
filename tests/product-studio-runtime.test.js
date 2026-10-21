@@ -453,3 +453,19 @@ test("mountGpuProductStudio selects the PVOX loader without falling back to GLTF
   assert.equal(rendererOptions.meshes.length, result.meshes.length);
   result.destroy();
 });
+
+test('actual Product Studio loader consumes enabled/disabled remote conversion decisions',async t=>{
+  const {adapterFixture}=await import('./helpers/gltf-adapter-contract.js');
+  const {document:source,bytes}=adapterFixture();
+  t.mock.method(globalThis,'fetch',async url=>new Response(String(url).endsWith('.gltf')?JSON.stringify(source):bytes,{headers:{'content-type':String(url).endsWith('.gltf')?'model/gltf+json':'application/octet-stream'}}));
+  for(const enabled of [true,false]){
+    const {document,root}=createFakeDocument();let uploaded;
+    const result=await mountGpuProductStudio({document,root,assetUrl:'https://example.test/model.gltf',
+      __lightingLoader:async()=>null,__rendererLoader:async()=>({createWavefrontPathTracingComputeRenderer:async options=>{
+        uploaded=options.meshes;return {renderOnce(){return {};},destroy(){}};
+      }}),
+    },{'gpu.model.conversion.enabled':enabled});
+    assert.equal(result.model.importProfile,enabled?'gltf-static-resources-v1':undefined);
+    assert.ok(uploaded.length>0);assert.equal(result.model.positions[0],10);result.destroy();
+  }
+});

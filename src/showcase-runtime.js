@@ -1,3 +1,4 @@
+import { isModelConversionEnabled } from "./feature-flags.js";
 import { resolveShowcaseAssetUrl } from "./asset-url.js";
 import { loadGltfModel } from "./gltf-loader.js";
 import { advanceHarbourTraffic, boatForward, createHarbourTraffic, trafficWakes } from "./harbour-traffic.js";
@@ -1705,12 +1706,12 @@ function normalizeAssetCatalogFailureReason(error) {
   return "showcase asset loading failed";
 }
 
-async function loadShowcaseAssetCatalog({ includeSecondaryShip = true, includeTrafficFleet = false } = {}) {
+async function loadShowcaseAssetCatalog({ includeSecondaryShip = true, includeTrafficFleet = false, gltfLoadOptions } = {}) {
   const [brigantine, lighthouse, harborDock, shoreline] = await Promise.all([
-    loadGltfModel(resolveShowcaseAssetUrl("brigantine")),
-    loadGltfModel(resolveShowcaseAssetUrl("lighthouse")),
-    loadGltfModel(resolveShowcaseAssetUrl("harbor-dock")),
-    loadGltfModel(resolveShowcaseAssetUrl("shoreline")),
+    loadGltfModel(resolveShowcaseAssetUrl("brigantine"), gltfLoadOptions),
+    loadGltfModel(resolveShowcaseAssetUrl("lighthouse"), gltfLoadOptions),
+    loadGltfModel(resolveShowcaseAssetUrl("harbor-dock"), gltfLoadOptions),
+    loadGltfModel(resolveShowcaseAssetUrl("shoreline"), gltfLoadOptions),
   ]);
   const ships = {
     brigantine,
@@ -1718,14 +1719,14 @@ async function loadShowcaseAssetCatalog({ includeSecondaryShip = true, includeTr
   const environment = { lighthouse, "harbor-dock": harborDock, shoreline };
 
   if (includeSecondaryShip) {
-    ships.cutter = await loadGltfModel(resolveShowcaseAssetUrl("cutter"));
+    ships.cutter = await loadGltfModel(resolveShowcaseAssetUrl("cutter"), gltfLoadOptions);
   }
 
   if (includeSecondaryShip && includeTrafficFleet) {
     const names = ["tug", "fishing-boat", "pilot-launch", "coaster"];
-    const models = await Promise.all(names.map(name => loadGltfModel(resolveShowcaseAssetUrl(name))));
+    const models = await Promise.all(names.map(name => loadGltfModel(resolveShowcaseAssetUrl(name), gltfLoadOptions)));
     names.forEach((name, index) => { ships[name] = models[index]; });
-    environment["harbour-berths"] = await loadGltfModel(resolveShowcaseAssetUrl("harbour-berths"));
+    environment["harbour-berths"] = await loadGltfModel(resolveShowcaseAssetUrl("harbour-berths"), gltfLoadOptions);
   }
 
   return createShowcaseAssetCatalog({
@@ -1735,8 +1736,8 @@ async function loadShowcaseAssetCatalog({ includeSecondaryShip = true, includeTr
   });
 }
 
-async function createLegacyShowcaseAssetCatalog(error = null) {
-  const brigantine = await loadGltfModel(resolveShowcaseAssetUrl("brigantine"));
+async function createLegacyShowcaseAssetCatalog(error = null, gltfLoadOptions) {
+  const brigantine = await loadGltfModel(resolveShowcaseAssetUrl("brigantine"), gltfLoadOptions);
   return createShowcaseAssetCatalog({
     mode: "legacy-fallback",
     ships: {
@@ -1751,7 +1752,9 @@ async function loadShowcaseAssetCatalogWithFallback(options = {}) {
   try {
     return await loadShowcaseAssetCatalog(options);
   } catch (error) {
-    return createLegacyShowcaseAssetCatalog(error);
+    // Validation, cancellation, limits and integrity never downgrade the scene.
+    if (options.gltfLoadOptions?.signal?.aborted || options.gltfLoadOptions?.integrity || error?.name === "GltfAdapterLoadError") throw error;
+    return createLegacyShowcaseAssetCatalog(error, options.gltfLoadOptions);
   }
 }
 
@@ -4613,6 +4616,11 @@ export async function mountGpuShowcase(options = {}, featureFlags = null) {
   const assetCatalog = await loadShowcaseAssetCatalogWithFallback({
     includeSecondaryShip: state.showcaseRealisticModelsEnabled,
     includeTrafficFleet: trafficEnabled,
+    gltfLoadOptions: {
+      ...options.gltfLoadOptions,
+      signal: options.signal ?? options.gltfLoadOptions?.signal,
+      conversionEnabled: isModelConversionEnabled(featureFlags),
+    },
   });
   const shipModel = assetCatalog.ships[assetCatalog.primaryShipKey];
 

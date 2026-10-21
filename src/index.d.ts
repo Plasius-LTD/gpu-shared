@@ -82,6 +82,8 @@ export interface GltfModelPrimitive {
 }
 
 export interface GltfModel {
+  readonly importProfile?: "gltf-static-resources-v1" | "legacy";
+  readonly compatibilityReason?: "unsupported-gltf-feature" | "showcase-network-unavailable";
   readonly name: string;
   readonly positions: readonly number[];
   readonly indices: readonly number[];
@@ -432,6 +434,7 @@ export interface MountGpuShowcaseOptions {
   productAssetName?: string;
   productMaximumSurfaceFaces?: number;
   signal?: AbortSignal;
+  gltfLoadOptions?: Omit<GltfLoadOptions, "conversionEnabled">;
   animationAdventure?: AnimationAdventureConfig;
   width?: number;
   height?: number;
@@ -542,6 +545,11 @@ export function resolveShowcaseAssetUrl(
 ): URL;
 
 export interface GltfLoadOptions {
+  /** Host's remotely evaluated gpu.model.conversion.enabled decision. Missing/false keeps compatibility. */
+  conversionEnabled?: boolean;
+  /** Adapter path only: tighten the 30s total deadline and 16MiB entry ceiling. */
+  timeoutMs?: number;
+  maxInputBytes?: number;
   signal?: AbortSignal;
   /** Absolute URL to Subresource Integrity digest; when supplied, unlisted resources fail closed. */
   integrity?: Readonly<Record<string, string>>;
