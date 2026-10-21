@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.3.0] - 2026-10-21
+
+- **Added**
   - Lazy, remotely gated glTF adapter loading with bounded runtime resource acquisition, source-coordinate renderer projection, explicit compatibility metadata and fail-closed request policy.
 
 - **Changed**
@@ -892,3 +906,4 @@ All notable changes to this project will be documented in this file.
 [1.1.12]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.12
 [1.2.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.2.0
 [1.2.1]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.2.1
+[1.3.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.3.0
