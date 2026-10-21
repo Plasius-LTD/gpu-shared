@@ -58,9 +58,9 @@ export const showcaseFocusModes = Object.freeze([
 ]);
 export const showcaseDemoModes = Object.freeze(["harbor", "product-studio", "animation-adventure"]);
 
-export async function loadGltfModel(url) {
+export async function loadGltfModel(url, options) {
   const module = await import("./gltf-loader.js");
-  return module.loadGltfModel(url);
+  return module.loadGltfModel(url, options);
 }
 
 function isProductStudioFeatureEnabled(featureFlags) {

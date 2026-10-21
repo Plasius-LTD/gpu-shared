@@ -164,16 +164,27 @@ You can also reuse loading and mesh conversion independently:
 ```js
 import { loadGltfModel, createProductStudioMeshes } from "@plasius/gpu-shared";
 
-const model = await loadGltfModel(new URL("/models/my-scene.glb", location.href));
+const controller = new AbortController();
+const modelUrl = new URL("/models/my-scene.glb", location.href);
+const model = await loadGltfModel(modelUrl, { signal: controller.signal });
 const studioMeshes = createProductStudioMeshes(model, {
   targetCenter: [0, 0.85, 0], targetSize: 3.2,
 });
 ```
 
 `createProductStudioMeshes` fits the longest model dimension to `targetSize` and
-includes the four studio environment meshes. `loadGltfModel(url)` is a convenience
-wrapper accepting one argument with legacy fallback behaviour. Use the strict
-inspection entry when you need cancellation and resource integrity.
+includes the four studio environment meshes. `loadGltfModel(url, options?)`
+accepts an optional `AbortSignal` and `integrity` map from absolute resource URLs
+to browser Subresource Integrity digests. Supply a digest for the model and every
+external buffer/image; an unlisted resource is rejected before its request.
+The same signal and each declared digest reach the corresponding fetch. Call
+`controller.abort()` to cancel acquisition. This does not interrupt synchronous
+mesh processing or image decoding already underway.
+
+One-argument calls retain the existing showcase fallback. Aborted loads and loads
+with an integrity manifest never substitute the inline showcase model. ESM and
+CommonJS exports apply the same policy. See the [request policy](https://github.com/Plasius-LTD/gpu-shared/blob/main/docs/tdrs/tdr-0006-public-loader-request-options.md)
+for a manifest example and the inspection entry's separate lifecycle controls.
 
 ## Add interaction and explore other features
 

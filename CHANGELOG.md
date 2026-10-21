@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Fixed**
-  - (placeholder)
+  - Forward cancellation and resource-integrity options through the public lazy glTF loader in ESM and CommonJS, preserving one-argument showcase fallback.
 
 - **Security**
   - (placeholder)

@@ -6,3 +6,4 @@
 
 - [TDR 0004: Inspection quality](tdr-0004-inspection-quality.md)
 - [TDR 0005: Composite model inspection](tdr-0005-composite-model-inspection.md)
+- [TDR 0006: Public loader request options](tdr-0006-public-loader-request-options.md)
