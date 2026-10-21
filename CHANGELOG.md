@@ -8,6 +8,20 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.1.12] - 2026-10-21
+
+- **Added**
+  - (placeholder)
+
+- **Changed**
   - Explain the native WebGPU design in the public README and move dependency admission guidance into contributor documentation.
 
 - **Fixed**
@@ -847,3 +861,4 @@ All notable changes to this project will be documented in this file.
 [1.1.9]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.9
 [1.1.10]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.10
 [1.1.11]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.11
+[1.1.12]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.12
