@@ -55,3 +55,13 @@ Promote a lesson from this retrospective file to `AGENTS.md` only when:
   example; keep prebuilt integrations in a linked reference and exercise the
   example against public APIs.
 - Scope: repository-specific. Not promoted to AGENTS.md.
+
+## Public architecture framing — 2026-10-21
+
+- Context: a README described an internal dependency check as a public invariant.
+- Rejected approach: making exclusion of another library part of package identity.
+- Reason: the author supports Three.js and chose a direct WebGPU implementation
+  to suit this project's workflow.
+- Lesson candidate: explain capabilities and design choices positively; keep
+  contributor dependency rules in development documentation.
+- Scope: repository-specific. Not promoted to AGENTS.md; enforcement is unchanged.

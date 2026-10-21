@@ -40,3 +40,17 @@ guide. Preserve prebuilt integration and release-integrity documentation.
 
 Existing ADRs 0005 and 0014 describe the reused boundaries. No architectural
 decision changes, so a new ADR is not required.
+
+## Public design rationale
+
+Describe the native WebGPU approach through the capabilities and responsibilities
+of each package. The README should help consumers build scenes; an internal
+dependency-check name should not become the project's public identity or imply
+opposition to Three.js. The author's preference for a more direct WebGPU workflow
+is not a general claim about another library's quality.
+
+Move dependency admission commands to linked contributor documentation, with the
+existing implementation boundary, tests and release gates intact. Preserve the
+working gallery, public API examples and managed release-integrity block. Review
+the rendered prose and links and run existing example and package checks; no
+word-for-word editorial assertion or new runtime test is needed for prose alone.

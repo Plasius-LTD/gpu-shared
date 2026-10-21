@@ -13,6 +13,10 @@ Build browser scenes from generated geometry or your own glTF/GLB assets. Use
 and progressive inspection to an authored scene. `@plasius/gpu-renderer` supplies
 the WebGPU rendering; no Plasius website, account or service is required.
 
+The shared helpers prepare assets, materials and camera interaction, while the
+renderer owns path tracing, accumulation and GPU resources. This separation lets
+you compose a scene in JavaScript or TypeScript with explicit rendering controls.
+
 Apache-2.0 · ESM and CommonJS · TypeScript declarations included.
 
 ## Install
@@ -199,29 +203,13 @@ Public declarations: [root helpers](https://github.com/Plasius-LTD/gpu-shared/bl
 
 ## Development
 
-From a repository checkout, use Node.js 24 and npm:
-
-```sh
-npm ci
-npm run lint
-npm run typecheck
-npm test
-npm run build
-npm run pack:check
-```
+For checkout setup and required validation, start with the
+[development guide](https://github.com/Plasius-LTD/gpu-shared/blob/main/docs/maintainers/development.md).
 
 `npm run demo` also requires Python 3. It serves the parent directory; with the
 checkout named `gpu-shared`, open `http://localhost:8000/gpu-shared/demo/`.
 See [contributing](https://github.com/Plasius-LTD/gpu-shared/blob/main/CONTRIBUTING.md)
 and [release operations](https://github.com/Plasius-LTD/gpu-shared/blob/main/docs/maintainers/releasing.md).
-
-## Zero-Three architecture invariant
-
-Three.js and dependency paths reaching it remain prohibited across runtime,
-tooling and published artifacts. Run `npm run zero-three:source` before installing
-and `npm run build && npm run zero-three` for package evidence. See the repository's
-[architecture records](https://github.com/Plasius-LTD/gpu-shared/tree/main/docs/adrs)
-for implementation decisions.
 
 <!-- BEGIN PLASIUS RELEASE INTEGRITY -->
 ## Release integrity
