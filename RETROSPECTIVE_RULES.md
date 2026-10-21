@@ -42,3 +42,16 @@ Promote a lesson from this retrospective file to `AGENTS.md` only when:
 - it is useful across future tasks;
 - it is not merely stylistic or one-off;
 - and it improves operational quality without creating noise or contradiction.
+
+## Scene-authoring documentation — 2026-10-21
+
+- Context: the public package README led with mounting the Plasius website's
+  prebuilt GPU showcase.
+- Rejected approach: treating a ready-made site demo as the main getting-started
+  example for library consumers.
+- Reason: consumers need to learn how to create their own scene and use the
+  package's reusable loading, material and scene-management features.
+- Lesson candidate: lead public usage documentation with a complete original-scene
+  example; keep prebuilt integrations in a linked reference and exercise the
+  example against public APIs.
+- Scope: repository-specific. Not promoted to AGENTS.md.

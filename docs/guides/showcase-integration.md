@@ -5,6 +5,39 @@ its controls; use the dedicated model-inspection entry for your own static asset
 All rendering modes return a handle whose `destroy()` method belongs in host
 route/component cleanup.
 
+## Mount the prebuilt harbour
+
+Add `<div id="app"></div>` to your page, then run this browser module:
+
+```js
+import { mountGpuShowcase } from "@plasius/gpu-shared";
+
+const root = document.getElementById("app");
+if (!root) throw new Error("Missing #app container");
+const showcase = await mountGpuShowcase({ root });
+
+export function dispose() {
+  showcase.destroy();
+}
+```
+
+Use a bundler, or an import map for the package and its dependencies. This mounts
+the supplied harbour; to author a new scene, start with the README's material
+gallery instead. The default harbour has a Canvas2D compatibility path and does
+not require the renderer peer until native rendering is selected.
+
+## Packaged asset helpers
+
+```js
+import { loadGltfModel, resolveShowcaseAssetUrl } from "@plasius/gpu-shared";
+
+const lighthouseUrl = resolveShowcaseAssetUrl("lighthouse");
+const model = await loadGltfModel(lighthouseUrl);
+```
+
+The resolver addresses package-owned assets. It is optional when using your own
+model URLs. Do not import workspace-private source files in a consumer application.
+
 ## Native harbour
 
 The harbour can use `@plasius/gpu-renderer` native surface drawing when its caller

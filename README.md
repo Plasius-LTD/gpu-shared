@@ -8,165 +8,194 @@
 [![Security Policy](https://img.shields.io/badge/security%20policy-yes-orange.svg)](./SECURITY.md)
 [![Changelog](https://img.shields.io/badge/changelog-md-blue.svg)](./CHANGELOG.md)
 
-Browser scene orchestration, model loading and inspection tools for the Plasius
-GPU packages. Embed the harbour showcase, inspect your own glTF/GLB models, or
-use the asset helpers with a renderer of your choice. WebGPU rendering is supplied
-by `@plasius/gpu-renderer`; this package manages loading, scene setup and interaction.
+Build browser scenes from generated geometry or your own glTF/GLB assets. Use
+`gpu-shared` to load materials, fit meshes into a studio, or add camera gestures
+and progressive inspection to an authored scene. `@plasius/gpu-renderer` supplies
+the WebGPU rendering; no Plasius website, account or service is required.
 
 Apache-2.0 · ESM and CommonJS · TypeScript declarations included.
 
 ## Install
 
 ```sh
-npm install @plasius/gpu-shared
+npm install @plasius/gpu-shared @plasius/gpu-renderer
 ```
 
-For model inspection, material studies, Product Studio or native harbour rendering,
-also install the optional renderer peer:
+Use a browser bundler, such as the one in your existing application, and serve it
+over HTTPS or localhost in a WebGPU-capable browser. The renderer is an optional
+peer of `gpu-shared` (compatible range `^0.2.49`) and is needed for this example.
+Installing the packages in Node does not provide a browser GPU.
 
-```sh
-npm install @plasius/gpu-renderer
-```
+## Create a scene: a material gallery
 
-The renderer peer must satisfy `^0.2.49`. Use a WebGPU-capable browser over HTTPS
-or localhost for those GPU paths. The default harbour has a Canvas2D compatibility
-path. Optional PVOX loading needs `@plasius/gpu-model-voxel`; external translation
-integration may use `@plasius/translations`. Neither is needed for the basic example.
+Make three faceted sculptures with different finishes: rough terracotta, polished
+copper and blue ceramic. Generate the geometry locally, then let `gpu-shared` fit
+it into a lit studio. No downloaded models or site assets are needed.
 
-## Quick start
-
-Add a container to your page:
+Add a container and a live status message to your page:
 
 ```html
-<div id="app"></div>
+<div id="gallery" style="max-width:960px"></div>
+<p id="status" role="status">Preparing the material gallery…</p>
 ```
 
-Then run this module through your browser bundler:
+Run this complete JavaScript module through your bundler. It creates a tiny glTF
+asset in memory and passes its URL to the shared scene runtime:
 
 ```js
-import { mountGpuShowcase } from "@plasius/gpu-shared";
+import { mountGpuProductStudio } from "@plasius/gpu-shared";
 
-const root = document.getElementById("app");
-if (!root) throw new Error("Missing #app container");
+// One octahedron, reused by three independently positioned nodes.
+const positions = new Float32Array([
+  0, 1.6, 0, 0, 0, 0,
+  -0.5, 0.8, 0, 0, 0.8, 0.5, 0.5, 0.8, 0, 0, 0.8, -0.5,
+]);
+const indices = new Uint16Array([
+  0, 2, 3, 0, 3, 4, 0, 4, 5, 0, 5, 2,
+  1, 3, 2, 1, 4, 3, 1, 5, 4, 1, 2, 5,
+]);
+const bytes = new Uint8Array(positions.byteLength + indices.byteLength);
+bytes.set(new Uint8Array(positions.buffer));
+bytes.set(new Uint8Array(indices.buffer), positions.byteLength);
+const finishes = [
+  { name: "Terracotta", color: [0.6, 0.16, 0.07, 1], roughness: 0.85, metallic: 0 },
+  { name: "Copper", color: [0.95, 0.64, 0.54, 1], roughness: 0.22, metallic: 1 },
+  { name: "Ceramic", color: [0.04, 0.22, 0.48, 1], roughness: 0.32, metallic: 0 },
+];
+const gltf = {
+  asset: { version: "2.0" }, scene: 0,
+  scenes: [{ name: "Material gallery", nodes: [0, 1, 2] }],
+  nodes: finishes.map((finish, i) => ({
+    name: finish.name, mesh: i, translation: [(i - 1) * 1.1, 0, 0],
+  })),
+  meshes: finishes.map((_, material) => ({
+    primitives: [{ attributes: { POSITION: 0 }, indices: 1, material }],
+  })),
+  materials: finishes.map(finish => ({
+    name: finish.name,
+    pbrMetallicRoughness: { baseColorFactor: finish.color,
+      roughnessFactor: finish.roughness, metallicFactor: finish.metallic },
+  })),
+  buffers: [{ byteLength: bytes.length,
+    uri: `data:application/octet-stream;base64,${btoa(String.fromCharCode(...bytes))}` }],
+  bufferViews: [
+    { buffer: 0, byteOffset: 0, byteLength: positions.byteLength },
+    { buffer: 0, byteOffset: positions.byteLength, byteLength: indices.byteLength },
+  ],
+  accessors: [
+    { bufferView: 0, componentType: 5126, count: 6, type: "VEC3",
+      min: [-0.5, 0, -0.5], max: [0.5, 1.6, 0.5] },
+    { bufferView: 1, componentType: 5123, count: 24, type: "SCALAR" },
+  ],
+};
 
-const showcase = await mountGpuShowcase({ root });
+const root = document.querySelector("#gallery");
+const status = document.querySelector("#status");
+if (!(root instanceof HTMLElement) || !status) {
+  throw new Error("Add the gallery and status markup first.");
+}
+const assetUrl = URL.createObjectURL(new Blob([JSON.stringify(gltf)], {
+  type: "model/gltf+json",
+}));
+/** @type {Awaited<ReturnType<typeof mountGpuProductStudio>> | undefined} */
+let gallery;
+try {
+  gallery = await mountGpuProductStudio({
+    root, productAssetUrl: assetUrl,
+    width: 640, height: 360, samplesPerPixel: 64, maxDepth: 4, denoise: true,
+  });
+  gallery.canvas.setAttribute("role", "img");
+  gallery.canvas.setAttribute("aria-label",
+    "Three faceted sculptures: terracotta, copper and blue ceramic, in a lit studio");
+  status.textContent = "Gallery submitted. The image appears when the GPU finishes.";
+} catch (error) {
+  dispose();
+  root.replaceChildren();
+  status.textContent = error instanceof Error ? error.message : "Unable to render the gallery.";
+} finally {
+  URL.revokeObjectURL(assetUrl);
+}
 
-// Call this from your route or component cleanup.
+// Call this when leaving the page or unmounting the component.
 export function dispose() {
-  showcase.destroy();
+  gallery?.destroy();
+  gallery = undefined;
 }
 ```
 
-This mounts the default harbour and its controls. Importing the package alone does
-not mount a scene. If you serve browser modules without a bundler, use an import map
-for the package and its dependencies; do not import workspace-private source files.
+You authored the geometry, layout and materials. `mountGpuProductStudio` loads
+that glTF, applies its node transforms and material factors, fits the complete
+model, adds a floor, two walls and an emissive light, and delegates rendering to
+`@plasius/gpu-renderer`. Despite the API's name, it accepts your own scene; the
+provided URL prevents the default product asset from being loaded.
 
-## Choose an entry point
+This entry submits one bounded render with a fixed studio camera. It does not
+attach camera controls or progressively refine. Its promise resolves after
+submission, so the status deliberately does not claim GPU completion. The Blob
+URL is released after loading, and `dispose()` releases the scene when unmounted.
+For larger scenes, export a glTF/GLB file instead of building a base64 buffer in
+JavaScript. The small in-memory geometry above is just a self-contained starting
+point. Normals are omitted to use flat facets.
 
-| Entry | Use it for |
+## Make the scene yours
+
+| Change | Where to edit |
 | --- | --- |
-| `@plasius/gpu-shared` | Harbour/Product Studio/animation mounting, glTF loading, mesh conversion and translations |
-| `@plasius/gpu-shared/model-inspection` | Your own integrity-checked static models with camera and progressive quality controls |
-| `@plasius/gpu-shared/material-study` | The supplied Wooden Crate 01 varnish and rope-fray study |
-| `@plasius/gpu-shared/feedback-diagnostics` | Validating consented, structured diagnostic packets |
+| Sculpture shape | `positions` and `indices`; update accessor counts, bounds and buffer offsets if the geometry size changes |
+| Placement or scale | glTF `nodes`: `translation`, `rotation` (quaternion) and `scale`; the studio fits the complete group |
+| Colour and finish | `finishes`: RGB values are linear; roughness runs from smooth `0` to rough `1`, metallic from dielectric `0` to metal `1` |
+| Image quality | `samplesPerPixel`, `maxDepth`, `denoise`, `width` and `height`; retain the studio's 16:9 presentation ratio |
+| Your own environment and interactive camera | Use the [inspection entry](https://github.com/Plasius-LTD/gpu-shared/blob/main/docs/guides/model-inspection.md), which does not add the studio environment |
 
-Import the inspection and material-study entries on demand so unrelated pages do
-not load their renderer code. Model assets download when the selected view mounts.
+To use an authored scene, replace `assetUrl` with
+`new URL("/models/my-scene.glb", location.href)` and omit the geometry/Blob creation.
+Serve your model at that URL and keep any external buffers/textures beside it.
+The loader decodes glTF/GLB, shares authored materials within each load, and honours
+`EXT_texture_webp` sources. The mesh adapter carries UVs and supported material
+maps/factors to the renderer. Source licences and attribution remain your
+responsibility.
 
-## Inspect a model
-
-`createModelInspection` requires a canvas, an absolute HTTP(S) `modelUrl`, an explicit
-`enabled: true` decision, and an `integrity` map. Each map key is an absolute URL
-for the model or one of its external buffers/images; each value is a
-`sha256-<base64 digest>` SRI string. Generate it from the exact files you serve.
-Missing or mismatched resources fail instead of substituting another model.
-
-The following helper mounts the inspection and wires document visibility to pause
-further GPU work. Pass your host's options, including an AbortSignal if initialization
-must be cancellable when navigating away.
+You can also reuse loading and mesh conversion independently:
 
 ```js
-import { createModelInspection } from "@plasius/gpu-shared/model-inspection";
+import { loadGltfModel, createProductStudioMeshes } from "@plasius/gpu-shared";
 
-/** @param {import("@plasius/gpu-shared/model-inspection").ModelInspectionOptions} options */
-export async function mountInspection(options) {
-  const inspection = await createModelInspection(options);
-  const syncVisibility = () => inspection.setPaused(document.hidden);
-  document.addEventListener("visibilitychange", syncVisibility);
-  syncVisibility();
-
-  return {
-    inspection,
-    dispose() {
-      document.removeEventListener("visibilitychange", syncVisibility);
-      inspection.destroy();
-    },
-  };
-}
+const model = await loadGltfModel(new URL("/models/my-scene.glb", location.href));
+const studioMeshes = createProductStudioMeshes(model, {
+  targetCenter: [0, 0.85, 0], targetSize: 3.2,
+});
 ```
 
-`onProgress` receives `{ phase, samples, target, width, height, maxDepth, denoise }`.
-Samples count GPU-completed work. `onError` reports failures after initialization;
-initialization errors reject the returned promise. `onHintChange` controls a brief
-camera hint; the host supplies permanent accessible instructions and error/retry UI.
+`createProductStudioMeshes` fits the longest model dimension to `targetSize` and
+includes the four studio environment meshes. `loadGltfModel(url)` is a convenience
+wrapper accepting one argument with legacy fallback behaviour. Use the strict
+inspection entry when you need cancellation and resource integrity.
 
-| Setting | Default | Supported values |
-| --- | --- | --- |
-| `quality.samplesPerPixel` | 64 | Integer 1–256 |
-| `quality.maxDepth` | 6 | Integer 1–12 |
-| `quality.denoise` | `true` | Boolean |
-| `width`, `height` | 800 × 600 | Integer 1–3840 per axis, at most 8,294,400 pixels in total |
+## Add interaction and explore other features
 
-Use `inspection.setQuality({ samplesPerPixel, maxDepth, denoise, width, height })`
-to change settings; only supplied fields change. Native 1920×1080, 2560×1440 and
-3840×2160 targets are supported independently of CSS display size. Device limits
-and model resources can still prevent allocation; 4K availability is not a promise
-of real-time performance.
+- **Camera and progressive refinement:** [inspect your own scene](https://github.com/Plasius-LTD/gpu-shared/blob/main/docs/guides/model-inspection.md)
+  with mouse, touch and keyboard controls, SHA-256 asset verification, samples,
+  bounces, denoising and native render sizes up to 3840 × 2160. The shared runtime
+  refines while the camera is still; your application supplies UI and handles
+  visibility and cleanup. It currently renders static poses with fixed-SPP batches.
+- **Material ageing:** the [isolated material study](https://github.com/Plasius-LTD/gpu-shared/blob/main/docs/guides/material-study.md)
+  demonstrates varnish wear and rope fraying on its supplied crate. These effects
+  are specific to that study, not automatically applied to arbitrary models.
+- **Voxel assets, animation, translations and ready-made scenes:** see the
+  [integration guide](https://github.com/Plasius-LTD/gpu-shared/blob/main/docs/guides/showcase-integration.md).
+  The harbour remains available through `mountGpuShowcase`; it is a separate
+  prebuilt example. PVOX loading needs the optional `@plasius/gpu-model-voxel` peer.
+- **Structured diagnostics:** [validate consented diagnostic packets](https://github.com/Plasius-LTD/gpu-shared/blob/main/docs/guides/feedback-diagnostics.md)
+  before passing them to your application's delivery service.
 
-The first pass uses one sample. After 200ms of camera stillness, batches of up to
-four refine toward the target. Moving the camera or changing quality resets history;
-identical settings preserve it. `setPaused()` retains completed history, `reset()`
-restarts refinement, and `destroy()` is safe to call more than once. Resize the
-render target explicitly through `setQuality`; keep the displayed aspect ratio.
+Import `@plasius/gpu-shared/model-inspection` or `@plasius/gpu-shared/material-study`
+only when their view is needed. Hosts own access policy, visible errors and
+resource disposal. The package consumes caller-supplied decisions; it does not
+connect to Plasius account or feature services.
 
-Inspection accepts 1–500,000 triangles and bounds initialization/GPU waits to
-60 seconds. It renders static poses: source skinning/animation playback and adaptive
-per-pixel sampling are not part of this entry. Mouse, touch and keyboard gestures
-are described in the [camera guide](https://github.com/Plasius-LTD/gpu-shared/blob/main/docs/guides/material-study.md#camera-and-accessibility).
-
-## Asset helpers
-
-```js
-import {
-  createProductStudioMeshes,
-  loadGltfModel,
-  resolveShowcaseAssetUrl,
-} from "@plasius/gpu-shared";
-
-const lighthouseUrl = resolveShowcaseAssetUrl("lighthouse");
-const model = await loadGltfModel(lighthouseUrl);
-const meshes = createProductStudioMeshes(model);
-console.log(model.primitives.length, meshes.length);
-```
-
-The public `loadGltfModel(url)` convenience function accepts one argument and retains
-legacy fallback behaviour. Cancellation and strict resource integrity are supplied
-by the dedicated inspection/study runtimes; do not pass unsupported options to the
-root loader. The loader handles glTF/GLB, shares authored materials within each load,
-and honours `EXT_texture_webp` image sources. Models and texture resources must be
-servable by your host; asset licences and attribution remain your responsibility.
-
-## Other integrations
-
-- [Harbour, Product Studio, PVOX, animation and translation integration](https://github.com/Plasius-LTD/gpu-shared/blob/main/docs/guides/showcase-integration.md).
-- [Material ageing study and camera gestures](https://github.com/Plasius-LTD/gpu-shared/blob/main/docs/guides/material-study.md).
-- [Feedback diagnostics and consent contract](https://github.com/Plasius-LTD/gpu-shared/blob/main/docs/guides/feedback-diagnostics.md).
-- Public declarations: [root APIs](https://github.com/Plasius-LTD/gpu-shared/blob/main/src/index.d.ts), [inspection](https://github.com/Plasius-LTD/gpu-shared/blob/main/src/model-inspection.d.ts), [material study](https://github.com/Plasius-LTD/gpu-shared/blob/main/src/material-study.d.ts).
-
-`gpuSharedTranslations` contains the bundled `en-GB` dictionary for integration
-with `@plasius/translations` or another host translator. The library evaluates
-supplied decisions; it does not connect to a Plasius account or feature service.
-Production hosts retain responsibility for access, rollout and diagnostics consent.
+Public declarations: [root helpers](https://github.com/Plasius-LTD/gpu-shared/blob/main/src/index.d.ts),
+[inspection](https://github.com/Plasius-LTD/gpu-shared/blob/main/src/model-inspection.d.ts),
+[material study](https://github.com/Plasius-LTD/gpu-shared/blob/main/src/material-study.d.ts).
 
 ## Development
 
