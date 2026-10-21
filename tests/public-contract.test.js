@@ -44,12 +44,14 @@ test("package exports keep the public gpu-shared runtime surface stable", () => 
   for(const name of ["tug","fishing-boat","pilot-launch","coaster","harbour-berths"]) assert.equal(packageJson.exports[`./assets/${name}.gltf`],`./assets/${name}.gltf`);
 });
 
-test("readme documents package-surface imports for browser demos", () => {
-  assert.match(readme, /import \{ mountGpuShowcase \} from "@plasius\/gpu-shared"/);
-  assert.match(readme, /import map/i);
-  assert.match(readme, /resolveShowcaseAssetUrl\("lighthouse"\)/);
-  assert.match(readme, /gpuSharedTranslations/);
-  assert.match(readme, /@plasius\/translations/);
+test("consumer docs retain package-surface imports for optional prebuilt demos", () => {
+  const integration = readFileSync(new URL("../docs/guides/showcase-integration.md", import.meta.url), "utf8");
+  assert.match(readme, /docs\/guides\/showcase-integration\.md/);
+  assert.match(integration, /import \{ mountGpuShowcase \} from "@plasius\/gpu-shared"/);
+  assert.match(integration, /import map/i);
+  assert.match(integration, /resolveShowcaseAssetUrl\("lighthouse"\)/);
+  assert.match(integration, /gpuSharedTranslations/);
+  assert.match(integration, /@plasius\/translations/);
 });
 
 test("showcase feature packages are adapter-injected from mount options", () => {

@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Teach original scene creation with a self-contained material-gallery example; separate authored-scene inspection and prebuilt showcase integrations into linked guides.
+
 - **Added**
   - (placeholder)
 
