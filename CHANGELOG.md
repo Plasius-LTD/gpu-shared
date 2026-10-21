@@ -11,6 +11,20 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.2.1] - 2026-10-21
+
+- **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
   - Forward cancellation and resource-integrity options through the public lazy glTF loader in ESM and CommonJS, preserving one-argument showcase fallback.
 
 - **Security**
@@ -877,3 +891,4 @@ All notable changes to this project will be documented in this file.
 [1.1.11]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.11
 [1.1.12]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.12
 [1.2.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.2.0
+[1.2.1]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.2.1
