@@ -5,3 +5,4 @@
 - [TDR-0003 Feedback Diagnostic Packet](./tdr-0003-feedback-diagnostic-packet.md)
 
 - [TDR 0004: Inspection quality](tdr-0004-inspection-quality.md)
+- [TDR 0005: Composite model inspection](tdr-0005-composite-model-inspection.md)
