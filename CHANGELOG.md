@@ -8,7 +8,7 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Changed**
-  - (placeholder)
+  - Explain the native WebGPU design in the public README and move dependency admission guidance into contributor documentation.
 
 - **Fixed**
   - (placeholder)
