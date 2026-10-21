@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.2.0] - 2026-10-21
+
+- **Added**
   - `createSceneInspection` composes up to six integrity-checked models with explicit placement, retained authored materials, shared ground, camera and progressive quality controls.
 
 - **Changed**
@@ -862,3 +876,4 @@ All notable changes to this project will be documented in this file.
 [1.1.10]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.10
 [1.1.11]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.11
 [1.1.12]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.1.12
+[1.2.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.2.0
