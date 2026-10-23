@@ -26,6 +26,21 @@ the supplied harbour; to author a new scene, start with the README's material
 gallery instead. The default harbour has a Canvas2D compatibility path and does
 not require the renderer peer until native rendering is selected.
 
+### Text supplied by the host
+
+`packageName`, `title`, `subtitle`, translated labels and the `sceneMetrics`,
+`qualityMetrics`, `debugMetrics` and `notes` arrays returned by `describeState()`
+are plain text. Pass the original strings, without HTML escaping. For example,
+`"A & B < C"` and `"&lt;caption&gt;"` display exactly as supplied; HTML-looking
+values never become elements. Empty arrays clear the corresponding list, and
+later frames apply the same rule. Existing `status`, `details` and serialized
+`textState` behavior is unchanged. Rich HTML is not supported in these fields.
+
+Text safety applies in native and Canvas2D rendering, independently of the
+`gpu-demo.scene-fidelity.enabled` decision. Hosts keep their existing capability
+checks. Roll back product exposure by disabling that remote flag; do not restore
+HTML parsing as a fallback. `destroy()` continues to restore host-owned markup.
+
 ## Packaged asset helpers
 
 ```js

@@ -229,6 +229,9 @@ for a manifest example and the inspection entry's separate lifecycle controls.
   [integration guide](https://github.com/Plasius-LTD/gpu-shared/blob/main/docs/guides/showcase-integration.md).
   The harbour remains available through `mountGpuShowcase`; it is a separate
   prebuilt example. PVOX loading needs the optional `@plasius/gpu-model-voxel` peer.
+  Harbour headers, translated labels and diagnostic lists accept plain text.
+  HTML-looking strings and entity syntax display literally, including text from
+  `describeState()`; consumers do not need to pre-escape these values.
 - **Structured diagnostics:** [validate consented diagnostic packets](https://github.com/Plasius-LTD/gpu-shared/blob/main/docs/guides/feedback-diagnostics.md)
   before passing them to your application's delivery service.
 
@@ -256,7 +259,9 @@ and [release operations](https://github.com/Plasius-LTD/gpu-shared/blob/main/doc
 
 CI keeps the administrative contributor registry outside Git and npm package
 artifacts using exact, case-normalised path checks. CI validates repository-owned
-branch pushes on explicit `[self-hosted, Linux, X64]` runners. Pull-request and
+branch pushes on explicit `[self-hosted, Linux, X64]` runners in the approved
+`Public CI - Quarantined` group. Scheduled dependency validation uses the same
+group; matching labels in Default cannot satisfy either selector. Pull-request and
 `pull_request_target` events do not execute CI code. Maintainers review fork
 contributions before moving accepted commits to repository-owned branches.
 Release preparation and

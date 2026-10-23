@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createTextList } from "./helpers/text-list.js";
 import { readFileSync } from "node:fs";
 import { createI18n } from "@plasius/translations";
 
@@ -855,10 +856,10 @@ function createShowcaseRuntimeHarness({ failAssetPattern = null } = {}) {
     "#pauseButton": createControl("pauseButton"),
     "#stressToggle": createControl("stressToggle"),
     "#focusMode": createControl("focusMode", { value: "integrated" }),
-    "#sceneMetrics": { innerHTML: "" },
-    "#qualityMetrics": { innerHTML: "" },
-    "#debugMetrics": { innerHTML: "" },
-    "#sceneNotes": { innerHTML: "" },
+    "#sceneMetrics": createTextList(),
+    "#qualityMetrics": createTextList(),
+    "#debugMetrics": createTextList(),
+    "#sceneNotes": createTextList(),
   };
 
   const root = {
@@ -1045,10 +1046,10 @@ test("showcase runtime exposes an idempotent destroy hook for browser consumers"
     "#pauseButton": createControl("pauseButton"),
     "#stressToggle": createControl("stressToggle"),
     "#focusMode": createControl("focusMode", { value: "integrated" }),
-    "#sceneMetrics": { innerHTML: "" },
-    "#qualityMetrics": { innerHTML: "" },
-    "#debugMetrics": { innerHTML: "" },
-    "#sceneNotes": { innerHTML: "" },
+    "#sceneMetrics": createTextList(),
+    "#qualityMetrics": createTextList(),
+    "#debugMetrics": createTextList(),
+    "#sceneNotes": createTextList(),
   };
 
   const root = {

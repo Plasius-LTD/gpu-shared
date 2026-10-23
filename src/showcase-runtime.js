@@ -1841,15 +1841,26 @@ function createPerformanceGovernor(performanceFeatures) {
   return { governor, fluidDetail, clothDetail, lightingDetail };
 }
 
+// Encode text for the template's text and double-quoted attribute contexts.
+// Ampersands go first so entity-looking input remains literal after parsing.
+function encodeHtmlText(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
 function buildDemoDom(root, options) {
-  const t = options.translate;
+  const t = (key) => encodeHtmlText(options.translate(key));
   root.innerHTML = `
     <main class="plasius-demo">
       <section class="plasius-demo__hero">
         <section class="plasius-panel plasius-demo__hero-card">
-          <p class="plasius-demo__eyebrow">${options.packageName}</p>
-          <h1>${options.title}</h1>
-          <p class="plasius-demo__lead">${options.subtitle}</p>
+          <p class="plasius-demo__eyebrow">${encodeHtmlText(options.packageName)}</p>
+          <h1>${encodeHtmlText(options.title)}</h1>
+          <p class="plasius-demo__lead">${encodeHtmlText(options.subtitle)}</p>
         </section>
         <section class="plasius-panel plasius-demo__status">
           <p id="demoStatus" class="plasius-demo__status-badge">${t(gpuSharedTranslationKeys.statusBooting)}</p>
@@ -2914,7 +2925,11 @@ function createSceneState(options, featureAdapters) {
 }
 
 function setListContent(element, values) {
-  element.innerHTML = values.map((value) => `<li>${value}</li>`).join("");
+  element.replaceChildren(...values.map((value) => {
+    const item = document.createElement("li");
+    item.textContent = String(value);
+    return item;
+  }));
 }
 
 function drawSkyAndShore(ctx, canvas, state, nearLighting, reflectionStrength, shadowStrength, visuals) {

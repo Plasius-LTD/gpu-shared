@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createTextList } from "./helpers/text-list.js";
 
 import {
   loadGltfModel,
@@ -120,10 +121,10 @@ function createSceneHarness({
     "#pauseButton": createControl("pauseButton", listenerRegistry, removals),
     "#stressToggle": createControl("stressToggle", listenerRegistry, removals),
     "#focusMode": createControl("focusMode", listenerRegistry, removals, { value: "integrated" }),
-    "#sceneMetrics": { innerHTML: "" },
-    "#qualityMetrics": { innerHTML: "" },
-    "#debugMetrics": { innerHTML: "" },
-    "#sceneNotes": { innerHTML: "" },
+    "#sceneMetrics": createTextList(),
+    "#qualityMetrics": createTextList(),
+    "#debugMetrics": createTextList(),
+    "#sceneNotes": createTextList(),
   };
 
   const root = {
@@ -376,6 +377,94 @@ function createLargeGltfDocument(vertexCount = 55_000) {
   };
 }
 
+async function withTextShowcase(options, verify, harnessOptions = {}) {
+  const original = Object.fromEntries(
+    ["document", "window", "fetch", "requestAnimationFrame", "cancelAnimationFrame"]
+      .map((key) => [key, globalThis[key]])
+  );
+  const harness = createSceneHarness(harnessOptions);
+  const { document } = createTriangleGltfDocument();
+  const frames = [];
+  Object.assign(globalThis, {
+    document: harness.documentStub,
+    window: harness.windowStub,
+    fetch: async () => ({ ok: true, json: async () => document }),
+    requestAnimationFrame: (callback) => { frames.push(callback); return frames.length; },
+    cancelAnimationFrame() {},
+  });
+  let showcase;
+  try {
+    showcase = await mountGpuShowcase({ root: harness.root, ...options });
+    await verify(harness, showcase, (time) => frames.shift()(time));
+  } finally {
+    showcase?.destroy();
+    Object.assign(globalThis, original);
+  }
+}
+
+test("showcase text encodes headers and translations in text and attribute contexts", async () => {
+  const payload = `"><img src=x onerror='globalThis.injected=true'> &lt;b&gt; & "quoted"`;
+  const encoded = "&quot;&gt;&lt;img src=x onerror=&#39;globalThis.injected=true&#39;&gt; &amp;lt;b&amp;gt; &amp; &quot;quoted&quot;";
+  await withTextShowcase({
+    packageName: `package ${payload}`,
+    title: `title ${payload}`,
+    subtitle: `subtitle ${payload}`,
+    translate: () => `translation ${payload}`,
+  }, async ({ root }) => {
+    for (const prefix of ["package", "title", "subtitle", "translation"]) {
+      assert.ok(root.innerHTML.includes(`${prefix} ${encoded}`));
+    }
+    assert.ok(root.innerHTML.includes(`aria-label="translation ${encoded}"`));
+    assert.ok(!root.innerHTML.includes("<img"));
+    assert.ok(!root.innerHTML.includes(payload));
+    assert.match(root.innerHTML, /<canvas id="demoCanvas"/);
+    assert.match(root.innerHTML, /<details class="plasius-demo__diagnostics">/);
+  });
+});
+
+test("showcase text keeps every hook list literal across updates and empty replacement", async () => {
+  const values = ["<img src=x onerror=alert(1)>", "</li><svg onload=alert(2)>", "A & B < C > D 'quote' &lt;tag&gt;", ""];
+  let description = {
+    sceneMetrics: values, qualityMetrics: values, debugMetrics: values, notes: values,
+    status: values[0], details: values[1], textState: { value: values[2] },
+  };
+  await withTextShowcase({ describeState: () => description }, async ({ elements, root }, showcase, frame) => {
+    frame(16);
+    for (const id of ["sceneMetrics", "qualityMetrics", "debugMetrics", "sceneNotes"]) {
+      const list = elements[`#${id}`];
+      assert.deepEqual(list.children.map((child) => child.textContent), values);
+      assert.ok(list.children.every((child) => child.tagName === "LI"));
+    }
+    assert.equal(elements["#demoStatus"].textContent, values[0]);
+    assert.equal(elements["#demoDetails"].textContent, values[1]);
+    assert.deepEqual(JSON.parse(window.render_game_to_text()).package, description.textState);
+    description = { sceneMetrics: [], qualityMetrics: [], debugMetrics: [], notes: [] };
+    frame(32);
+    for (const id of ["sceneMetrics", "qualityMetrics", "debugMetrics", "sceneNotes"]) {
+      assert.deepEqual(elements[`#${id}`].children, []);
+    }
+    description = { notes: ["<b>new frame</b>"] };
+    frame(48);
+    assert.equal(elements["#sceneNotes"].children[0].textContent, "<b>new frame</b>");
+    showcase.destroy();
+    showcase.destroy();
+    assert.equal(root.innerHTML, "<p>placeholder</p>");
+    assert.equal(window.render_game_to_text(), "previous-text");
+  });
+});
+
+test("showcase text keeps default metrics and translated fallback notes out of HTML parsing", async () => {
+  const focus = "<svg onload=alert(1)>";
+  const note = "Translated <img src=x onerror=alert(2)> &lt;literal&gt;";
+  await withTextShowcase({ translate: () => note }, async ({ elements }, showcase, frame) => {
+    showcase.state.focus = focus;
+    frame(16);
+    assert.equal(showcase.state.focus, focus);
+    assert.equal(elements["#sceneMetrics"].children[0].textContent, `focus: ${focus}`);
+    assert.ok(elements["#sceneNotes"].children.every((child) => child.textContent === note));
+  });
+});
+
 test("mountGpuShowcase renders live frames, package hooks, and physics telemetry", async () => {
   const originalDocument = globalThis.document;
   const originalWindow = globalThis.window;
@@ -485,10 +574,10 @@ test("mountGpuShowcase renders live frames, package hooks, and physics telemetry
     assert.ok(harness.ctx.operations.length > 100);
     assert.match(harness.elements["#demoStatus"].textContent, /Frame 1/);
     assert.match(harness.elements["#demoDetails"].textContent, /Focus physics/);
-    assert.match(harness.elements["#sceneMetrics"].innerHTML, /scene metric/);
-    assert.match(harness.elements["#qualityMetrics"].innerHTML, /quality metric/);
-    assert.match(harness.elements["#debugMetrics"].innerHTML, /debug metric/);
-    assert.match(harness.elements["#sceneNotes"].innerHTML, /custom note/);
+    assert.match(harness.elements["#sceneMetrics"].textContent, /scene metric/);
+    assert.match(harness.elements["#qualityMetrics"].textContent, /quality metric/);
+    assert.match(harness.elements["#debugMetrics"].textContent, /debug metric/);
+    assert.match(harness.elements["#sceneNotes"].textContent, /custom note/);
     assert.match(harness.root.innerHTML, /plasius-demo__diagnostics/);
     assert.equal(showcase.state.demoVisuals.moonCore, "rgba(255, 250, 240, 0.97)");
     assert.deepEqual(showcase.state.demoVisuals.waveDirection, { x: 1, z: 0.25 });
@@ -563,7 +652,7 @@ test("mountGpuShowcase renders live frames, package hooks, and physics telemetry
     harness.listenerRegistry.get("focusMode:change")();
     animationFrames.shift().callback(83.5);
     assert.match(harness.elements["#demoDetails"].textContent, /Stable world snapshots are emitted/);
-    assert.match(harness.elements["#sceneNotes"].innerHTML, /Stable world snapshots/);
+    assert.match(harness.elements["#sceneNotes"].textContent, /Stable world snapshots/);
 
     showcase.destroy();
     showcase.destroy();
@@ -675,9 +764,9 @@ test("native showcase submits world geometry, freezes on pause and disposes rend
     assert.match(harness.elements['#demoDetails'].textContent,/8 vessels/);
     const eye=draws[0].camera.eye;
     assert.equal(harness.ctx.operations.length,0);
-    assert.match(harness.elements['#debugMetrics'].innerHTML,/Submitted frames: 2/);
-    assert.match(harness.elements['#debugMetrics'].innerHTML,/1280 × 720/);
-    assert.match(harness.elements['#sceneNotes'].innerHTML,/procedural harbour assets/i);
+    assert.match(harness.elements['#debugMetrics'].textContent,/Submitted frames: 2/);
+    assert.match(harness.elements['#debugMetrics'].textContent,/1280 × 720/);
+    assert.match(harness.elements['#sceneNotes'].textContent,/procedural harbour assets/i);
     harness.listenerRegistry.get('pauseButton:click')();
     frames.shift()(48); frames.shift()(64);
     assert.equal(draws.length,2);
