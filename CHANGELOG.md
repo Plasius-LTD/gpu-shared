@@ -11,6 +11,20 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.3.1] - 2026-10-23
+
+- **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
   - Bind package CI and scheduled dependency validation to the approved
     quarantined runner group rather than any runner with matching labels.
 
@@ -909,3 +923,4 @@ All notable changes to this project will be documented in this file.
 [1.2.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.2.0
 [1.2.1]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.2.1
 [1.3.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.3.0
+[1.3.1]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.3.1
