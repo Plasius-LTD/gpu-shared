@@ -14,7 +14,8 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Security**
-  - (placeholder)
+  - Render harbour headers, translated labels and live diagnostic lists as plain
+    text, including HTML-looking values supplied through public options and hooks.
 
 ## [1.3.0] - 2026-10-21
 

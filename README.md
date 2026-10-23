@@ -229,6 +229,9 @@ for a manifest example and the inspection entry's separate lifecycle controls.
   [integration guide](https://github.com/Plasius-LTD/gpu-shared/blob/main/docs/guides/showcase-integration.md).
   The harbour remains available through `mountGpuShowcase`; it is a separate
   prebuilt example. PVOX loading needs the optional `@plasius/gpu-model-voxel` peer.
+  Harbour headers, translated labels and diagnostic lists accept plain text.
+  HTML-looking strings and entity syntax display literally, including text from
+  `describeState()`; consumers do not need to pre-escape these values.
 - **Structured diagnostics:** [validate consented diagnostic packets](https://github.com/Plasius-LTD/gpu-shared/blob/main/docs/guides/feedback-diagnostics.md)
   before passing them to your application's delivery service.
 
