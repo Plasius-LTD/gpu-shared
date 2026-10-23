@@ -242,7 +242,7 @@ test("package CI and production CD cannot skip permanent Zero-Three evidence", (
   assert.match(ci, /npm run zero-three:source/u);
   assert.match(ci, /npm run zero-three:test/u);
   assert.match(ci, /npm run zero-three[\s\S]*actions\/upload-artifact@/u);
-  assert.match(ci, /runs-on: \[self-hosted, Linux, X64\]/u);
+  assert.match(ci, /runs-on:\n\s+group: Public CI - Quarantined\n\s+labels: \[self-hosted, Linux, X64\]/u);
   assert.match(ci, /package-manager-cache: false/u);
   assert.doesNotMatch(ci, /cache:.*npm/u);
   assert.match(cd, /npm run zero-three/u);
