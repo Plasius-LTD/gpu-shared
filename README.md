@@ -259,7 +259,9 @@ and [release operations](https://github.com/Plasius-LTD/gpu-shared/blob/main/doc
 
 CI keeps the administrative contributor registry outside Git and npm package
 artifacts using exact, case-normalised path checks. CI validates repository-owned
-branch pushes on explicit `[self-hosted, Linux, X64]` runners. Pull-request and
+branch pushes on explicit `[self-hosted, Linux, X64]` runners in the approved
+`Public CI - Quarantined` group. Scheduled dependency validation uses the same
+group; matching labels in Default cannot satisfy either selector. Pull-request and
 `pull_request_target` events do not execute CI code. Maintainers review fork
 contributions before moving accepted commits to repository-owned branches.
 Release preparation and

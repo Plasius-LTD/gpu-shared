@@ -11,7 +11,8 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Fixed**
-  - (placeholder)
+  - Bind package CI and scheduled dependency validation to the approved
+    quarantined runner group rather than any runner with matching labels.
 
 - **Security**
   - Render harbour headers, translated labels and live diagnostic lists as plain

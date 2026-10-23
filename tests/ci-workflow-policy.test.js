@@ -15,7 +15,7 @@ test("CI validates trusted repository pushes on explicit self-hosted runners", (
   assert.doesNotMatch(ciWorkflow, /^\s*(?:pull_request|pull_request_target):/mu);
   assert.doesNotMatch(ciWorkflow, /ubuntu-latest|fromJSON|inputs\./u);
   assert.equal(
-    (ciWorkflow.match(/runs-on: \[self-hosted, Linux, X64\]/gu) ?? []).length,
+    (ciWorkflow.match(/runs-on:\n\s+group: Public CI - Quarantined\n\s+labels: \[self-hosted, Linux, X64\]/gu) ?? []).length,
     3,
   );
   assert.match(ciWorkflow, /name: Trusted head admission/u);
@@ -31,7 +31,7 @@ test("CI validates trusted repository pushes on explicit self-hosted runners", (
 
 test("scheduled dependency validation uses bounded trusted self-hosted capacity", () => {
   const auditWorkflow = read(".github/workflows/npm-audit-fix.yml");
-  assert.match(auditWorkflow, /runs-on: \[self-hosted, Linux, X64\]/u);
+  assert.match(auditWorkflow, /runs-on:\n\s+group: Public CI - Quarantined\n\s+labels: \[self-hosted, Linux, X64\]/u);
   assert.match(auditWorkflow, /if: \$\{\{ github\.ref == 'refs\/heads\/main' \}\}/u);
   assert.match(auditWorkflow, /timeout-minutes: 30/u);
   assert.match(auditWorkflow, /package-manager-cache: false/u);
