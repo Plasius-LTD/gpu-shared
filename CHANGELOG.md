@@ -11,7 +11,8 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Fixed**
-  - (placeholder)
+  - Normalize pre-aborted enabled glTF loads to the existing bounded cancellation
+    error before requests or fallback work, without retaining the caller's reason.
 
 - **Security**
   - (placeholder)

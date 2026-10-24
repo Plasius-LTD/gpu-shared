@@ -21,7 +21,9 @@ export async function loadAdapterGltfModel(url, options, project, compatible, un
   };
   const timeoutMs = limit('timeoutMs', DEFAULT_GLTF_RESOURCE_IMPORT_LIMITS.timeoutMs);
   const maxInputBytes = limit('maxInputBytes', DEFAULT_GLTF_RESOURCE_IMPORT_LIMITS.maxInputBytes);
-  options.signal?.throwIfAborted();
+  // Native throwIfAborted returns the caller's arbitrary reason unchanged.
+  // Keep preflight cancellation inside the same finite contract as later aborts.
+  if (options.signal?.aborted) throw new GltfAdapterLoadError('aborted-or-timeout');
   const controller = new AbortController();
   const abort = () => controller.abort();
   options.signal?.addEventListener('abort', abort, { once: true });

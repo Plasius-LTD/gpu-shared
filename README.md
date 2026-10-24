@@ -165,8 +165,16 @@ validation, byte budgets, cancellation and integrity failures never downgrade to
 another scene. An integrity manifest must list every external resource; embedded
 normalized resources retain the admitted source identity.
 
+With conversion enabled, a signal that is already aborted rejects with
+`name: "GltfAdapterLoadError"` and `code: "aborted-or-timeout"`, just like
+mid-load cancellation or the deadline. The loader does not read or retain the
+signal's arbitrary reason, start a request or select a compatibility fallback.
+Missing/disabled conversion decisions retain the existing legacy error behaviour.
+
 See [the migration contract](docs/tdrs/tdr-0007-gltf-adapter-migration.md) for
 limits, source/canonical coordinate differences, fallback and release guidance.
+The [cancellation contract](docs/tdrs/tdr-0008-adapter-preflight-cancellation.md)
+describes preflight failure and its regression coverage.
 
 
 ## Make the scene yours

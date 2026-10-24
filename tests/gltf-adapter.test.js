@@ -8,6 +8,24 @@ import {readFileSync,readdirSync} from 'node:fs';
 import {createProductStudioMeshes} from '../src/index.js';
 import {adapterFixture} from './helpers/gltf-adapter-contract.js';
 import {isModelConversionEnabled} from '../src/feature-flags.js';
+import {loadAdapterGltfModel} from '../src/gltf-adapter.js';
+
+test('pre-abort reads no reason and allocates no request, timer, controller or projection work',async t=>{
+  const controller=new AbortController();controller.abort(new Error('SYNTHETIC_ABORT_CANARY'));
+  Object.defineProperty(controller.signal,'reason',{get(){throw new Error('reason must not be read');}});
+  const calls={controller:0,timer:0,listener:0,fetch:0,projection:0,compatibility:0,inline:0};
+  const NativeAbortController=globalThis.AbortController;
+  t.mock.method(globalThis,'AbortController',class extends NativeAbortController{
+    constructor(){super();calls.controller++;}
+  });
+  t.mock.method(globalThis,'setTimeout',()=>{calls.timer++;throw new Error('must not schedule');});
+  t.mock.method(controller.signal,'addEventListener',()=>{calls.listener++;});
+  t.mock.method(globalThis,'fetch',()=>{calls.fetch++;throw new Error('must not fetch');});
+  await assert.rejects(loadAdapterGltfModel(new URL('https://example.test/model.gltf'),
+    {signal:controller.signal},()=>{calls.projection++;},()=>{calls.compatibility++;},()=>{calls.inline++;}),
+    {name:'GltfAdapterLoadError',code:'aborted-or-timeout',message:'glTF adapter loading failed: aborted-or-timeout.'});
+  assert.deepEqual(calls,{controller:0,timer:0,listener:0,fetch:0,projection:0,compatibility:0,inline:0});
+});
 
 test('all ten tracked showcase assets preserve exact renderer and physics output through adapter',async t=>{
   for(const name of readdirSync(new URL('../assets/',import.meta.url)).filter(n=>n.endsWith('.gltf'))){
