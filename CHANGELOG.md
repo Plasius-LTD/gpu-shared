@@ -11,6 +11,20 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.3.3] - 2026-10-24
+
+- **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
   - Preserve material-study canvas proportions when portrait or landscape views reach the 1440-pixel drawing-buffer cap, without replacing camera or renderer resources.
 
 - **Security**
@@ -940,3 +954,4 @@ All notable changes to this project will be documented in this file.
 [1.3.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.3.0
 [1.3.1]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.3.1
 [1.3.2]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.3.2
+[1.3.3]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.3.3
