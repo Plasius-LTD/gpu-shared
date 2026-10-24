@@ -63,17 +63,47 @@ export function registerAdapterContract(label, load) {
     await t.test('nonboolean conversion decision fails before request',{timeout:2000},async()=>{
       reset();await assert.rejects(load(modelUrl,{conversionEnabled:'true'}));assert.equal(calls.length,0);
     });
-    await t.test('pre-abort causes no request',{timeout:2000},async()=>{
-      reset();const controller=new AbortController();controller.abort();
-      await assert.rejects(load(modelUrl,{...enabled,signal:controller.signal}));assert.equal(calls.length,0);
+    for (const [reasonName, reason] of [
+      ['default', undefined],
+      ['error', new Error('SYNTHETIC_ABORT_CANARY')],
+      ['string', 'SYNTHETIC_ABORT_CANARY'],
+      ['object', Object.freeze({ detail: 'SYNTHETIC_ABORT_CANARY' })],
+      ['hostile', Object.freeze({ toString() { throw new Error('reason must not be coerced'); },
+        toJSON() { throw new Error('reason must not be serialized'); } })],
+    ]) {
+      await t.test(`pre-abort ${reasonName} is bounded before network or showcase fallback`,{timeout:2000},async()=>{
+        reset();const controller=new AbortController();controller.abort(reason);
+        for (const url of [modelUrl, 'https://example.test/assets/brigantine.gltf']) {
+          await assert.rejects(load(url,{...enabled,signal:controller.signal}),error=>{
+            assert.ok(error instanceof Error);
+            assert.notStrictEqual(error, controller.signal.reason);
+            assert.equal(error.name,'GltfAdapterLoadError');
+            assert.equal(error.code,'aborted-or-timeout');
+            assert.equal(error.message,'glTF adapter loading failed: aborted-or-timeout.');
+            assert.equal(error.cause,undefined);
+            assert.deepEqual(Object.keys(error).sort(),['code','name']);
+            assert.equal(JSON.stringify(error).includes('SYNTHETIC_ABORT_CANARY'),false);
+            return true;
+          });
+        }
+        assert.equal(calls.length,0);
+      });
+    }
+    await t.test('disabled/absent pre-abort retains legacy reason identity',{timeout:2000},async()=>{
+      reset();const reason=new Error('SYNTHETIC_LEGACY_REASON');
+      const controller=new AbortController();controller.abort(reason);
+      for (const options of [{},{conversionEnabled:false}]) {
+        await assert.rejects(load(modelUrl,{...options,signal:controller.signal}),error=>error===reason);
+      }
+      assert.equal(calls.length,0);
     });
     await t.test('mid-acquisition abort stops an ignoring fetch without retry',{timeout:2000},async()=>{
       reset();const controller=new AbortController();respond=async()=>{controller.abort();return new Promise(()=>{});};
-      await assert.rejects(load(modelUrl,{...enabled,signal:controller.signal}));assert.equal(calls.length,1);
+      await assert.rejects(load(modelUrl,{...enabled,signal:controller.signal}),{name:'GltfAdapterLoadError',code:'aborted-or-timeout'});assert.equal(calls.length,1);
     });
     await t.test('bounded deadline stops an ignoring fetch without retry',{timeout:2000},async()=>{
       reset();respond=async()=>new Promise(()=>{});
-      await assert.rejects(load(modelUrl,{...enabled,timeoutMs:20}));assert.equal(calls.length,1);
+      await assert.rejects(load(modelUrl,{...enabled,timeoutMs:20}),{name:'GltfAdapterLoadError',code:'aborted-or-timeout'});assert.equal(calls.length,1);
     });
     await t.test('entrypoint byte budget rejects and cancels stream before parsing',{timeout:2000},async()=>{
       reset();let cancelled=false;
