@@ -41,9 +41,9 @@ export async function createStudyRuntime({canvas,modelUrl,signal,onHintChange}={
   combined.addEventListener('abort',destroy,{once:true});
   const draw=()=>{
     if(!ready || disposed || canvas.clientWidth<=0 || canvas.clientHeight<=0)return;
-    const scale=Math.min(2,globalThis.devicePixelRatio||1);
-    const width=Math.max(1,Math.min(1440,Math.round(canvas.clientWidth*scale)));
-    const height=Math.max(1,Math.min(1440,Math.round(width*canvas.clientHeight/canvas.clientWidth)));
+    const scale=Math.min(2,globalThis.devicePixelRatio||1,1440/canvas.clientWidth,1440/canvas.clientHeight);
+    const width=Math.max(1,Math.round(canvas.clientWidth*scale));
+    const height=Math.max(1,Math.round(canvas.clientHeight*scale));
     if(canvas.width!==width)canvas.width=width;if(canvas.height!==height)canvas.height=height;
     const chosen=toggles.fibres?fibred:mesh;
     renderer.render({vertices:chosen.vertices,texcoords:chosen.texcoords,...(toggles.materials?{surfaces:chosen.surfaces}:{}),camera:camera.read(),water:false});
