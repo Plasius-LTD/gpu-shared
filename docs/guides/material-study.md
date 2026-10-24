@@ -27,6 +27,12 @@ container changes; call `destroy()` during teardown. `update()` rejects overlapp
 changes, so await or debounce control updates. Aborting/destroying releases input,
 timers and GPU resources, including late initialization resources.
 
+The drawing buffer uses one scale for both CSS dimensions, capped at DPR 2 and
+1440 pixels on either edge. A 500 × 1000 CSS canvas at DPR 2 renders at 720 × 1440;
+rounding and the minimum one-pixel buffer can change the shorter edge by up to one
+pixel. Resizing retains the camera and renderer. Hidden or zero-sized canvases
+skip drawing and recover when the host next calls `resize()` with visible dimensions.
+
 The weathered preset uses 30% rope fray and 90% varnish wear. At full varnish wear,
 wood is uncoated; rope and metal are never coated. These are static authoring
 approximations, not gameplay or structural-damage simulation.

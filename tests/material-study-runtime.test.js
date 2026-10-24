@@ -50,3 +50,51 @@ test('bad URLs, cancelled loads and invalid geometry fail without a renderer',as
  s.deps.load=async()=>({...model,primitives:[]});await assert.rejects(createStudyRuntime({canvas:s.canvas,modelUrl:'https://example.test/wooden_crate_01.gltf'},s.deps),/geometry/);
  assert.equal(s.renderers.length,0);
 });
+
+test('resolution caps preserve portrait and landscape proportions without replacing resources',async t=>{
+ const previous=Object.getOwnPropertyDescriptor(globalThis,'devicePixelRatio');
+ t.after(()=>{if(previous)Object.defineProperty(globalThis,'devicePixelRatio',previous);else delete globalThis.devicePixelRatio;});
+ Object.defineProperty(globalThis,'devicePixelRatio',{configurable:true,writable:true,value:2});
+ const s=setup();s.canvas.clientWidth=500;s.canvas.clientHeight=1000;
+ const study=await createStudyRuntime({canvas:s.canvas,modelUrl:'https://example.test/wooden_crate_01.gltf'},s.deps);
+ t.after(()=>study.destroy());
+ assert.deepEqual([s.canvas.width,s.canvas.height],[720,1440]);
+ const camera=s.frames[0].camera;
+ for(const [width,height,dpr,expected] of [
+  [700,768,2,[1313,1440]], [1000,500,2,[1440,720]],
+  [700,700,2,[1400,1400]], [800,500,1,[800,500]],
+  [800,500,3,[1440,900]], [500,1000,1,[500,1000]],
+ ]) {
+  s.canvas.clientWidth=width;s.canvas.clientHeight=height;globalThis.devicePixelRatio=dpr;
+  study.resize();
+  assert.deepEqual([s.canvas.width,s.canvas.height],expected,`${width}x${height} at DPR${dpr}`);
+  assert.equal(s.frames.at(-1).camera,camera);
+ }
+ for(const dpr of [0.75,1,2,4])for(const [width,height] of [[500,1000],[1000,500],[700,768],[700,700],[1,100000],[100000,1]]) {
+  s.canvas.clientWidth=width;s.canvas.clientHeight=height;globalThis.devicePixelRatio=dpr;
+  study.resize();
+  assert.ok(s.canvas.width>=1 && s.canvas.width<=1440);
+  assert.ok(s.canvas.height>=1 && s.canvas.height<=1440);
+  // Compare the shorter edge with the aspect implied by the longer edge;
+  // allow one pixel for rounding and the minimum one-pixel buffer size.
+  if(width<=height)assert.ok(Math.abs(s.canvas.width-s.canvas.height*width/height)<=1);
+  else assert.ok(Math.abs(s.canvas.height-s.canvas.width*height/width)<=1);
+  assert.equal(s.frames.at(-1).camera,camera);
+ }
+ assert.equal(s.renderers.length,1);assert.equal(s.cameras.length,1);
+ assert.equal(s.renderers[0].destroyed,0);assert.equal(s.cameras[0].destroyed,0);
+});
+
+test('hidden material canvases skip drawing and recover at the current orientation',async t=>{
+ const s=setup(),study=await createStudyRuntime({canvas:s.canvas,modelUrl:'https://example.test/wooden_crate_01.gltf'},s.deps);
+ t.after(()=>study.destroy());
+ const before=s.frames.length,buffer=[s.canvas.width,s.canvas.height],camera=s.frames[0].camera;
+ for(const [width,height] of [[0,500],[800,0],[0,0]]) {
+  s.canvas.clientWidth=width;s.canvas.clientHeight=height;
+  study.resize();s.cameras[0].onChange();
+  assert.equal(s.frames.length,before);assert.deepEqual([s.canvas.width,s.canvas.height],buffer);
+ }
+ s.canvas.clientWidth=500;s.canvas.clientHeight=1000;study.resize();
+ assert.equal(s.frames.length,before+1);assert.equal(s.frames.at(-1).camera,camera);
+ assert.equal(s.renderers.length,1);assert.equal(s.cameras.length,1);
+});

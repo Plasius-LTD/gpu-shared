@@ -19,3 +19,20 @@ the family-owned 3D harbor/showcase runtime.
 - Product Studio mode starts from a host-safe wavefront render budget and
   requires callers to opt into higher `width`, `height`, or `maxDepth` values
   deliberately.
+
+## Material-study sizing correction (Task #145)
+
+The isolated material study retains the ownership boundary in ADR-0013. Its
+drawing buffer uses a common scale limited by DPR 2 and both 1440-pixel edge
+budgets. Independent edge clipping distorts portrait views; changing the
+renderer projection would also change every consumer. Correct sizing belongs in
+this runtime, with no renderer or camera replacement on resize. Integer rounding
+and the one-pixel minimum allow at most one pixel of shorter-edge error.
+
+Regression tests cover portrait/landscape/square/extreme dimensions, fractional
+and high DPR, orientation changes and hidden-canvas recovery. This is an
+implementation correction with no API or package-boundary change. The host
+continues to evaluate `gpu-demo.scene-fidelity.enabled` and its route capability;
+stored disable/rollback prevents subsequent mounts. Sizing remains unconditional
+for admitted runtimes. Release through package main/production `cd.yml`; site
+Task #2300 owns published-version adoption and responsive visual qualification.

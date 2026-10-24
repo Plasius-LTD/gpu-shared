@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Fixed**
-  - (placeholder)
+  - Preserve material-study canvas proportions when portrait or landscape views reach the 1440-pixel drawing-buffer cap, without replacing camera or renderer resources.
 
 - **Security**
   - (placeholder)
