@@ -11,6 +11,20 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.3.4] - 2026-10-26
+
+- **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
   - Roll back Product Studio startup failures, release acquired renderers exactly once, preserve caller host classes, and fence superseded mounts and snapshot hooks.
 
 - **Security**
@@ -955,3 +969,4 @@ All notable changes to this project will be documented in this file.
 [1.3.1]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.3.1
 [1.3.2]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.3.2
 [1.3.3]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.3.3
+[1.3.4]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.3.4
