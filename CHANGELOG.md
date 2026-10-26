@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Fixed**
-  - (placeholder)
+  - Roll back Product Studio startup failures, release acquired renderers exactly once, preserve caller host classes, and fence superseded mounts and snapshot hooks.
 
 - **Security**
   - (placeholder)

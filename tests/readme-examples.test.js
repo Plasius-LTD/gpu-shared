@@ -16,15 +16,16 @@ test("Getting-started scene loads generated geometry, preserves materials and re
     const entry = pathToFileURL(path.join(root, "src/index.js")).href;
     writeFileSync(path.join(directory, "shared.mjs"), `
       import { mountGpuProductStudio as mount } from ${JSON.stringify(entry)};
-      export const calls = { destroy: 0, render: 0 };
+      export const calls = { allocated: 0, destroy: 0, render: 0 };
       export async function mountGpuProductStudio(options) {
         return mount({ ...options, __lightingLoader: async () => null,
           __rendererLoader: async () => ({
             async createWavefrontPathTracingComputeRenderer(settings) {
               calls.options = settings;
-              if (process.env.SCENE_FAILURE) throw new Error("GPU unavailable");
+              if (process.env.SCENE_FAILURE === "init") throw new Error("GPU unavailable");
+              calls.allocated++;
               return {
-                renderOnce() { calls.render++; return {}; },
+                renderOnce() { calls.render++; if (process.env.SCENE_FAILURE === "draw") throw new Error("GPU unavailable"); return {}; },
                 destroy() { calls.destroy++; },
               };
             },
@@ -39,7 +40,12 @@ test("Getting-started scene loads generated geometry, preserves materials and re
       import { calls } from "./shared.mjs";
       globalThis.HTMLElement = class {};
       const root = Object.assign(new HTMLElement(), {
-        innerHTML: "", children: [], classList: { add() {}, remove() {} },
+        innerHTML: "<p>original host</p>", children: [], classList: {
+          values: new Set(["caller-owned"]),
+          add(value) { this.values.add(value); },
+          remove(value) { this.values.delete(value); },
+          contains(value) { return this.values.has(value); },
+        },
         appendChild(child) { this.children.push(child); },
         replaceChildren() { this.children = []; },
       });
@@ -66,7 +72,8 @@ test("Getting-started scene loads generated geometry, preserves materials and re
       assert.equal(revoked, 1, "Release the generated Blob after loading on either path");
       if (process.env.SCENE_FAILURE) {
         assert.match(status.textContent, /GPU unavailable/);
-        assert.equal(root.children.length, 0);
+        assert.equal(root.innerHTML, "<p>original host</p>");
+        assert.deepEqual([...root.classList.values], ["caller-owned"]);
       } else {
         assert.equal(calls.render, 1);
         assert.match(status.textContent, /submitted/i);
@@ -74,9 +81,11 @@ test("Getting-started scene loads generated geometry, preserves materials and re
       }
       scene.dispose();
       scene.dispose();
-      assert.equal(calls.destroy, process.env.SCENE_FAILURE ? 0 : 1);
+      assert.equal(calls.allocated, process.env.SCENE_FAILURE === "init" ? 0 : 1);
+      assert.equal(calls.destroy, calls.allocated);
+      assert.deepEqual([...root.classList.values], ["caller-owned"]);
     `);
-    for (const failure of ["", "init"]) {
+    for (const failure of ["", "init", "draw"]) {
       const result = spawnSync(process.execPath, [path.join(directory, "run.mjs")], {
         cwd: root, encoding: "utf8", timeout: 30000,
         env: { ...process.env, SCENE_FAILURE: failure },

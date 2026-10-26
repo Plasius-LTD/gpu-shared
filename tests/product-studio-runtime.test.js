@@ -117,6 +117,9 @@ function createFakeDocument() {
       remove(value) {
         this.values.delete(value);
       },
+      contains(value) {
+        return this.values.has(value);
+      },
     },
     getBoundingClientRect() {
       return { width: 960, height: 540 };
@@ -125,6 +128,11 @@ function createFakeDocument() {
       this.children.push(element);
     },
   };
+  let markup = root.innerHTML;
+  Object.defineProperty(root, "innerHTML", {
+    get() { return markup; },
+    set(value) { markup = value; root.children = []; },
+  });
   const document = {
     head,
     body: root,
@@ -467,5 +475,259 @@ test('actual Product Studio loader consumes enabled/disabled remote conversion d
     },{'gpu.model.conversion.enabled':enabled});
     assert.equal(result.model.importProfile,enabled?'gltf-static-resources-v1':undefined);
     assert.ok(uploaded.length>0);assert.equal(result.model.positions[0],10);result.destroy();
+  }
+});
+
+const studioClass = "plasius-product-studio-wavefront";
+
+function lifecycleFixture(overrides = {}) {
+  const { document, root } = createFakeDocument();
+  const calls = { allocated: 0, destroyed: 0, rendered: 0 };
+  return {
+    document, root, calls,
+    options: {
+      document, root,
+      __modelLoader: async () => createModelFixture(),
+      __lightingLoader: async () => null,
+      __rendererLoader: async () => ({
+        async createWavefrontPathTracingComputeRenderer() {
+          calls.allocated++;
+          return {
+            renderOnce() { calls.rendered++; return {}; },
+            destroy() { calls.destroyed++; },
+          };
+        },
+      }),
+      ...overrides,
+    },
+  };
+}
+
+function deferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+  return { promise, resolve, reject };
+}
+
+for (const stage of ["model", "pvox", "module", "lighting", "lighting-options", "renderer", "draw"]) {
+  test(`Product Studio rolls back ${stage} startup failure and permits retry`, async () => {
+    const fixture = lifecycleFixture();
+    const { options, root, calls } = fixture;
+    const failure = new Error(`synthetic ${stage} failure`);
+    const reject = async () => { throw failure; };
+    if (stage === "model") options.__modelLoader = reject;
+    if (stage === "pvox") {
+      options.productAssetRepresentation = "pvox";
+      options.__pvoxModelLoader = reject;
+    }
+    if (stage === "module") options.__rendererLoader = reject;
+    if (stage === "lighting") options.__lightingLoader = reject;
+    if (stage === "lighting-options") options.__lightingLoader = async () => ({
+      createWavefrontEnvironmentLightingOptions() { throw failure; },
+    });
+    if (stage === "renderer" || stage === "draw") options.__rendererLoader = async () => ({
+      async createWavefrontPathTracingComputeRenderer() {
+        if (stage === "renderer") throw failure;
+        calls.allocated++;
+        return {
+          renderOnce() { throw failure; },
+          destroy() { calls.destroyed++; },
+        };
+      },
+    });
+    await assert.rejects(mountGpuProductStudio(options), error => error === failure);
+    assert.equal(calls.destroyed, calls.allocated, "Every acquired renderer is released");
+    assert.equal(root.innerHTML, "<p>previous</p>");
+    assert.equal(root.children.length, 0);
+    assert.equal(root.classList.contains(studioClass), false);
+    const retry = await mountGpuProductStudio({ ...lifecycleFixture().options, document: fixture.document, root });
+    retry.destroy();
+    retry.destroy();
+    assert.equal(root.innerHTML, "<p>previous</p>");
+    assert.equal(root.classList.contains(studioClass), false);
+  });
+}
+
+test("Product Studio restores state after invalid representation, geometry and renderer contract failures", async () => {
+  for (const overrides of [
+    { productAssetRepresentation: "unknown" },
+    { __modelLoader: async () => ({ primitives: [] }) },
+    { __rendererLoader: async () => ({}) },
+  ]) {
+    const { root, calls, options } = lifecycleFixture(overrides);
+    await assert.rejects(mountGpuProductStudio(options));
+    assert.equal(root.innerHTML, "<p>previous</p>");
+    assert.equal(root.classList.contains(studioClass), false);
+    assert.equal(calls.allocated, 0);
+  }
+});
+
+test("Product Studio preserves caller classes and releases a successful renderer exactly once", async () => {
+  const { root, calls, options } = lifecycleFixture();
+  root.classList.add(studioClass);
+  root.classList.add("caller-owned");
+  const handle = await mountGpuProductStudio(options);
+  handle.destroy();
+  handle.destroy();
+  assert.equal(calls.destroyed, 1);
+  assert.equal(root.innerHTML, "<p>previous</p>");
+  assert.deepEqual([...root.classList.values], [studioClass, "caller-owned"]);
+});
+
+test("Product Studio cleanup errors preserve startup failure and do not skip host restoration", async () => {
+  const failure = new Error("first draw failed");
+  let destroyed = 0;
+  for (const drawFails of [true, false]) {
+    const { root, options } = lifecycleFixture({
+      __rendererLoader: async () => ({
+        async createWavefrontPathTracingComputeRenderer() {
+          return {
+            renderOnce() { if (drawFails) throw failure; return {}; },
+            destroy() { destroyed++; throw new Error("destroy failed"); },
+          };
+        },
+      }),
+    });
+    root.classList.add(studioClass);
+    if (drawFails) {
+      await assert.rejects(mountGpuProductStudio(options), error => error === failure);
+    } else {
+      const handle = await mountGpuProductStudio(options);
+      assert.throws(() => handle.destroy(), /destroy failed/);
+      assert.doesNotThrow(() => handle.destroy());
+    }
+    assert.equal(root.innerHTML, "<p>previous</p>");
+    assert.equal(root.classList.contains(studioClass), true);
+  }
+  assert.equal(destroyed, 2);
+});
+
+for (const stage of ["model", "renderer"]) {
+  test(`A superseded ${stage} acquisition cannot replace or destroy the current mount`, async () => {
+    const gate = deferred();
+    const acquired = deferred();
+    const fixture = lifecycleFixture();
+    const { root, document, options, calls } = fixture;
+    if (stage === "model") options.__modelLoader = () => { acquired.resolve(); return gate.promise; };
+    else options.__rendererLoader = async () => ({
+      createWavefrontPathTracingComputeRenderer() { acquired.resolve(); return gate.promise; },
+    });
+    const old = mountGpuProductStudio(options);
+    const rejected = assert.rejects(old, /superseded/);
+    await acquired.promise;
+    const next = lifecycleFixture();
+    const current = await mountGpuProductStudio({ ...next.options, root, document });
+    const canvas = root.children[0];
+    gate.resolve(stage === "model" ? createModelFixture() : {
+      renderOnce() { calls.rendered++; return {}; },
+      destroy() { calls.destroyed++; },
+    });
+    await rejected;
+    assert.equal(root.children[0], canvas);
+    assert.equal(root.classList.contains(studioClass), true);
+    assert.equal(calls.rendered, 0, "Obsolete mounts never submit a frame");
+    assert.equal(calls.destroyed, stage === "renderer" ? 1 : 0);
+    assert.equal(next.calls.destroyed, 0);
+    current.destroy();
+    assert.equal(next.calls.destroyed, 1);
+    assert.equal(root.innerHTML, "<p>previous</p>");
+  });
+}
+
+test("Destroying a replaced handle cannot restore obsolete DOM or snapshot hooks", async () => {
+  const previousWindow = globalThis.window;
+  const original = () => "caller snapshot";
+  globalThis.window = { render_game_to_text: original };
+  try {
+    const first = lifecycleFixture();
+    const old = await mountGpuProductStudio(first.options);
+    const next = lifecycleFixture();
+    const current = await mountGpuProductStudio({ ...next.options, root: first.root, document: first.document });
+    const snapshot = window.render_game_to_text;
+    old.destroy();
+    assert.equal(first.calls.destroyed, 1);
+    assert.equal(window.render_game_to_text, snapshot);
+    assert.equal(first.root.children[0], current.canvas);
+    current.destroy();
+    current.destroy();
+    assert.equal(next.calls.destroyed, 1);
+    assert.equal(window.render_game_to_text, original);
+    assert.equal(first.root.innerHTML, "<p>previous</p>");
+  } finally {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  }
+});
+
+test("Snapshot ownership across roots never revives a disposed runtime", async () => {
+  const previousWindow = globalThis.window;
+  globalThis.window = {};
+  try {
+    const first = await mountGpuProductStudio(lifecycleFixture().options);
+    const second = await mountGpuProductStudio(lifecycleFixture().options);
+    const currentSnapshot = window.render_game_to_text;
+    first.destroy();
+    assert.equal(window.render_game_to_text, currentSnapshot);
+    second.destroy();
+    assert.equal(Object.hasOwn(window, "render_game_to_text"), false);
+  } finally {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  }
+});
+
+test("Class cleanup failure cannot mask startup failure or skip renderer and markup cleanup", async () => {
+  const failure = new Error("original draw failure");
+  let destroyed = 0;
+  const { root, options } = lifecycleFixture({
+    __rendererLoader: async () => ({
+      async createWavefrontPathTracingComputeRenderer() {
+        return {
+          renderOnce() { throw failure; },
+          destroy() { destroyed++; },
+        };
+      },
+    }),
+  });
+  root.classList.remove = () => { throw new Error("class cleanup failed"); };
+  await assert.rejects(mountGpuProductStudio(options), error => error === failure);
+  assert.equal(destroyed, 1);
+  assert.equal(root.innerHTML, "<p>previous</p>");
+});
+
+test("Renderer disposal can reenter destroy without releasing resources twice", async () => {
+  let handle;
+  let destroyed = 0;
+  const { root, options } = lifecycleFixture({
+    __rendererLoader: async () => ({
+      async createWavefrontPathTracingComputeRenderer() {
+        return {
+          renderOnce() { return {}; },
+          destroy() { destroyed++; handle.destroy(); },
+        };
+      },
+    }),
+  });
+  handle = await mountGpuProductStudio(options);
+  handle.destroy();
+  assert.equal(destroyed, 1);
+  assert.equal(root.innerHTML, "<p>previous</p>");
+});
+
+test("Admitted enabled, disabled, unavailable and rollback snapshots retain unconditional cleanup", async () => {
+  for (const featureFlags of [
+    { enabled: { "gpu-demo.scene-fidelity.enabled": true } },
+    { enabled: { "gpu-demo.scene-fidelity.enabled": false } },
+    null,
+    { enabled: { "gpu-demo.scene-fidelity.enabled": false }, revision: "rollback" },
+  ]) {
+    const { root, calls, options } = lifecycleFixture();
+    const handle = await mountGpuProductStudio(options, featureFlags);
+    assert.equal(handle.state.featureFlags, featureFlags);
+    handle.destroy();
+    handle.destroy();
+    assert.equal(calls.destroyed, 1);
+    assert.equal(root.innerHTML, "<p>previous</p>");
   }
 });

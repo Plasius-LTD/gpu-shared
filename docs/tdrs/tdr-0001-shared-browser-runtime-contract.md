@@ -36,3 +36,22 @@ continues to evaluate `gpu-demo.scene-fidelity.enabled` and its route capability
 stored disable/rollback prevents subsequent mounts. Sizing remains unconditional
 for admitted runtimes. Release through package main/production `cd.yml`; site
 Task #2300 owns published-version adoption and responsive visual qualification.
+
+## Product Studio startup ownership (Task #160)
+
+[ADR-0021](../adrs/adr-0021-product-studio-startup-ownership.md) supplements the
+Product Studio boundary in ADR-0005. Failed acquisition or first draw releases
+owned renderers and restores the captured host markup/class ownership before
+rejecting with the original failure. Destroy is idempotent, attempts every
+cleanup step and then reports its first cleanup failure. Consumers own their
+visible error state and Blob URLs; they do not need a nonexistent failed handle.
+
+Each root has one mount owner. Replacement disposes the previous mount, fences
+late acquisition and preserves the newer canvas/snapshot. Snapshot hooks across
+roots skip disposed predecessors. Host rollout/capability evaluation stays
+external; cleanup remains unconditional for admitted resources, including
+rollout disable/unavailable/rollback states. Existing bounded loaders, renderer
+APIs and package dependencies are reused. Regression tests exercise these
+contracts through public entries and the README example. Release only through
+protected PR/exact-main CI and main/production cd.yml; qualify registry bytes and
+installed ESM/CJS consumers before closure. No site adoption is claimed here.
