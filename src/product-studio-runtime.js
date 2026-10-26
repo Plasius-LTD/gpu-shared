@@ -10,6 +10,9 @@ const DEFAULT_TARGET_SIZE = 2.25;
 const DEFAULT_RENDER_WIDTH = 640;
 const DEFAULT_RENDER_HEIGHT = 360;
 const DEFAULT_RENDER_MAX_DEPTH = 2;
+const STUDIO_CLASS = "plasius-product-studio-wavefront";
+const productStudioOwners = new WeakMap();
+const snapshotHookStates = new WeakMap();
 
 function isFiniteVector(value) {
   return (
@@ -377,8 +380,9 @@ function installSnapshotHook(state) {
   if (typeof globalThis.window === "undefined") {
     return () => {};
   }
-  const previous = globalThis.window.render_game_to_text;
-  globalThis.window.render_game_to_text = () =>
+  const windowRef = globalThis.window;
+  const previous = windowRef.render_game_to_text;
+  const snapshot = () =>
     JSON.stringify({
       surface: "gpu-product-studio-wavefront",
       model: state.modelName,
@@ -392,12 +396,19 @@ function installSnapshotHook(state) {
       requiresMeshBvhForDisplayQuality: state.requiresMeshBvhForDisplayQuality,
       renderer: state.rendererStats,
     });
+  const ownership = { active: true, previous };
+  snapshotHookStates.set(snapshot, ownership);
+  windowRef.render_game_to_text = snapshot;
   return () => {
-    if (previous === undefined) {
-      delete globalThis.window.render_game_to_text;
-    } else {
-      globalThis.window.render_game_to_text = previous;
+    ownership.active = false;
+    if (windowRef.render_game_to_text !== snapshot) return;
+    let restore = previous;
+    // Another root can outlive this one; never resurrect a disposed snapshot.
+    while (typeof restore === "function" && snapshotHookStates.get(restore)?.active === false) {
+      restore = snapshotHookStates.get(restore).previous;
     }
+    if (restore === undefined) delete windowRef.render_game_to_text;
+    else windowRef.render_game_to_text = restore;
   };
 }
 
@@ -435,111 +446,149 @@ export async function mountGpuProductStudio(options = {}, featureFlags = null) {
   const root = resolveRoot(options);
   const documentRef = options.document ?? root.ownerDocument ?? globalThis.document;
   ensureStyles(documentRef);
+  productStudioOwners.get(root)?.cleanup();
   const previousMarkup = root.innerHTML;
-  root.innerHTML = "";
-  root.classList?.add?.("plasius-product-studio-wavefront");
+  const hadStudioClass = root.classList?.contains?.(STUDIO_CLASS) ?? false;
+  let renderer = null;
+  let restoreSnapshotHook = null;
+  let closed = false;
+  const owner = { cleanup };
+  productStudioOwners.set(root, owner);
 
-  const canvas = documentRef.createElement("canvas");
-  canvas.dataset.plasiusGpuProductStudio = "wavefront";
-  root.appendChild(canvas);
-
-  const modelLoader =
-    typeof options.__modelLoader === "function" ? options.__modelLoader : loadGltfModel;
-  const rendererLoader =
-    typeof options.__rendererLoader === "function"
-      ? options.__rendererLoader
-      : () => import("@plasius/gpu-renderer");
-  const assetUrl = options.productAssetUrl ?? options.assetUrl ?? DEFAULT_PRODUCT_ASSET_URL;
-  const requestedRepresentation = options.productAssetRepresentation
-    ?? options.assetRepresentation;
-  if (
-    requestedRepresentation !== undefined
-    && requestedRepresentation !== "gltf"
-    && requestedRepresentation !== "pvox"
-  ) {
-    throw new Error("Product Studio asset representation is unsupported.");
-  }
-  const pvoxAsset = requestedRepresentation === "pvox"
-    || (requestedRepresentation === undefined && isPvoxAssetUrl(assetUrl));
-  const pvoxModelLoader = typeof options.__pvoxModelLoader === "function"
-    ? options.__pvoxModelLoader
-    : loadPvoxModel;
-  const model = pvoxAsset
-    ? await pvoxModelLoader(assetUrl, {
-        expectedArtifactSha256: options.productAssetSha256,
-        name: options.productAssetName,
-        signal: options.signal,
-        fetch: options.__fetch,
-        moduleLoader: options.__voxelLoader,
-        maximumFaces: options.productMaximumSurfaceFaces,
-      })
-    : await modelLoader(assetUrl, {
-        ...options.gltfLoadOptions,
-        signal: options.signal ?? options.gltfLoadOptions?.signal,
-        conversionEnabled: isModelConversionEnabled(featureFlags),
-      });
-  const meshes = createProductStudioMeshes(model, {
-    targetCenter: options.targetCenter,
-    targetSize: options.targetSize,
-  });
-  const rendererModule = await rendererLoader();
-  if (typeof rendererModule.createWavefrontPathTracingComputeRenderer !== "function") {
-    throw new Error("Product Studio renderer loader must provide createWavefrontPathTracingComputeRenderer.");
+  function assertCurrent() {
+    if (closed || productStudioOwners.get(root) !== owner) {
+      throw new Error("Product Studio mount was superseded.");
+    }
   }
 
-  const size = resolveRenderSize(options);
-  const lightingOptions = await resolveWavefrontLightingOptions(options);
-  const renderer = await rendererModule.createWavefrontPathTracingComputeRenderer({
-    canvas,
-    width: size.width,
-    height: size.height,
-    maxDepth: Number.isFinite(options.maxDepth) ? options.maxDepth : DEFAULT_RENDER_MAX_DEPTH,
-    tileSize: Number.isFinite(options.tileSize) ? options.tileSize : 128,
-    samplesPerPixel: Number.isFinite(options.samplesPerPixel) ? options.samplesPerPixel : 8,
-    denoise: options.denoise !== false,
-    presentationOutput: options.presentationOutput,
-    displayQuality: true,
-    meshes,
-    camera: {
-      position: [0, 1.12, 5.05],
-      target: [0, 0.72, 0],
-      up: [0, 1, 0],
-      fovYDegrees: 43,
-    },
-    featureFlags,
-    ...lightingOptions,
-  });
-  const rendererStats = renderer.renderOnce();
-  const state = Object.freeze({
-    featureFlags,
-    modelName: model.name,
-    sourceTriangleCount: countSourceTriangles(model),
-    meshCount: meshes.length,
-    sourceRepresentation: model.representation === "pvox" ? "pvox" : "gltf",
-    compatibilityProjection: model.compatibilityProjection ?? null,
-    sourceArtifactSha256: model.sourceArtifactSha256 ?? null,
-    geometryMode: model.representation === "pvox"
-      ? "pvox-derived-surface-cache-display-quality"
-      : "mesh-bvh-display-quality",
-    requiresTriangleMeshRenderer: true,
-    displayQuality: true,
-    requiresMeshBvhForDisplayQuality: true,
-    rendererStats,
-  });
-  const restoreSnapshotHook = installSnapshotHook(state);
+  function cleanup(suppressErrors = false) {
+    closed = true;
+    const errors = [];
+    const release = action => {
+      try { action(); } catch (error) { errors.push(error); }
+    };
+    // Take each resource before calling user/renderer code, including reentrant destroy.
+    const snapshot = restoreSnapshotHook;
+    restoreSnapshotHook = null;
+    if (snapshot) release(snapshot);
+    const acquiredRenderer = renderer;
+    renderer = null;
+    if (acquiredRenderer) release(() => acquiredRenderer.destroy());
+    if (productStudioOwners.get(root) === owner) {
+      productStudioOwners.delete(root);
+      if (!hadStudioClass) release(() => root.classList?.remove?.(STUDIO_CLASS));
+      release(() => { root.innerHTML = previousMarkup; });
+    }
+    if (!suppressErrors && errors.length) throw errors[0];
+  }
 
-  return Object.freeze({
-    state,
-    model,
-    productModel: model,
-    canvas,
-    renderer,
-    meshes,
-    destroy() {
-      restoreSnapshotHook();
-      renderer.destroy();
-      root.classList?.remove?.("plasius-product-studio-wavefront");
-      root.innerHTML = previousMarkup;
-    },
-  });
+  try {
+    root.innerHTML = "";
+    root.classList?.add?.(STUDIO_CLASS);
+    const canvas = documentRef.createElement("canvas");
+    canvas.dataset.plasiusGpuProductStudio = "wavefront";
+    root.appendChild(canvas);
+
+    const modelLoader =
+      typeof options.__modelLoader === "function" ? options.__modelLoader : loadGltfModel;
+    const rendererLoader =
+      typeof options.__rendererLoader === "function"
+        ? options.__rendererLoader
+        : () => import("@plasius/gpu-renderer");
+    const assetUrl = options.productAssetUrl ?? options.assetUrl ?? DEFAULT_PRODUCT_ASSET_URL;
+    const requestedRepresentation = options.productAssetRepresentation
+      ?? options.assetRepresentation;
+    if (
+      requestedRepresentation !== undefined
+      && requestedRepresentation !== "gltf"
+      && requestedRepresentation !== "pvox"
+    ) {
+      throw new Error("Product Studio asset representation is unsupported.");
+    }
+    const pvoxAsset = requestedRepresentation === "pvox"
+      || (requestedRepresentation === undefined && isPvoxAssetUrl(assetUrl));
+    const pvoxModelLoader = typeof options.__pvoxModelLoader === "function"
+      ? options.__pvoxModelLoader
+      : loadPvoxModel;
+    const model = pvoxAsset
+      ? await pvoxModelLoader(assetUrl, {
+          expectedArtifactSha256: options.productAssetSha256,
+          name: options.productAssetName,
+          signal: options.signal,
+          fetch: options.__fetch,
+          moduleLoader: options.__voxelLoader,
+          maximumFaces: options.productMaximumSurfaceFaces,
+        })
+      : await modelLoader(assetUrl, {
+          ...options.gltfLoadOptions,
+          signal: options.signal ?? options.gltfLoadOptions?.signal,
+          conversionEnabled: isModelConversionEnabled(featureFlags),
+        });
+    assertCurrent();
+    const meshes = createProductStudioMeshes(model, {
+      targetCenter: options.targetCenter,
+      targetSize: options.targetSize,
+    });
+    const rendererModule = await rendererLoader();
+    assertCurrent();
+    if (typeof rendererModule.createWavefrontPathTracingComputeRenderer !== "function") {
+      throw new Error("Product Studio renderer loader must provide createWavefrontPathTracingComputeRenderer.");
+    }
+
+    const size = resolveRenderSize(options);
+    const lightingOptions = await resolveWavefrontLightingOptions(options);
+    assertCurrent();
+    renderer = await rendererModule.createWavefrontPathTracingComputeRenderer({
+      canvas,
+      width: size.width,
+      height: size.height,
+      maxDepth: Number.isFinite(options.maxDepth) ? options.maxDepth : DEFAULT_RENDER_MAX_DEPTH,
+      tileSize: Number.isFinite(options.tileSize) ? options.tileSize : 128,
+      samplesPerPixel: Number.isFinite(options.samplesPerPixel) ? options.samplesPerPixel : 8,
+      denoise: options.denoise !== false,
+      presentationOutput: options.presentationOutput,
+      displayQuality: true,
+      meshes,
+      camera: {
+        position: [0, 1.12, 5.05],
+        target: [0, 0.72, 0],
+        up: [0, 1, 0],
+        fovYDegrees: 43,
+      },
+      featureFlags,
+      ...lightingOptions,
+    });
+    assertCurrent();
+    const rendererStats = renderer.renderOnce();
+    assertCurrent();
+    const state = Object.freeze({
+      featureFlags,
+      modelName: model.name,
+      sourceTriangleCount: countSourceTriangles(model),
+      meshCount: meshes.length,
+      sourceRepresentation: model.representation === "pvox" ? "pvox" : "gltf",
+      compatibilityProjection: model.compatibilityProjection ?? null,
+      sourceArtifactSha256: model.sourceArtifactSha256 ?? null,
+      geometryMode: model.representation === "pvox"
+        ? "pvox-derived-surface-cache-display-quality"
+        : "mesh-bvh-display-quality",
+      requiresTriangleMeshRenderer: true,
+      displayQuality: true,
+      requiresMeshBvhForDisplayQuality: true,
+      rendererStats,
+    });
+    restoreSnapshotHook = installSnapshotHook(state);
+    return Object.freeze({
+      state,
+      model,
+      productModel: model,
+      canvas,
+      renderer,
+      meshes,
+      destroy() { cleanup(); },
+    });
+  } catch (error) {
+    cleanup(true);
+    throw error;
+  }
 }

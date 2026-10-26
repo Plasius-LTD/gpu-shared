@@ -1,5 +1,7 @@
 # ADR Index
 
+- [ADR-0021 Product Studio startup ownership](./adr-0021-product-studio-startup-ownership.md)
+
 - [ADR-0020 Bounded adapter preflight cancellation](./adr-0020-bounded-adapter-preflight-cancellation.md)
 
 - [ADR-0019 Explicit quarantine-group selection](./adr-0019-explicit-quarantine-group-selection.md)

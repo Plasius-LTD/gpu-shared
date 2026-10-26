@@ -51,3 +51,9 @@ of truth for live exposure and rollback in `plasius-ltd-site`.
 
 - Add progressive accumulation controls once the renderer exposes a full-frame
   accumulation history suitable for interactive convergence.
+
+## Lifecycle supplement
+
+[ADR-0021](adr-0021-product-studio-startup-ownership.md) defines transactional
+startup cleanup, root ownership and idempotent disposal for Task #160 without
+changing the loading, scene or renderer delegation decisions above.

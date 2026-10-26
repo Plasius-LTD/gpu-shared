@@ -114,7 +114,6 @@ try {
   status.textContent = "Gallery submitted. The image appears when the GPU finishes.";
 } catch (error) {
   dispose();
-  root.replaceChildren();
   status.textContent = error instanceof Error ? error.message : "Unable to render the gallery.";
 } finally {
   URL.revokeObjectURL(assetUrl);
@@ -137,6 +136,13 @@ This entry submits one bounded render with a fixed studio camera. It does not
 attach camera controls or progressively refine. Its promise resolves after
 submission, so the status deliberately does not claim GPU completion. The Blob
 URL is released after loading, and `dispose()` releases the scene when unmounted.
+A rejected mount releases any acquired renderer and restores the host markup and
+pre-existing classes before rejecting. The caller can show the failure without
+needing a handle from a failed mount. Destroy is idempotent; a new mount on the
+same root supersedes its predecessor, and late startup work cannot replace the
+newer scene. Cleanup still runs if renderer destruction throws; startup preserves
+the original error, while explicit destroy reports its first cleanup error after
+attempting the remaining restoration.
 For larger scenes, export a glTF/GLB file instead of building a base64 buffer in
 JavaScript. The small in-memory geometry above is just a self-contained starting
 point. Normals are omitted to use flat facets.
