@@ -9,9 +9,15 @@ async function qualityContract() {
   inspection.setPaused(true);inspection.destroy();
 }
 void qualityContract;
-const scene: Promise<SceneInspection> = createSceneInspection({ canvas, enabled: true,
+const scene: Promise<SceneInspection> = createSceneInspection({ canvas, enabled: true, instancing: true, memoryBudgetBytes: 1024 ** 3,
+  onProgress(progress) { const bytes: number | undefined = progress.allocations?.allocatedBytes; void bytes; },
   models: [{ modelUrl: 'https://example.test/scene.gltf', integrity: {}, anchor: [0, 0, 0], size: 2 }] });
-void scene;
+void scene.then(value => {
+  const mode: "instanced" | "expanded" = value.geometryMode;
+  const count: number = value.instanceCount;
+  const bytes: number | undefined = value.getAllocationSnapshot()?.allocatedBytes;
+  return { mode, count, bytes };
+});
 
 // The loader's migration policy remains available without a renderer import.
 import { loadGltfModel as migrationLoader } from "../src/index.js";

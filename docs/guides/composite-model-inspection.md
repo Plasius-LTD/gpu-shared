@@ -38,18 +38,51 @@ Geometry, normals and authored texture/material properties are retained.
 The neutral ground receives shared shadows. The default camera is shown above;
 it can be reset with Home or `inspection.reset()`.
 
-Supply 1–6 models. Aggregate geometry, including the two ground triangles, must
-fit within 500,000 triangles. Decoded texture buffers retained by the material
-maps must fit within 128 MiB; this is an admission limit, not a total browser or
-GPU memory guarantee. Loading is sequential and abortable. The existing
-60-second inspection deadline covers the entire scene load; per-GPU waits also
-have deadlines. Integrity is mandatory for each model and its external resources.
-Host applications should separately bound downloads and use reviewed inputs.
+Supply 1–128 placements from at most six distinct model URLs. Repeated URLs
+must have identical integrity manifests and are loaded and decoded once per scene.
+Install `@plasius/gpu-renderer` 0.2.57 or newer on the compatible 0.2 line.
+Use `instancing: true` to retain one copy of each source mesh and its acceleration
+structure on the GPU. Placements become affine instance records and a top-level
+acceleration structure; different sizes and rotations still share geometry.
+The default expanded path preserves existing scene and emissive-material behavior.
+Instancing currently supports static, non-emissive meshes; unsupported emissive
+instances fail explicitly instead of silently losing their lighting.
 
-The returned object also reports `modelCount` and `textureBytes`. Its triangle
-and primitive counts include the ground. Keep each source's attribution and
-licence visible in the host. These are static inspection scenes; source animation,
-physical scale accuracy and adaptive per-pixel sampling are not implied.
+```js
+const crowd = await createSceneInspection({
+  canvas, enabled: true, instancing: true,
+  models: Array.from({ length: 100 }, (_, i) => ({
+    modelUrl: astronautUrl, integrity: astronautManifest,
+    anchor: [(i % 10 - 4.5) * 1.75, 0, (Math.floor(i / 10) - 4.5) * 1.75],
+    size: 1.8, yaw: i * 0.618,
+  })),
+  camera: { eye: [25, 22, 33], target: [0, 1, 0], fov: 42 },
+  memoryBudgetBytes: 1024 ** 3,
+});
+console.log(crowd.sourceCount, crowd.instanceCount, crowd.getAllocationSnapshot());
+```
+
+GPU admission uses the renderer's device limits and requested resource allocation
+bytes, with a configurable `memoryBudgetBytes` (default 1 GiB). There is no fixed
+triangle-count ceiling. Shared geometry is counted once; instance records, TLAS,
+material textures, accumulation, denoising, queues and readbacks consume their
+own allocations. WebGPU does not expose reliable available physical VRAM. These
+figures exclude driver/pipeline overhead and resources owned outside this renderer.
+A fitting byte budget cannot guarantee GPU execution time or prevent device loss.
+
+Decoded CPU texture buffers remain bounded to 128 MiB per scene, independently
+of the GPU budget. Loading is sequential and abortable. The existing 60-second
+inspection deadline covers scene loading; GPU waits also have deadlines. Integrity
+is mandatory for every external resource. Hosts should separately bound downloads,
+retain attribution, and provide retry/lower-quality controls after failure.
+
+The returned object reports `modelCount` (placements), `sourceCount`,
+`instanceCount` (mesh instances, including the ground), `geometryMode` and
+`textureBytes` (decoded CPU buffers). `triangleCount` and `primitiveCount` include
+the ground and describe unique geometry when instancing is enabled. Progress and
+`getAllocationSnapshot()` expose the renderer's current allocation report.
+These are static inspection scenes; source animation, physical scale accuracy
+and adaptive per-pixel sampling are not implied.
 
 See [single-model inspection](model-inspection.md) for the quality and lifecycle
 contract, including fixed sample counts, denoising and the native UHD pixel limit.

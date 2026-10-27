@@ -28,3 +28,5 @@
 - [ADR 0016: Composite model inspection](adr-0016-composite-model-inspection.md)
 
 - [ADR 0017: Gated glTF adapter migration](adr-0017-gltf-adapter-migration.md)
+
+- [ADR 0022: Instanced inspection and allocation budgets](adr-0022-instanced-inspection-and-allocation-budgets.md)
