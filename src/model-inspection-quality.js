@@ -12,8 +12,11 @@ export function inspectionQuality(input = {}, previous = defaults) {
 }
 
 /** Bound queued work without changing the requested image quality. One sample is indivisible. */
-export function inspectionBatchSize(settings, completedSamples) {
+export function inspectionBatchCapacity(settings) {
   const pixelBounces = settings.width * settings.height * settings.maxDepth;
-  const budgetedSamples = Math.max(1, Math.min(4, Math.floor(16 * 1024 * 1024 / pixelBounces)));
-  return Math.min(completedSamples === 0 ? 1 : budgetedSamples, settings.samplesPerPixel - completedSamples);
+  return Math.max(1, Math.min(4, Math.floor(16 * 1024 * 1024 / pixelBounces)));
+}
+
+export function inspectionBatchSize(settings, completedSamples) {
+  return Math.min(completedSamples === 0 ? 1 : inspectionBatchCapacity(settings), settings.samplesPerPixel - completedSamples);
 }

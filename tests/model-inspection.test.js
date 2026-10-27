@@ -9,7 +9,7 @@ const options = () => ({canvas:{width:640,height:480},modelUrl:url,
   enabled:true,integrity:{[url]:'sha256-'+'A'.repeat(43)+'='}});
 function fixture() {
   const calls=[];
-  const renderer={resetAccumulation:()=>calls.push('reset'),renderOnce:()=>calls.push('render'),updateCamera:c=>calls.push(c),
+  const renderer={resetAccumulation:()=>calls.push('reset'),renderOnce:quality=>{assert.ok(quality.samplesPerPixel<=calls.findLast(c=>c?.meshes).samplesPerPixel,'submitted batch exceeds allocated renderer capacity');calls.push('render');},updateCamera:c=>calls.push(c),
     device:{destroy:()=>calls.push('device.destroy'),queue:{onSubmittedWorkDone:async()=>{}}},destroy:()=>calls.push('destroy')};
   const deps={load:async(u,o)=>{calls.push(o);return {primitives:[{indices:[0,1,2]}]};},
     meshes:()=>[{id:1},{id:1000,material:{transmission:1}}],

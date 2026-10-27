@@ -15,7 +15,9 @@ fault or a guarantee against device loss.
 Use a conservative 16 × 1024 × 1024 pixel-bounce budget to choose each idle batch,
 floored to whole samples, clamped to one through four, and capped by samples
 remaining. A single sample is indivisible at this boundary; UHD can exceed the
-budget even at one sample. The first preview remains one sample. No requested
+budget even at one sample. The first preview remains one sample. Allocate the renderer with the idle batch
+capacity, since its per-frame override is capped by that allocation; do not use
+the preview size as its capacity. No requested
 resolution, bounce count, denoising option or total sample target is reduced.
 Wait for queue completion before progress advances and before the next batch.
 Retain cancellation, generation checks, camera ownership, timeout and explicit
