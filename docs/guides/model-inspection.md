@@ -65,3 +65,13 @@ Inspection accepts 1–500,000 triangles and bounds initialization/GPU waits to
 per-pixel sampling are not part of this entry. Mouse, touch and keyboard gestures
 are described in the [camera guide](https://github.com/Plasius-LTD/gpu-shared/blob/main/docs/guides/material-study.md#camera-and-accessibility).
 
+
+### Refinement work
+
+The preview traces one sample. Idle refinement submits up to four samples at a
+time, with smaller batches as resolution and bounce count increase. UHD at twelve
+bounces submits one sample at a time until the requested total is complete.
+Completed progress advances only after the GPU queue finishes that submission.
+This limits bursts of work; it does not reduce image quality or guarantee that
+every device can finish a high-resolution scene. Device loss and timeout still
+reach `onError`; dispose the failed runtime and create a new one on explicit retry.

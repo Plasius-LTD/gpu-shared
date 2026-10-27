@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { inspectionBatchSize, inspectionQuality } from '../src/model-inspection-quality.js';
 import { createInspectionRuntime } from '../src/model-inspection-runtime.js';
 import { createModelInspection, createSceneInspection } from '../src/model-inspection.js';
 
@@ -156,4 +157,39 @@ test('identical quality changes preserve completed history without rendering aga
   assert.equal(f.calls.filter(c=>c==='render').length,renders);
   assert.equal(f.calls.filter(c=>c==='reset').length,resets);
   runtime.destroy();
+});
+
+
+test('UHD at twelve bounces completes 256 samples in single-sample submissions',async(t)=>{
+  t.mock.timers.enable({apis:['setTimeout','Date']});
+  const f=fixture(),batches=[],progress=[];
+  f.renderer.renderOnce=quality=>batches.push(quality.samplesPerPixel);
+  const runtime=await createInspectionRuntime({...options(),width:3840,height:2160,
+    quality:{samplesPerPixel:256,maxDepth:12},onProgress:p=>progress.push(p)},f.deps);
+  for(let i=1;i<256;i++){
+    t.mock.timers.tick(200);
+    for(let j=0;j<15;j++)await Promise.resolve();
+    assert.equal(progress.at(-1).samples,i+1);
+  }
+  assert.deepEqual(batches,Array(256).fill(1));
+  assert.equal(progress.at(-1).phase,'complete');
+  assert.deepEqual([progress.at(-1).width,progress.at(-1).height,progress.at(-1).maxDepth],[3840,2160,12]);
+  t.mock.timers.tick(1000);
+  for(let j=0;j<15;j++)await Promise.resolve();
+  assert.equal(batches.length,256);
+  runtime.destroy();
+});
+
+
+test('batch budget scales with pixel count and depth without changing quality',()=>{
+  for(const [width,height,maxDepth,expected] of [
+    [800,600,6,4],[1920,1080,4,2],[1920,1080,8,1],[3840,2160,12,1],
+    [2160,3840,12,1],[1024,1024,4,4],[1025,1024,4,3],
+  ]){
+    const quality=inspectionQuality({width,height,maxDepth,samplesPerPixel:256});
+    assert.equal(inspectionBatchSize(quality,0),1);
+    assert.equal(inspectionBatchSize(quality,1),expected);
+    assert.equal(inspectionBatchSize(quality,255),1);
+    assert.equal(inspectionBatchSize(quality,256),0);
+  }
 });

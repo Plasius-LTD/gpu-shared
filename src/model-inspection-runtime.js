@@ -1,4 +1,4 @@
-import { inspectionQuality } from './model-inspection-quality.js';
+import { inspectionBatchSize, inspectionQuality } from './model-inspection-quality.js';
 
 /** Framework-independent inspection lifecycle; all rendering stays in gpu-renderer. */
 export async function createInspectionRuntime({ canvas, modelUrl, integrity, enabled,
@@ -47,7 +47,7 @@ export async function createInspectionRuntime({ canvas, modelUrl, integrity, ena
   async function allocate(settings) {
     destroyRenderer(renderer);renderer=undefined;
     const value=await wait(deps.renderer({canvas,meshes,...settings,
-      samplesPerPixel:4,progressive:true,displayQuality:true,tileSize:128,
+      samplesPerPixel:inspectionBatchSize(settings,0),progressive:true,displayQuality:true,tileSize:128,
       environmentPortalMode:'disabled',environmentPortals:[],
       environmentColor:[0.58,0.66,0.76,1],ambientColor:[0.04,0.046,0.052,1],
       environmentLighting:{horizonColor:[0.7,0.78,0.86,1],zenithColor:[0.18,0.24,0.34,1],
@@ -68,7 +68,7 @@ export async function createInspectionRuntime({ canvas, modelUrl, integrity, ena
         if(disposed) return;
         if(id!==generation) continue;
         if(renderedGeneration!==id){renderer.updateCamera(readCamera());renderer.resetAccumulation();samples=0;renderedGeneration=id;}
-        const batch=Math.min(samples===0?1:4,settings.samplesPerPixel-samples);
+        const batch=inspectionBatchSize(settings,samples);
         if(batch<1) return;
         progress(samples===0?'rendering':'refining');
         renderer.renderOnce({samplesPerPixel:batch});
