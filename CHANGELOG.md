@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.4.0] - 2026-10-27
+
+- **Added**
   - Opt-in shared-geometry scene instancing for up to 128 placements from six integrity-checked sources, with distinct source/placement/mesh-instance counts and GPU allocation reports.
 
 - **Changed**
@@ -985,3 +999,4 @@ All notable changes to this project will be documented in this file.
 [1.3.3]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.3.3
 [1.3.4]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.3.4
 [1.3.5]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.3.5
+[1.4.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.4.0
