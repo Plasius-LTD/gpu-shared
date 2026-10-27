@@ -118,10 +118,3 @@ Use Conventional Commits, e.g.:
 - Add a new ADR (do not rewrite accepted ADR history) for architectural changes.
 
 Thanks for contributing.
-
-## CI execution
-
-Repository-owned branch pushes validate on isolated GitHub-hosted runners. Main
-continues on the `Public CI - Quarantined` group; its workflow allowlist does not
-admit branch refs. The same tests, coverage, package/privacy and security gates
-apply to both routes. Package publication remains main/production `cd.yml`.

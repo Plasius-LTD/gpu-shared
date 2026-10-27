@@ -4,8 +4,6 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
-- Route repository branch CI to isolated GitHub-hosted runners while retaining the quarantined main runner group and all quality gates.
-
 - **Added**
   - Opt-in shared-geometry scene instancing for up to 128 placements from six integrity-checked sources, with distinct source/placement/mesh-instance counts and GPU allocation reports.
 

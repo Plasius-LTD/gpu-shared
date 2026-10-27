@@ -14,7 +14,9 @@ jobs:
   trusted_head:
     name: Trusted head admission
     if: ${{ github.event_name == 'push' }}
-    runs-on: ${{ github.ref == 'refs/heads/main' && fromJSON('{"group":"Public CI - Quarantined","labels":["self-hosted","Linux","X64"]}') || 'ubuntu-latest' }}
+    runs-on:
+      group: Public CI - Quarantined
+      labels: [self-hosted, Linux, X64]
     timeout-minutes: 2
     permissions: {}
     steps:
@@ -23,7 +25,9 @@ jobs:
 
   build-test:
     needs: trusted_head
-    runs-on: ${{ github.ref == 'refs/heads/main' && fromJSON('{"group":"Public CI - Quarantined","labels":["self-hosted","Linux","X64"]}') || 'ubuntu-latest' }}
+    runs-on:
+      group: Public CI - Quarantined
+      labels: [self-hosted, Linux, X64]
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -139,7 +143,9 @@ jobs:
   public_artifact_integrity:
     name: Public artifact integrity
     needs: trusted_head
-    runs-on: ${{ github.ref == 'refs/heads/main' && fromJSON('{"group":"Public CI - Quarantined","labels":["self-hosted","Linux","X64"]}') || 'ubuntu-latest' }}
+    runs-on:
+      group: Public CI - Quarantined
+      labels: [self-hosted, Linux, X64]
     timeout-minutes: 10
     permissions:
       contents: read
