@@ -11,6 +11,20 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.3.5] - 2026-10-27
+
+- **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
   - Bound model and composite inspection batches by resolution and bounce count; UHD at twelve bounces refines one sample per submission while preserving the full requested sample target and native image size.
 
 - **Security**
@@ -970,3 +984,4 @@ All notable changes to this project will be documented in this file.
 [1.3.2]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.3.2
 [1.3.3]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.3.3
 [1.3.4]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.3.4
+[1.3.5]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.3.5
