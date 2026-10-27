@@ -36,7 +36,10 @@ export async function mountInspection(options) {
 }
 ```
 
-`onProgress` receives `{ phase, samples, target, width, height, maxDepth, denoise }`.
+`onProgress` receives `{ phase, samples, target, width, height, maxDepth, denoise, allocations }`.
+`allocations` and `getAllocationSnapshot()` report requested renderer-owned GPU
+resource bytes, not physical VRAM. Set `memoryBudgetBytes` at creation to choose
+a positive byte budget (default 1 GiB); device limits also apply.
 Samples count GPU-completed work. `onError` reports failures after initialization;
 initialization errors reject the returned promise. `onHintChange` controls a brief
 camera hint; the host supplies permanent accessible instructions and error/retry UI.
@@ -60,8 +63,8 @@ identical settings preserve it. `setPaused()` retains completed history, `reset(
 restarts refinement, and `destroy()` is safe to call more than once. Resize the
 render target explicitly through `setQuality`; keep the displayed aspect ratio.
 
-Inspection accepts 1–500,000 triangles and bounds initialization/GPU waits to
-60 seconds. It renders static poses: source skinning/animation playback and adaptive
+Inspection requires nonempty valid geometry and uses GPU resource bytes and
+device limits for admission. Initialization/GPU waits are bounded to 60 seconds. It renders static poses: source skinning/animation playback and adaptive
 per-pixel sampling are not part of this entry. Mouse, touch and keyboard gestures
 are described in the [camera guide](https://github.com/Plasius-LTD/gpu-shared/blob/main/docs/guides/material-study.md#camera-and-accessibility).
 

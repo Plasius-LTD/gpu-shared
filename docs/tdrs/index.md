@@ -11,3 +11,5 @@
 - [TDR 0006: Public loader request options](tdr-0006-public-loader-request-options.md)
 
 - [TDR 0007: glTF adapter migration](tdr-0007-gltf-adapter-migration.md)
+
+- [TDR 0009: Instanced inspection qualification](tdr-0009-instanced-inspection-qualification.md)

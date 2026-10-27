@@ -25,7 +25,7 @@ test('disabled or invalid fixtures cannot allocate renderer resources',async()=>
   }
   assert.equal(calls.length,0);
   await assert.rejects(createModelInspection(),/enabled/);
-  await assert.rejects(createSceneInspection(),/1–6 models/);
+  await assert.rejects(createSceneInspection(),/1–128 model placements/);
 });
 test('preserves model materials, reuses camera and releases exactly once',async()=>{
   const {deps,calls}=fixture();const abort=new AbortController();
@@ -40,10 +40,10 @@ test('preserves model materials, reuses camera and releases exactly once',async(
   assert.equal(calls.filter(c=>c==='camera.destroy').length,1);
   await runtime.draw();
 });
-test('load failures, oversized meshes and aborted late allocation fail closed',async()=>{
+test('load failures, malformed meshes and aborted late allocation fail closed',async()=>{
   let f=fixture();f.deps.load=async()=>{throw new Error('hash mismatch');};
   await assert.rejects(createInspectionRuntime(options(),f.deps),/hash mismatch/);
-  f=fixture();f.deps.load=async()=>({primitives:[{indices:{length:1500003}}]});
+  f=fixture();f.deps.load=async()=>({primitives:[{indices:{length:1.5}}]});
   await assert.rejects(createInspectionRuntime(options(),f.deps),/triangle/);
   f=fixture();f.deps.load=async()=>({primitives:[]});
   await assert.rejects(createInspectionRuntime(options(),f.deps),/triangle/);
@@ -192,4 +192,11 @@ test('batch budget scales with pixel count and depth without changing quality',(
     assert.equal(inspectionBatchSize(quality,255),1);
     assert.equal(inspectionBatchSize(quality,256),0);
   }
+});
+
+test('inspection delegates geometry admission to the renderer byte budget rather than 500K triangles',async()=>{
+  const f=fixture();f.deps.load=async()=>({primitives:[{indices:{length:1800000}}]});
+  const runtime=await createInspectionRuntime({...options(),memoryBudgetBytes:512*1024*1024},f.deps);
+  assert.equal(runtime.triangleCount,600000);
+  assert.equal(f.calls.find(c=>c?.meshes).memoryBudgetBytes,512*1024*1024);runtime.destroy();
 });

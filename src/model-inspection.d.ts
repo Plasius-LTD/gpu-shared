@@ -1,3 +1,5 @@
+import type { WavefrontGpuAllocationSnapshot } from "@plasius/gpu-renderer";
+
 export interface ModelInspectionQuality {
   samplesPerPixel: number;
   maxDepth: number;
@@ -13,6 +15,8 @@ export interface ModelInspectionProgress {
   height: number;
   maxDepth: number;
   denoise: boolean;
+  /** Renderer-owned requested GPU allocations; not physical VRAM residency. */
+  allocations?: WavefrontGpuAllocationSnapshot;
 }
 export interface ModelInspectionOptions {
   canvas: HTMLCanvasElement;
@@ -22,6 +26,8 @@ export interface ModelInspectionOptions {
   signal?: AbortSignal;
   width?: number;
   height?: number;
+  /** Positive byte budget for renderer-owned GPU resources. Defaults to 1 GiB. */
+  memoryBudgetBytes?: number;
   quality?: Partial<Omit<ModelInspectionQuality, "width" | "height">>;
   onProgress?: (progress: ModelInspectionProgress) => void;
   onHintChange?: (visible: boolean) => void;
@@ -30,6 +36,7 @@ export interface ModelInspectionOptions {
 export interface ModelInspection {
   readonly triangleCount: number;
   readonly primitiveCount: number;
+  getAllocationSnapshot(): WavefrontGpuAllocationSnapshot | null;
   draw(): Promise<void>;
   setQuality(quality: Partial<ModelInspectionQuality>): Promise<void>;
   setPaused(paused: boolean): void;
@@ -49,11 +56,20 @@ export interface SceneInspectionModel {
   yaw?: number;
 }
 export interface SceneInspectionOptions extends Omit<ModelInspectionOptions, 'modelUrl' | 'integrity'> {
+  /** 1–128 placements from at most six distinct URLs; repeated URLs must have identical manifests. */
   models: SceneInspectionModel[];
+  /** Share source mesh geometry/BLAS with affine instances/TLAS. Static, non-emissive meshes only. */
+  instancing?: boolean;
   camera?: { eye: [number, number, number]; target: [number, number, number]; fov: number };
 }
 export interface SceneInspection extends ModelInspection {
+  /** Number of placed model copies, excluding the ground. */
   readonly modelCount: number;
+  /** Number of distinct sources loaded and decoded for this scene. */
+  readonly sourceCount: number;
+  /** Mesh instances including the ground; zero for the expanded geometry path. */
+  readonly instanceCount: number;
+  readonly geometryMode: 'instanced' | 'expanded';
   readonly textureBytes: number;
 }
 export function createSceneInspection(options: SceneInspectionOptions): Promise<SceneInspection>;

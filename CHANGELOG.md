@@ -5,10 +5,10 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - **Added**
-  - (placeholder)
+  - Opt-in shared-geometry scene instancing for up to 128 placements from six integrity-checked sources, with distinct source/placement/mesh-instance counts and GPU allocation reports.
 
 - **Changed**
-  - (placeholder)
+  - Inspection admission uses renderer-owned GPU resource bytes and device limits instead of a 500,000-triangle ceiling; default GPU allocation budget is 1 GiB. Retain a separate 128 MiB decoded CPU texture limit for composites.
 
 - **Fixed**
   - (placeholder)

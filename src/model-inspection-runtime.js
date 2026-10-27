@@ -3,8 +3,9 @@ import { inspectionBatchCapacity, inspectionBatchSize, inspectionQuality } from 
 /** Framework-independent inspection lifecycle; all rendering stays in gpu-renderer. */
 export async function createInspectionRuntime({ canvas, modelUrl, integrity, enabled,
   signal, onHintChange, onError = () => {}, onProgress = () => {}, quality,
-  width = 800, height = 600 } = {}, deps) {
+  width = 800, height = 600, memoryBudgetBytes = 1024*1024*1024 } = {}, deps) {
   if (enabled !== true) throw new Error('Model inspection must be explicitly enabled.');
+  if(!Number.isSafeInteger(memoryBudgetBytes)||memoryBudgetBytes<=0) throw new Error('GPU memory budget must be a positive safe integer.');
   const url = new URL(modelUrl);
   if (!['http:', 'https:'].includes(url.protocol) || !canvas) throw new Error('Invalid inspection canvas or asset URL.');
   let desired = inspectionQuality({...quality,width,height});
@@ -23,12 +24,13 @@ export async function createInspectionRuntime({ canvas, modelUrl, integrity, ena
     if(combined.aborted) cancel();
     Promise.resolve(promise).then(value=>{cleanup();resolve(value);},error=>{cleanup();reject(error);});
   });
-  let renderer, camera, meshes, applied, disposed=false, pending, timer, paused=false;
+  let renderer, camera, meshes, instances, applied, disposed=false, pending, timer, paused=false;
   let generation=0, renderedGeneration=-1, samples=0, changedAt=Date.now();
   const destroyRenderer = value => { value?.destroy(); value?.device?.destroy(); };
   const progress = phase => {
     if (!disposed) onProgress(Object.freeze({phase,samples,target:desired.samplesPerPixel,
-      width:desired.width,height:desired.height,maxDepth:desired.maxDepth,denoise:desired.denoise}));
+      width:desired.width,height:desired.height,maxDepth:desired.maxDepth,denoise:desired.denoise,
+      ...(renderer?.getSnapshot?{allocations:renderer.getSnapshot().allocations}:{}),}));
   };
   const destroy = () => {
     if (disposed) return;
@@ -46,7 +48,7 @@ export async function createInspectionRuntime({ canvas, modelUrl, integrity, ena
   };
   async function allocate(settings) {
     destroyRenderer(renderer);renderer=undefined;
-    const value=await wait(deps.renderer({canvas,meshes,...settings,
+    const value=await wait(deps.renderer({canvas,meshes,...settings,memoryBudgetBytes,...(instances?{instances}:{}),
       samplesPerPixel:inspectionBatchCapacity(settings),progressive:true,displayQuality:true,tileSize:128,
       environmentPortalMode:'disabled',environmentPortals:[],
       environmentColor:[0.58,0.66,0.76,1],ambientColor:[0.04,0.046,0.052,1],
@@ -58,6 +60,7 @@ export async function createInspectionRuntime({ canvas, modelUrl, integrity, ena
       return value;
     }));
     renderer=value;applied=settings;
+    if(instances && renderer.getSnapshot?.().instanceCount!==instances.length) throw new Error('This renderer version does not support scene instancing.');
     if(typeof renderer.resetAccumulation!=='function') throw new Error('This renderer version does not support progressive inspection.');
   }
   async function run() {
@@ -100,12 +103,14 @@ export async function createInspectionRuntime({ canvas, modelUrl, integrity, ena
     const model=await wait(deps.load(url,{signal:combined,integrity:{...integrity}}));
     combined.throwIfAborted();
     const triangleCount=model.primitives.reduce((n,p)=>n+p.indices.length/3,0);
-    if(!Number.isInteger(triangleCount)||triangleCount<1||triangleCount>500000) throw new Error('Inspection requires 1–500000 triangles.');
+    if(!Number.isSafeInteger(triangleCount)||triangleCount<1) throw new Error('Inspection requires a valid positive triangle count.');
     meshes=deps.meshes(model,{targetCenter:[0,0,0],targetSize:2.2}).filter(mesh=>mesh.id>=1000);
+    instances=model.sceneInstances;
     camera=deps.camera({canvas,camera:{eye:[3,1.5,4.2],target:[0,0,0],fov:38},onHintChange,
       onChange:()=>{void draw().catch(()=>{});}});
     await draw();combined.throwIfAborted();
     return Object.freeze({triangleCount,primitiveCount:model.primitives.length,draw,
+      getAllocationSnapshot:()=>renderer?.getSnapshot?.().allocations??null,
       async setQuality(patch){
         if(disposed)return;
         const next=inspectionQuality(patch,desired);
