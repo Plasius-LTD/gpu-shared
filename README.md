@@ -232,6 +232,9 @@ for a manifest example and the inspection entry's separate lifecycle controls.
 
 - **Camera and progressive refinement:** [inspect your own scene](https://github.com/Plasius-LTD/gpu-shared/blob/main/docs/guides/model-inspection.md)
 - **Several models together:** [arrange a composite study](https://github.com/Plasius-LTD/gpu-shared/blob/main/docs/guides/composite-model-inspection.md) with explicit placement, shared lighting and one progressive camera using `createSceneInspection`.
+  Heavy inspection settings use smaller sample batches to keep GPU submissions bounded;
+  the requested total samples, bounce count and native image size stay unchanged.
+
   with mouse, touch and keyboard controls, SHA-256 asset verification, samples,
   bounces, denoising and native render sizes up to 3840 × 2160. The shared runtime
   refines while the camera is still; your application supplies UI and handles

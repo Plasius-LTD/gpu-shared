@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Fixed**
-  - (placeholder)
+  - Bound model and composite inspection batches by resolution and bounce count; UHD at twelve bounces refines one sample per submission while preserving the full requested sample target and native image size.
 
 - **Security**
   - (placeholder)
