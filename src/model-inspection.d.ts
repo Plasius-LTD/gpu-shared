@@ -48,15 +48,17 @@ export function createModelInspection(options: ModelInspectionOptions): Promise<
 export interface SceneInspectionModel {
   modelUrl: string | URL;
   integrity: Record<string, string>;
-  /** Bottom-centre placement; Y is height above the shared ground. Each axis is bounded to ±20. */
+  /** Bottom-centre placement; Y is height above the shared ground. Finite values up to ±1e12; GPU float precision still applies. */
   anchor: [number, number, number];
-  /** Longest model dimension, in chosen scene units, between 0.25 and 10. */
+  /** Positive longest model dimension in chosen scene units, at most 1e12. */
   size: number;
   /** Rotation around the up axis in radians. Defaults to zero. */
   yaw?: number;
+  /** Optional distinct decoded primitive indices, e.g. one authored variant. Bounds are recomputed. */
+  primitiveIndices?: number[];
 }
 export interface SceneInspectionOptions extends Omit<ModelInspectionOptions, 'modelUrl' | 'integrity'> {
-  /** 1–128 placements from at most six distinct URLs; repeated URLs must have identical manifests. */
+  /** Nonempty placements admitted against GPU resource budgets; repeated URLs must have identical manifests. */
   models: SceneInspectionModel[];
   /** Share source mesh geometry/BLAS with affine instances/TLAS. Static, non-emissive meshes only. */
   instancing?: boolean;

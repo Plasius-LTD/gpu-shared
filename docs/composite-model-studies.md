@@ -79,3 +79,11 @@ are unchanged. This is a static inspection qualification; dark material response
 and high-resolution noise remain useful subjects for renderer comparison. It is
 not optical-reference, physical-touch, screen-reader speech or real-time
 performance approval. Registry-consumer review follows the approved release.
+
+
+## Superseding scalable scene contract (2026-10-28)
+
+The historical six-model/500,000-triangle admission design above is superseded
+by ADR 0023 and the current composite-model-inspection guide. Current admission
+uses requested GPU resources and decoded texture budgets; repeated placements
+use unique geometry with explicit instancing and may select authored primitives.
