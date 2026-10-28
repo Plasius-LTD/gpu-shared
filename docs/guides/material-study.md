@@ -27,6 +27,24 @@ container changes; call `destroy()` during teardown. `update()` rejects overlapp
 changes, so await or debounce control updates. Aborting/destroying releases input,
 timers and GPU resources, including late initialization resources.
 
+Supply `onUnavailable(failure)` to handle terminal failures after mounting. The
+frozen notification contains only `code: 'render-unavailable'` and
+`message: 'Material study rendering is unavailable.'`; use the code to choose
+translated, accessible error and retry text. Input and renderer cleanup have
+already been attempted before notification. Raw GPU diagnostics are not passed
+to the host. Resize/camera exceptions and idle device loss use this same one-shot
+path. A throwing or rejected host callback cannot interrupt cleanup or escape
+the event callback. Cleanup attempts both owned adapters even if one throws.
+
+Initial acquisition errors reject `createMaterialStudy()` without notification.
+Errors during an awaited `update()` still reject that promise and also notify
+the mounted host. Invalid control patches and overlapping updates simply reject
+without terminating a healthy study. After terminal failure, `resize()` is inert
+and `update()` rejects; retry by mounting a fresh study after rechecking access.
+Disconnect the host's ResizeObserver and present its accessible retry control.
+Intentional abort/destroy/material replacement and obsolete renderer callbacks
+are silent. Healthy material replacement keeps the current camera.
+
 The drawing buffer uses one scale for both CSS dimensions, capped at DPR 2 and
 1440 pixels on either edge. A 500 × 1000 CSS canvas at DPR 2 renders at 720 × 1440;
 rounding and the minimum one-pixel buffer can change the shorter edge by up to one

@@ -9,7 +9,7 @@ const model = { primitives: [{ name:'wooden_crate_01-0', indices:Array.from({len
 function setup(extra={}) {
  const frames=[], renderers=[], cameras=[];
  const canvas={clientWidth:800,clientHeight:500,width:0,height:0};
- const deps={load:async()=>model,createRenderer:async()=>{ const r={destroyed:0,render:f=>{frames.push(f);return {vertexCount:f.vertices.length/12};},destroy(){this.destroyed++;}};renderers.push(r);return r; },
+ const deps={load:async()=>model,createRenderer:async options=>{ const r={...options,destroyed:0,render:f=>{frames.push(f);return {vertexCount:f.vertices.length/12};},destroy(){this.destroyed++;}};renderers.push(r);return r; },
   createCamera:options=>{const c={...options,read:()=>options.camera,destroyed:0,destroy(){this.destroyed++;}};cameras.push(c);return c;},...extra};
  return {canvas,deps,frames,renderers,cameras};
 }
@@ -97,4 +97,93 @@ test('hidden material canvases skip drawing and recover at the current orientati
  s.canvas.clientWidth=500;s.canvas.clientHeight=1000;study.resize();
  assert.equal(s.frames.length,before+1);assert.equal(s.frames.at(-1).camera,camera);
  assert.equal(s.renderers.length,1);assert.equal(s.cameras.length,1);
+});
+
+const studyUrl='https://example.test/wooden_crate_01.gltf';
+const failure={code:'render-unavailable',message:'Material study rendering is unavailable.'};
+test('idle renderer loss reports one bounded failure after releasing input and GPU',async()=>{
+ const s=setup(),events=[];
+ const study=await createStudyRuntime({canvas:s.canvas,modelUrl:studyUrl,onUnavailable:event=>{
+  assert.equal(s.renderers[0].destroyed,1);assert.equal(s.cameras[0].destroyed,1);events.push(event);
+ }},s.deps);
+ assert.equal(typeof s.renderers[0].onUnavailable,'function');
+ s.renderers[0].onUnavailable(new Error('private GPU diagnostic'));
+ s.renderers[0].onUnavailable();study.resize();s.cameras[0].onChange();study.destroy();
+ assert.deepEqual(events,[failure]);assert.ok(Object.isFrozen(events[0]));
+ assert.equal(s.renderers[0].destroyed,1);assert.equal(s.cameras[0].destroyed,1);
+ await assert.rejects(study.update({fibres:false}),/rendering is unavailable/);
+});
+for(const origin of ['resize','camera'])test(`${origin} draw failure cannot escape an event callback`,async()=>{
+ const s=setup(),events=[],study=await createStudyRuntime({canvas:s.canvas,modelUrl:studyUrl,onUnavailable:e=>events.push(e)},s.deps);
+ s.renderers[0].render=()=>{throw new Error('private diagnostic');};
+ assert.doesNotThrow(()=>origin==='resize'?study.resize():s.cameras[0].onChange());
+ assert.deepEqual(events,[failure]);assert.equal(s.renderers[0].destroyed,1);assert.equal(s.cameras[0].destroyed,1);
+ study.destroy();
+});
+test('replacement and destroy fence synchronous and late callbacks from old renderers',async()=>{
+ const s=setup(),events=[],study=await createStudyRuntime({canvas:s.canvas,modelUrl:studyUrl,onUnavailable:e=>events.push(e)},s.deps);
+ const old=s.renderers[0],destroy=old.destroy.bind(old);
+ old.destroy=()=>{destroy();old.onUnavailable();};
+ await study.update({varnishWear:.2});old.onUnavailable();
+ assert.deepEqual(events,[]);assert.equal(s.cameras.length,1);assert.equal(s.cameras[0].destroyed,0);
+ const current=s.renderers[1],currentDestroy=current.destroy.bind(current);
+ current.destroy=()=>{currentDestroy();current.onUnavailable();};
+ study.destroy();current.onUnavailable();old.onUnavailable();
+ assert.deepEqual(events,[]);assert.equal(current.destroyed,1);assert.equal(old.destroyed,1);
+});
+for(const mode of ['throw','reject','cleanup'])test(`a ${mode} failure cannot interrupt terminal cleanup`,async()=>{
+ const s=setup(),events=[],study=await createStudyRuntime({canvas:s.canvas,modelUrl:studyUrl,onUnavailable:e=>{
+  events.push(e);if(mode==='throw')throw new Error('host');if(mode==='reject')return Promise.reject(new Error('host'));
+ }},s.deps);
+ if(mode==='cleanup')s.cameras[0].destroy=()=>{s.cameras[0].destroyed++;throw new Error('input cleanup');};
+ assert.doesNotThrow(()=>s.renderers[0].onUnavailable());
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(s.renderers[0].destroyed,1);assert.equal(s.cameras[0].destroyed,1);assert.deepEqual(events,[failure]);
+ study.destroy();
+});
+test('abort and a pending replacement are silent, with late allocation cleaned once',async()=>{
+ const ac=new AbortController(),s=setup(),events=[];
+ const study=await createStudyRuntime({canvas:s.canvas,modelUrl:studyUrl,signal:ac.signal,onUnavailable:e=>events.push(e)},s.deps);
+ const base=s.deps.createRenderer;let resolve,options;
+ s.deps.createRenderer=x=>{options=x;return new Promise(r=>{resolve=r;});};
+ const pending=study.update({varnishWear:.1});ac.abort();options.onUnavailable();
+ const replacement=await base(options);resolve(replacement);
+ await assert.rejects(pending,{name:'AbortError'});replacement.onUnavailable();
+ assert.deepEqual(events,[]);assert.equal(replacement.destroyed,1);assert.equal(s.cameras[0].destroyed,1);
+});
+test('loss during acquisition rejects initialization and cleans the eventual allocation',async()=>{
+ const s=setup(),events=[],base=s.deps.createRenderer;
+ s.deps.createRenderer=async options=>{const r=await base(options);options.onUnavailable();return r;};
+ await assert.rejects(createStudyRuntime({canvas:s.canvas,modelUrl:studyUrl,onUnavailable:e=>events.push(e)},s.deps),/rendering is unavailable/);
+ assert.deepEqual(events,[]);assert.equal(s.renderers[0].destroyed,1);assert.equal(s.cameras.length,0);
+});
+test('update rendering and replacement errors reject while notifying the mounted host once',async()=>{
+ for(const phase of ['draw','replacement']) {
+  const s=setup(),events=[],study=await createStudyRuntime({canvas:s.canvas,modelUrl:studyUrl,onUnavailable:e=>events.push(e)},s.deps);
+  if(phase==='draw')s.renderers[0].render=()=>{throw new Error('private diagnostic');};
+  else s.deps.createRenderer=async()=>{throw new Error('replacement unavailable');};
+  await assert.rejects(study.update(phase==='draw'?{fibres:false}:{varnishWear:.2}));
+  assert.deepEqual(events,[failure]);assert.equal(s.renderers[0].destroyed,1);assert.equal(s.cameras[0].destroyed,1);
+  study.destroy();
+ }
+});
+
+test('loss while replacing terminates the owner and disposes the eventual GPU allocation',async()=>{
+ const s=setup(),events=[],study=await createStudyRuntime({canvas:s.canvas,modelUrl:studyUrl,onUnavailable:e=>events.push(e)},s.deps);
+ const base=s.deps.createRenderer;let resolve,options;
+ s.deps.createRenderer=x=>{options=x;return new Promise(r=>{resolve=r;});};
+ const pending=study.update({varnishWear:.2});options.onUnavailable();
+ const replacement=await base(options);resolve(replacement);
+ await assert.rejects(pending,/rendering is unavailable/);
+ s.renderers[0].onUnavailable();replacement.onUnavailable();
+ assert.deepEqual(events,[failure]);assert.equal(replacement.destroyed,1);assert.equal(s.cameras[0].destroyed,1);
+});
+test('first draw failure rejects mounting without a host event; absent callbacks remain safe',async()=>{
+ const s=setup(),events=[],base=s.deps.createRenderer;
+ s.deps.createRenderer=async options=>{const r=await base(options);r.render=()=>{throw new Error('draw');};return r;};
+ await assert.rejects(createStudyRuntime({canvas:s.canvas,modelUrl:studyUrl,onUnavailable:e=>events.push(e)},s.deps),/rendering is unavailable/);
+ assert.deepEqual(events,[]);assert.equal(s.renderers[0].destroyed,1);assert.equal(s.cameras[0].destroyed,1);
+ const fresh=setup(),study=await createStudyRuntime({canvas:fresh.canvas,modelUrl:studyUrl},fresh.deps);
+ assert.doesNotThrow(()=>fresh.renderers[0].onUnavailable());
+ study.destroy();assert.equal(fresh.renderers[0].destroyed,1);assert.equal(fresh.cameras[0].destroyed,1);
 });

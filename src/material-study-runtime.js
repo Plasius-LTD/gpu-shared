@@ -26,20 +26,32 @@ function geometry(model) {
 }
 
 /** Internal dependency boundary; the public entry supplies the released package adapters. */
-export async function createStudyRuntime({canvas,modelUrl,signal,onHintChange}={},deps) {
+export async function createStudyRuntime({canvas,modelUrl,signal,onHintChange,onUnavailable}={},deps) {
   const url=new URL(modelUrl);
   if(!['http:','https:'].includes(url.protocol) || !url.pathname.endsWith('/wooden_crate_01.gltf')) throw new Error('A reviewed material-study asset URL is required.');
   const abort=new AbortController();
   const combined=signal?AbortSignal.any([signal,abort.signal]):abort.signal;
-  let renderer,camera,disposed=false,busy=false,ready=false,profile=createCrateAgeing().profile;
+  let renderer,camera,disposed=false,busy=false,ready=false,mounted=false,generation=0,terminalError,profile=createCrateAgeing().profile;
   let toggles={coated:true,fibres:true,materials:true},mesh,fibred,looseEndCount=0;
-  const ensure=()=>combined.throwIfAborted();
+  const ensure=()=>{if(terminalError)throw terminalError;combined.throwIfAborted();};
+  const release=resource=>{try{resource?.destroy();}catch{/* Attempt all terminal cleanup even if an adapter fails. */}};
   const destroy=()=>{
-    if(disposed)return;disposed=true;ready=false;abort.abort();
-    combined.removeEventListener('abort',destroy);camera?.destroy();renderer?.destroy();renderer=undefined;
+    if(disposed)return;disposed=true;ready=false;generation++;
+    combined.removeEventListener('abort',destroy);abort.abort();
+    const input=camera,gpu=renderer;camera=undefined;renderer=undefined;
+    release(input);release(gpu);
+  };
+  const fail=()=>{
+    if(disposed)return;
+    terminalError=new Error('Material study rendering is unavailable.');
+    destroy();
+    if(mounted)try{
+      Promise.resolve(onUnavailable?.(Object.freeze({code:'render-unavailable',message:terminalError.message}))).catch(()=>{});
+    }catch{/* Host callbacks cannot escape GPU/input events or prevent cleanup. */}
   };
   combined.addEventListener('abort',destroy,{once:true});
   const draw=()=>{
+    try {
     if(!ready || disposed || canvas.clientWidth<=0 || canvas.clientHeight<=0)return;
     const scale=Math.min(2,globalThis.devicePixelRatio||1,1440/canvas.clientWidth,1440/canvas.clientHeight);
     const width=Math.max(1,Math.round(canvas.clientWidth*scale));
@@ -47,6 +59,7 @@ export async function createStudyRuntime({canvas,modelUrl,signal,onHintChange}={
     if(canvas.width!==width)canvas.width=width;if(canvas.height!==height)canvas.height=height;
     const chosen=toggles.fibres?fibred:mesh;
     renderer.render({vertices:chosen.vertices,texcoords:chosen.texcoords,...(toggles.materials?{surfaces:chosen.surfaces}:{}),camera:camera.read(),water:false});
+    }catch{fail();}
   };
   const buildFibres=()=>{
     const fibres=createCrateAgeing(profile).createFibres({...mesh,ranges:mesh.surfaces.filter(s=>s.materialIndex===1)});
@@ -56,10 +69,11 @@ export async function createStudyRuntime({canvas,modelUrl,signal,onHintChange}={
     looseEndCount=fibres.looseEndCount;
   };
   const replaceRenderer=async()=>{
-    ready=false;renderer?.destroy();renderer=undefined;
+    ready=false;const current=++generation,previous=renderer;renderer=undefined;release(previous);
     const {wood,rope,metal,fibres}=createCrateAgeing(profile).createMaterials(mesh.maps,toggles.coated);
-    const replacement=await deps.createRenderer({canvas,materials:[wood,rope,metal,{},fibres]});
-    if(combined.aborted){replacement.destroy();ensure();}
+    const replacement=await deps.createRenderer({canvas,materials:[wood,rope,metal,{},fibres],
+      onUnavailable:()=>{if(current===generation)fail();}});
+    if(disposed){release(replacement);ensure();}
     renderer=replacement;
   };
   try {
@@ -69,7 +83,7 @@ export async function createStudyRuntime({canvas,modelUrl,signal,onHintChange}={
     ensure();mesh=geometry(model);buildFibres();await replaceRenderer();ensure();
     const distance=mesh.height*3.4,centreY=mesh.height*.5;
     camera=deps.createCamera({canvas,camera:{eye:[-distance*.643,centreY+distance*.38,distance*.766],target:[0,centreY,0],fov:42},onChange:draw,onHintChange});
-    ready=true;draw();
+    ready=true;draw();ensure();mounted=true;
   } catch(error) {destroy();throw error;}
   return Object.freeze({
     read:()=>({...profile,...toggles,looseEndCount}),resize:draw,destroy,
@@ -81,8 +95,8 @@ export async function createStudyRuntime({canvas,modelUrl,signal,onHintChange}={
       const rebuild=next.varnishWear!==profile.varnishWear || (options.coated!==undefined && options.coated!==toggles.coated);
       const regroom=next.ropeFray!==profile.ropeFray;
       busy=true;profile=next;toggles={...toggles,...options};
-      try {if(regroom)buildFibres();if(rebuild)await replaceRenderer();ensure();ready=true;draw();}
-      catch(error){destroy();throw error;}
+      try {if(regroom)buildFibres();if(rebuild)await replaceRenderer();ensure();ready=true;draw();ensure();}
+      catch(error){fail();throw error;}
       finally{busy=false;}
     },
   });
