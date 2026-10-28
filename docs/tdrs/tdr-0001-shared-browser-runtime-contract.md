@@ -44,7 +44,9 @@ typed one-shot host notification after terminal input/GPU cleanup. The current
 renderer generation owns unavailable signals; old devices cannot fail a newer
 replacement. Camera and resize draws use the same containment path. Initial
 mount rejects, mounted update rejects and notifies, and intentional teardown
-remains silent. Callback failures are contained after all cleanup attempts.
+remains silent. Notification is queued after cleanup to preserve await/handle
+handoff; destroy or external abort cancels pending delivery. Callback failures
+are contained after all cleanup attempts.
 The host owns observer disconnection, accessible retry and new gated mounts.
 Deterministic lifecycle, public-entry/type and package checks qualify this
 boundary; physical GPU/host release acceptance remains on site#2300.

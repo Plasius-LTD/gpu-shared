@@ -33,7 +33,10 @@ frozen notification contains only `code: 'render-unavailable'` and
 translated, accessible error and retry text. Input and renderer cleanup have
 already been attempted before notification. Raw GPU diagnostics are not passed
 to the host. Resize/camera exceptions and idle device loss use this same one-shot
-path. A throwing or rejected host callback cannot interrupt cleanup or escape
+path. Notification is queued in a microtask after cleanup so the awaiting host
+can receive the mount handle before handling first-draw loss. Calling `destroy()`
+or aborting the supplied signal cancels notification still queued during teardown.
+A throwing or rejected host callback cannot interrupt cleanup or escape
 the event callback. Cleanup attempts both owned adapters even if one throws.
 
 Initial acquisition errors reject `createMaterialStudy()` without notification.

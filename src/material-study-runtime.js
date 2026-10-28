@@ -31,23 +31,33 @@ export async function createStudyRuntime({canvas,modelUrl,signal,onHintChange,on
   if(!['http:','https:'].includes(url.protocol) || !url.pathname.endsWith('/wooden_crate_01.gltf')) throw new Error('A reviewed material-study asset URL is required.');
   const abort=new AbortController();
   const combined=signal?AbortSignal.any([signal,abort.signal]):abort.signal;
-  let renderer,camera,disposed=false,busy=false,ready=false,mounted=false,generation=0,terminalError,profile=createCrateAgeing().profile;
+  let renderer,camera,disposed=false,busy=false,ready=false,mounted=false,notificationPending=false,generation=0,terminalError,profile=createCrateAgeing().profile;
   let toggles={coated:true,fibres:true,materials:true},mesh,fibred,looseEndCount=0;
   const ensure=()=>{if(terminalError)throw terminalError;combined.throwIfAborted();};
   const release=resource=>{try{resource?.destroy();}catch{/* Attempt all terminal cleanup even if an adapter fails. */}};
-  const destroy=()=>{
+  const cleanup=()=>{
     if(disposed)return;disposed=true;ready=false;generation++;
     combined.removeEventListener('abort',destroy);abort.abort();
     const input=camera,gpu=renderer;camera=undefined;renderer=undefined;
     release(input);release(gpu);
   };
+  const destroy=()=>{notificationPending=false;cleanup();};
   const fail=()=>{
     if(disposed)return;
     terminalError=new Error('Material study rendering is unavailable.');
-    destroy();
-    if(mounted)try{
-      Promise.resolve(onUnavailable?.(Object.freeze({code:'render-unavailable',message:terminalError.message}))).catch(()=>{});
-    }catch{/* Host callbacks cannot escape GPU/input events or prevent cleanup. */}
+    cleanup();
+    if(mounted){
+      notificationPending=true;
+      // A first-draw loss can run before the awaiting host receives its handle.
+      // Deliver after that continuation, and let host teardown cancel delivery.
+      queueMicrotask(()=>{
+        if(!notificationPending || signal?.aborted)return;
+        notificationPending=false;
+        try{
+          Promise.resolve(onUnavailable?.(Object.freeze({code:'render-unavailable',message:terminalError.message}))).catch(()=>{});
+        }catch{/* Host callbacks cannot escape GPU/input events or prevent cleanup. */}
+      });
+    }
   };
   combined.addEventListener('abort',destroy,{once:true});
   const draw=()=>{
