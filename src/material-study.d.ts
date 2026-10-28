@@ -21,6 +21,12 @@ export interface MaterialStudyOptions {
   modelUrl: string | URL;
   signal?: AbortSignal;
   onHintChange?: (visible: boolean) => void;
+  /** One terminal post-mount notification, after cleanup. Intentional abort/destroy is silent. */
+  onUnavailable?: (failure: MaterialStudyFailure) => void;
+}
+export interface MaterialStudyFailure {
+  readonly code: 'render-unavailable';
+  readonly message: 'Material study rendering is unavailable.';
 }
 /** Caller must confirm its rollout/capability before mounting. Rejects on unavailable WebGPU/assets. */
 export function createMaterialStudy(options: MaterialStudyOptions): Promise<MaterialStudy>;

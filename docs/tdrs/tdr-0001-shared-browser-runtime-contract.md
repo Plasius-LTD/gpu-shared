@@ -37,6 +37,18 @@ stored disable/rollback prevents subsequent mounts. Sizing remains unconditional
 for admitted runtimes. Release through package main/production `cd.yml`; site
 Task #2300 owns published-version adoption and responsive visual qualification.
 
+## Material-study failure ownership (Task #146)
+
+[ADR-0024](../adrs/adr-0024-material-study-terminal-failure.md) adds an optional
+typed one-shot host notification after terminal input/GPU cleanup. The current
+renderer generation owns unavailable signals; old devices cannot fail a newer
+replacement. Camera and resize draws use the same containment path. Initial
+mount rejects, mounted update rejects and notifies, and intentional teardown
+remains silent. Callback failures are contained after all cleanup attempts.
+The host owns observer disconnection, accessible retry and new gated mounts.
+Deterministic lifecycle, public-entry/type and package checks qualify this
+boundary; physical GPU/host release acceptance remains on site#2300.
+
 ## Product Studio startup ownership (Task #160)
 
 [ADR-0021](../adrs/adr-0021-product-studio-startup-ownership.md) supplements the

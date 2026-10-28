@@ -244,6 +244,8 @@ for a manifest example and the inspection entry's separate lifecycle controls.
   are specific to that study, not automatically applied to arbitrary models.
   Resizing preserves the canvas proportions with a shared scale capped at DPR 2
   and 1440 pixels per drawing-buffer dimension, including tall portrait canvases.
+  Supply `onUnavailable` to receive one terminal rendering-failure notification
+  after input/GPU cleanup. Intentional teardown is silent; the host owns retry.
 - **Voxel assets, animation, translations and ready-made scenes:** see the
   [integration guide](https://github.com/Plasius-LTD/gpu-shared/blob/main/docs/guides/showcase-integration.md).
   The harbour remains available through `mountGpuShowcase`; it is a separate

@@ -32,3 +32,4 @@
 - [ADR 0022: Instanced inspection and allocation budgets](adr-0022-instanced-inspection-and-allocation-budgets.md)
 
 - [ADR 0023: Resource-budgeted scalable scene preparation](adr-0023-scalable-scene-preparation.md)
+- [ADR 0024: Material-study terminal failure ownership](adr-0024-material-study-terminal-failure.md)
