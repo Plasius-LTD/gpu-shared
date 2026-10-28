@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.5.0] - 2026-10-28
+
 - Remove fixed scene placement/source ceilings in favour of resource budgets; support selected model primitives, larger finite layouts and cancellable batched preparation.
 
 - **Added**
@@ -1002,3 +1016,4 @@ All notable changes to this project will be documented in this file.
 [1.3.4]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.3.4
 [1.3.5]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.3.5
 [1.4.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.4.0
+[1.5.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.5.0
