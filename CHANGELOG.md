@@ -11,6 +11,20 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.6.0] - 2026-10-28
+
+- **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
   - Material-study device loss and resize/camera draw failures now dispose owned resources and notify the host once through the additive `onUnavailable` callback; notification preserves initial handle delivery and is cancelled on teardown, while obsolete renderer callbacks stay silent.
 
 - **Security**
@@ -1017,3 +1031,4 @@ All notable changes to this project will be documented in this file.
 [1.3.5]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.3.5
 [1.4.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.4.0
 [1.5.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.5.0
+[1.6.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.6.0
