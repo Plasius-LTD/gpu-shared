@@ -14,6 +14,9 @@ Reuse the released renderer's unavailable callback and one shared terminal path.
 Fence each renderer generation before intentional replacement or destruction.
 Terminal failure aborts work and attempts both input/GPU cleanup before issuing
 the additive optional `onUnavailable(MaterialStudyFailure)` callback exactly once.
+Queue notification in a microtask after cleanup so first-draw loss cannot notify
+before the awaiting host receives its handle. Public destroy or external abort
+cancels pending delivery, fencing host teardown/newer mounts as well as devices.
 Its frozen code/message contain no adapter diagnostics. Catch synchronous and
 asynchronous host callback failures; observer/input callbacks cannot throw them.
 Late allocation after abort/failure is destroyed without becoming current.
@@ -32,7 +35,8 @@ disposed study risks stale device ownership; retry creates a fresh runtime.
 Generation fencing also handles adapters that notify synchronously on destroy.
 
 Regressions cover idle loss, both draw entrypoints, replacement/acquisition races,
-abort, throwing cleanup/callbacks, rejected callbacks and one-shot ownership.
+abort, throwing cleanup/callbacks, rejected callbacks, first-draw microtask loss,
+pending-notification cancellation and one-shot ownership.
 Verify public types/ESM/CJS, full tests, changed-source LCOV, lint/types/build,
 privacy/pack/Zero-Three and full audit. These deterministic adapter tests do not
 claim a physical GPU reset or host browser verification.

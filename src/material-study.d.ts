@@ -21,7 +21,7 @@ export interface MaterialStudyOptions {
   modelUrl: string | URL;
   signal?: AbortSignal;
   onHintChange?: (visible: boolean) => void;
-  /** One terminal post-mount notification, after cleanup. Intentional abort/destroy is silent. */
+  /** One queued post-mount notification after cleanup. Abort/destroy cancels pending delivery. */
   onUnavailable?: (failure: MaterialStudyFailure) => void;
 }
 export interface MaterialStudyFailure {

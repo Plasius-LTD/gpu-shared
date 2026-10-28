@@ -11,7 +11,7 @@ All notable changes to this project will be documented in this file.
   - (placeholder)
 
 - **Fixed**
-  - Material-study device loss and resize/camera draw failures now dispose owned resources and notify the host once through the additive `onUnavailable` callback; intentional teardown and obsolete renderer callbacks stay silent.
+  - Material-study device loss and resize/camera draw failures now dispose owned resources and notify the host once through the additive `onUnavailable` callback; notification preserves initial handle delivery and is cancelled on teardown, while obsolete renderer callbacks stay silent.
 
 - **Security**
   - (placeholder)

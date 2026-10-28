@@ -108,7 +108,7 @@ test('idle renderer loss reports one bounded failure after releasing input and G
  }},s.deps);
  assert.equal(typeof s.renderers[0].onUnavailable,'function');
  s.renderers[0].onUnavailable(new Error('private GPU diagnostic'));
- s.renderers[0].onUnavailable();study.resize();s.cameras[0].onChange();study.destroy();
+ s.renderers[0].onUnavailable();study.resize();s.cameras[0].onChange();await Promise.resolve();study.destroy();
  assert.deepEqual(events,[failure]);assert.ok(Object.isFrozen(events[0]));
  assert.equal(s.renderers[0].destroyed,1);assert.equal(s.cameras[0].destroyed,1);
  await assert.rejects(study.update({fibres:false}),/rendering is unavailable/);
@@ -117,6 +117,7 @@ for(const origin of ['resize','camera'])test(`${origin} draw failure cannot esca
  const s=setup(),events=[],study=await createStudyRuntime({canvas:s.canvas,modelUrl:studyUrl,onUnavailable:e=>events.push(e)},s.deps);
  s.renderers[0].render=()=>{throw new Error('private diagnostic');};
  assert.doesNotThrow(()=>origin==='resize'?study.resize():s.cameras[0].onChange());
+ await Promise.resolve();
  assert.deepEqual(events,[failure]);assert.equal(s.renderers[0].destroyed,1);assert.equal(s.cameras[0].destroyed,1);
  study.destroy();
 });
@@ -186,4 +187,22 @@ test('first draw failure rejects mounting without a host event; absent callbacks
  const fresh=setup(),study=await createStudyRuntime({canvas:fresh.canvas,modelUrl:studyUrl},fresh.deps);
  assert.doesNotThrow(()=>fresh.renderers[0].onUnavailable());
  study.destroy();assert.equal(fresh.renderers[0].destroyed,1);assert.equal(fresh.cameras[0].destroyed,1);
+});
+
+test('first-draw microtask loss delivers the handle before terminal notification',async()=>{
+ const s=setup(),events=[],base=s.deps.createRenderer;let received=false;
+ s.deps.createRenderer=async options=>{
+  const r=await base(options),render=r.render;
+  r.render=f=>{const result=render(f);queueMicrotask(()=>options.onUnavailable());return result;};return r;
+ };
+ const study=await createStudyRuntime({canvas:s.canvas,modelUrl:studyUrl,onUnavailable:()=>events.push(received)},s.deps);
+ received=true;assert.deepEqual(events,[]);await Promise.resolve();
+ assert.deepEqual(events,[true]);assert.equal(s.renderers[0].destroyed,1);study.destroy();
+});
+for(const mode of ['destroy','abort'])test(`${mode} cancels a queued terminal notification before host teardown`,async()=>{
+ const s=setup(),events=[],ac=new AbortController();
+ const study=await createStudyRuntime({canvas:s.canvas,modelUrl:studyUrl,signal:ac.signal,onUnavailable:e=>events.push(e)},s.deps);
+ s.renderers[0].onUnavailable();if(mode==='abort')ac.abort();else study.destroy();
+ await Promise.resolve();assert.deepEqual(events,[]);
+ assert.equal(s.renderers[0].destroyed,1);assert.equal(s.cameras[0].destroyed,1);study.destroy();
 });
