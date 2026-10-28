@@ -1,32 +1,45 @@
 import { createInspectionRuntime } from './model-inspection-runtime.js';
 
-const vector = value => Array.isArray(value) && value.length === 3 &&
-  value.every(n => Number.isFinite(n) && Math.abs(n) <= 20);
+const finiteTransformValue = n => Number.isFinite(n) && Math.abs(n) <= 1e12;
+const vector = value => Array.isArray(value) && value.length === 3 && value.every(finiteTransformValue);
+const yieldPreparation = () => new Promise(resolve => setTimeout(resolve, 0));
 
-function validateSources(models) {
-  if (!Array.isArray(models) || models.length < 1 || models.length > 128) {
-    throw new Error('Scene inspection requires 1–128 model placements.');
+async function validateSources(models, signal) {
+  if (!Array.isArray(models) || models.length < 1 || models.length >= 0xffffffff - 1000) {
+    throw new Error('Scene inspection requires model placements with unsigned instance identities.');
   }
-  const sources = new Map();
-  const placements = models.map(({ modelUrl, integrity, anchor, size, yaw = 0 }) => {
+  const sources = new Map(), manifests = new WeakMap(), placements = [];
+  for (const [index, model] of models.entries()) {
+    if (index > 0 && index % 256 === 0) await yieldPreparation();
+    signal?.throwIfAborted();
+    const { modelUrl, integrity, anchor, size, yaw = 0, primitiveIndices } = model;
     const url = new URL(modelUrl).href;
     if (!['http:', 'https:'].includes(new URL(url).protocol) ||
-        !vector(anchor) || anchor[1] < 0 || !Number.isFinite(size) || size < .25 || size > 10 ||
+        !vector(anchor) || anchor[1] < 0 || !finiteTransformValue(size) || size <= 0 ||
         !Number.isFinite(yaw)) throw new Error('Invalid scene model URL or placement.');
-    if (!integrity || !Object.hasOwn(integrity, url) ||
-        !Object.values(integrity).every(v => /^sha256-[A-Za-z0-9+/]{43}=$/u.test(v))) {
-      throw new Error('Every scene model requires a SHA-256 integrity manifest.');
+    let manifest = integrity && manifests.get(integrity);
+    if (!manifest) {
+      if (!integrity || !Object.hasOwn(integrity, url) ||
+          !Object.values(integrity).every(v => /^sha256-[A-Za-z0-9+/]{43}=$/u.test(v))) {
+        throw new Error('Every scene model requires a SHA-256 integrity manifest.');
+      }
+      manifest = JSON.stringify(Object.entries(integrity).sort(([a], [b]) => a.localeCompare(b)));
+      manifests.set(integrity, manifest);
     }
-    const manifest = JSON.stringify(Object.entries(integrity).sort(([a], [b]) => a.localeCompare(b)));
+    if (!Object.hasOwn(integrity, url)) throw new Error('Every scene model requires a SHA-256 integrity manifest.');
+    if (primitiveIndices !== undefined && (!Array.isArray(primitiveIndices) || primitiveIndices.length === 0 ||
+        !primitiveIndices.every(i => Number.isSafeInteger(i) && i >= 0) || new Set(primitiveIndices).size !== primitiveIndices.length)) {
+      throw new Error('Primitive selection must contain distinct nonnegative indices.');
+    }
     let source = sources.get(url);
     if (source && source.manifest !== manifest) throw new Error('Conflicting source integrity manifests.');
     if (!source) {
       source = { modelUrl: url, integrity: { ...integrity }, manifest };
       sources.set(url, source);
-      if (sources.size > 6) throw new Error('Scene inspection requires at most six distinct model sources.');
     }
-    return { source, anchor: [...anchor], size, yaw };
-  });
+    placements.push({ source, anchor: [...anchor], size, yaw,
+      primitiveIndices: primitiveIndices ? [...primitiveIndices] : undefined });
+  }
   return { placements, sources: [...sources.values()] };
 }
 
@@ -49,7 +62,8 @@ function ground(extent) {
 
 /** Compose authored models; renderer/camera/refinement remain in the inspection lifecycle. */
 export async function createSceneInspectionRuntime(options = {}, deps) {
-  const { placements, sources } = validateSources(options.models);
+  if (options.enabled !== true) throw new Error('Model inspection must be explicitly enabled.');
+  const { placements, sources } = await validateSources(options.models, options.signal);
   if(options.instancing !== undefined && typeof options.instancing !== 'boolean') throw new Error('Scene instancing must be a boolean.');
   const instancing=options.instancing===true;
   let instanceCount=0;
@@ -84,14 +98,19 @@ export async function createSceneInspectionRuntime(options = {}, deps) {
       source.projections = new Map();
     }
     // Decode and validate every unique source before creating scene geometry.
-    for (const { source, anchor, size, yaw } of placements) {
+    for (const [index, { source, anchor, size, yaw, primitiveIndices }] of placements.entries()) {
+      if (index > 0 && index % 256 === 0) await yieldPreparation();
       signal.throwIfAborted();
       const projectionSize=instancing?1:size;
-      let projection = source.projections.get(projectionSize);
+      const projectionKey = `${projectionSize}:${primitiveIndices?.join(',') ?? 'all'}`;
+      let projection = source.projections.get(projectionKey);
       if (!projection) {
-        const projected = deps.meshes(source.model, { targetCenter: [0, 0, 0], targetSize: projectionSize })
+        const selected = primitiveIndices ? primitiveIndices.map(i => source.model.primitives[i]) : source.model.primitives;
+        if (selected.some(p => !p)) throw new Error('Primitive selection references missing geometry.');
+        const selectedModel = primitiveIndices ? { ...source.model, primitives: selected, bounds: undefined } : source.model;
+        const projected = deps.meshes(selectedModel, { targetCenter: [0, 0, 0], targetSize: projectionSize })
           .filter(mesh => mesh.id >= 1000);
-        if (projected.length !== source.model.primitives.length) throw new Error('Scene contains an invalid mesh primitive.');
+        if (projected.length !== selected.length) throw new Error('Scene contains an invalid mesh primitive.');
         let bottom = Infinity, radius=0;
         for (const mesh of projected) {
           if (!mesh.positions.every(Number.isFinite)) throw new Error('Scene contains invalid geometry.');
@@ -100,11 +119,11 @@ export async function createSceneInspectionRuntime(options = {}, deps) {
             radius = Math.max(radius,Math.hypot(mesh.positions[i-1],mesh.positions[i+1]));
           }
         }
-        projection = { projected, bottom, radius };
-        source.projections.set(projectionSize, projection);
+        projection = { projected, bottom, radius, selected };
+        source.projections.set(projectionKey, projection);
         if(instancing) {
           projection.geometry=projected.map((mesh,i)=>Object.freeze({...mesh,id:1001+meshes.length+i,
-            materialRefId:source.materials.get(source.model.primitives[i].material)}));
+            materialRefId:source.materials.get(projection.selected[i].material)}));
           meshes.push(...projection.geometry);
         }
       }
@@ -112,6 +131,7 @@ export async function createSceneInspectionRuntime(options = {}, deps) {
         const cosine=Math.cos(yaw)*size,sine=Math.sin(yaw)*size;
         const transform=Object.freeze([cosine,0,-sine,0,0,size,0,0,sine,0,cosine,0,
           anchor[0],anchor[1]-projection.bottom*size,anchor[2],1]);
+        if (instances.length + projection.geometry.length >= 0xffffffff - 1000) throw new Error('Scene mesh instances exceed unsigned identity storage.');
         for(const mesh of projection.geometry) instances.push(Object.freeze({id:1000+instances.length,meshId:mesh.id,transform}));
         extent=Math.max(extent,Math.abs(anchor[0])+projection.radius*size+1,Math.abs(anchor[2])+projection.radius*size+1);
         continue;
@@ -125,7 +145,7 @@ export async function createSceneInspectionRuntime(options = {}, deps) {
         }
         meshes.push(Object.freeze({ ...mesh, id: 1001 + meshes.length, positions,
           normals: rotate(mesh.normals, yaw),
-          materialRefId: source.materials.get(source.model.primitives[i].material) }));
+          materialRefId: source.materials.get(projection.selected[i].material) }));
       }
     }
     const sceneMeshes = Object.freeze([ground(extent), ...meshes]);

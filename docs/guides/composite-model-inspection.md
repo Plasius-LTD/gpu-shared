@@ -29,18 +29,18 @@ await inspection.setQuality({ width: 3840, height: 2160, samplesPerPixel: 128 })
 // On changing scenes or removing the canvas, call inspection.destroy().
 ```
 
-`size` is the model's longest dimension after uniform scaling, between 0.25 and
-10 scene units. `anchor` places its bottom centre; Y is height above the shared
-ground, so props can sit on other models. Each axis is bounded to ±20 and Y must
+`size` is the model's positive longest dimension after uniform scaling, in scene
+units. `anchor` places its bottom centre; Y is height above the shared
+ground, so props can sit on other models. Coordinates must be finite and Y must
 be nonnegative. `yaw` rotates around the up axis in radians. Choose consistent
 units for all models; unknown source units are not automatically inferred.
 Geometry, normals and authored texture/material properties are retained.
 The neutral ground receives shared shadows. The default camera is shown above;
 it can be reset with Home or `inspection.reset()`.
 
-Supply 1–128 placements from at most six distinct model URLs. Repeated URLs
+Supply a nonempty set of resource-budgeted placements. Repeated URLs
 must have identical integrity manifests and are loaded and decoded once per scene.
-Install `@plasius/gpu-renderer` 0.2.57 or newer on the compatible 0.2 line.
+Install a compatible `@plasius/gpu-renderer` release with packed instance texture support (see peer dependencies).
 Use `instancing: true` to retain one copy of each source mesh and its acceleration
 structure on the GPU. Placements become affine instance records and a top-level
 acceleration structure; different sizes and rotations still share geometry.
@@ -86,3 +86,25 @@ and adaptive per-pixel sampling are not implied.
 
 See [single-model inspection](model-inspection.md) for the quality and lifecycle
 contract, including fixed sample counts, denoising and the native UHD pixel limit.
+
+
+## Larger scenes and authored variants
+
+There is no fixed placement/source-count ceiling. Use `instancing: true` for
+repeated static non-emissive models and set `memoryBudgetBytes` for your host's
+requested GPU resource budget (default 1 GiB). The renderer enforces texture and
+buffer limits as well as bytes. Budgets are not free-VRAM measurements, and larger
+visible scenes still require traversal and shading work. Preparation yields in
+batches and honours `signal` cancellation; sources load sequentially.
+
+An optional `primitiveIndices: [0, 1, 2]` chooses those decoded primitives from a
+source. Consult that asset's authored structure; these indices do not generically
+mean a single object. Bounds are recomputed for the selection before applying
+`size`, so a selected variant is correctly centred and scaled. Identical selections
+share projected geometry, and every selection from one URL shares one decode.
+Repeated URLs must retain identical integrity manifests. No source file is altered.
+
+Anchors and positive sizes accept finite values up to 1e12, matching renderer
+transform validation; this is a numeric safety guard, not a useful precision
+promise at huge coordinates. Keep scenes near the origin for float precision.
+The 128 MiB decoded CPU texture budget remains independent of requested GPU bytes.

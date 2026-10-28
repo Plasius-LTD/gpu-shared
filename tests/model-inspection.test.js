@@ -25,7 +25,7 @@ test('disabled or invalid fixtures cannot allocate renderer resources',async()=>
   }
   assert.equal(calls.length,0);
   await assert.rejects(createModelInspection(),/enabled/);
-  await assert.rejects(createSceneInspection(),/1–128 model placements/);
+  await assert.rejects(createSceneInspection(),/explicitly enabled/);
 });
 test('preserves model materials, reuses camera and releases exactly once',async()=>{
   const {deps,calls}=fixture();const abort=new AbortController();

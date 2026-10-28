@@ -13,7 +13,7 @@ export function createModelInspection(options) {
   return createInspectionRuntime(options, dependencies);
 }
 
-/** Inspect up to 128 placements from six integrity-checked sources under shared lighting. */
+/** Inspect resource-budgeted placements from integrity-checked sources under shared lighting. */
 export function createSceneInspection(options) {
   return createSceneInspectionRuntime(options, dependencies);
 }

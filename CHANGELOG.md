@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Remove fixed scene placement/source ceilings in favour of resource budgets; support selected model primitives, larger finite layouts and cancellable batched preparation.
+
 - **Added**
   - (placeholder)
 

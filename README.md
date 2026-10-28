@@ -231,7 +231,7 @@ for a manifest example and the inspection entry's separate lifecycle controls.
 ## Add interaction and explore other features
 
 - **Camera and progressive refinement:** [inspect your own scene](https://github.com/Plasius-LTD/gpu-shared/blob/main/docs/guides/model-inspection.md)
-- **Several models together:** [arrange a composite study](https://github.com/Plasius-LTD/gpu-shared/blob/main/docs/guides/composite-model-inspection.md) with explicit placement, shared lighting and one progressive camera using `createSceneInspection`. Enable `instancing: true` for up to 128 placements sharing source geometry and acceleration structures; `memoryBudgetBytes` bounds requested GPU allocations and `getAllocationSnapshot()` reports their sizes.
+- **Several models together:** [arrange a composite study](https://github.com/Plasius-LTD/gpu-shared/blob/main/docs/guides/composite-model-inspection.md) with explicit placement, shared lighting and one progressive camera using `createSceneInspection`. Enable `instancing: true` to share source geometry and acceleration structures across resource-budgeted placements; `memoryBudgetBytes` bounds requested GPU allocations and `getAllocationSnapshot()` reports their sizes. Select `primitiveIndices` when an asset contains several authored variants and you want one of them; its bounds are recomputed before placement. Large scenes yield during preparation and accept cancellation.
   Heavy inspection settings use smaller sample batches to keep GPU submissions bounded;
   the requested total samples, bounce count and native image size stay unchanged.
 

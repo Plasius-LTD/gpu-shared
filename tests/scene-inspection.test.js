@@ -61,10 +61,9 @@ test('places intact models on a shared ground with isolated identities and rotat
 });
 test('invalid source lists, transforms and manifests perform no loading', async () => {
   const f = fixture();
-  const invalid = [[], Array.from({ length: 7 }, (_, i) => source(`source-${i}`)),
-    Array.from({ length: 129 }, () => source('a')), null,
+  const invalid = [[], null,
     [source('a', { anchor: [0, -1, 0] })], [source('a', { anchor: [NaN, 0, 0] })],
-    [source('a', { size: .1 })], [source('a', { yaw: Infinity })],
+    [source('a', { size: 0 })], [source('a', { yaw: Infinity })],
     [source('a', { modelUrl: 'file:///private/model.gltf' })],
     [source('a', { integrity: {} })], [source('a', { integrity: { x: 'invalid' } })]];
   for (const models of invalid) await assert.rejects(createSceneInspectionRuntime(options(models), f.deps));
@@ -105,6 +104,7 @@ test('composites share the existing UHD, quality, pause, reset and timeout lifec
   f.deps.load = () => new Promise(() => {});
   const stalled = createSceneInspectionRuntime(options(), f.deps);
   const rejected = assert.rejects(stalled, /timed out/);
+  await new Promise(resolve => setImmediate(resolve));
   t.mock.timers.tick(60000); await rejected;
 });
 
@@ -213,4 +213,55 @@ test('instancing and byte-budget options fail before network requests when malfo
   for(const patch of [{instancing:'yes'},{memoryBudgetBytes:0},{memoryBudgetBytes:Infinity}]){
     const f=fixture();await assert.rejects(createSceneInspectionRuntime({...options(),...patch},f.deps));assert.equal(f.calls.length,0);
   }
+});
+
+for (const count of [3000,15000,30000]) test(`${count} placements share three sources beyond the old authoring limits`,async()=>{
+  const f=fixture();let projections=0;
+  f.deps.meshes=(...args)=>{projections++;return createProductStudioMeshes(...args);};
+  const original=f.deps.renderer;
+  f.deps.renderer=async config=>({...await original(config),getSnapshot:()=>({instanceCount:config.instances.length})});
+  const sources=['astronaut','tree','shrub'].map(key=>source(key));
+  const models=Array.from({length:count},(_,i)=>({...sources[i%3],anchor:[i%200*4,0,Math.floor(i/200)*4]}));
+  const runtime=await createSceneInspectionRuntime({...options(models),instancing:true},f.deps);
+  assert.equal(runtime.modelCount,count);assert.equal(runtime.sourceCount,3);
+  assert.equal(runtime.instanceCount,count*2+1);assert.equal(runtime.triangleCount,8);
+  assert.equal(projections,3);assert.equal(f.calls.filter(c=>c.url).length,3);
+  runtime.destroy();
+});
+
+test('selects an individual authored variant and computes its own bounds',async()=>{
+  const f=fixture();
+  f.model.primitives=[f.model.primitives[0],{...f.model.primitives[0],positions:[99,-1,0,101,-1,0,100,1,0]}];
+  f.model.bounds={min:[-1,-2,0],max:[101,2,0]};
+  const runtime=await createSceneInspectionRuntime(options([source('a',{primitiveIndices:[1],size:2})]),f.deps);
+  const meshes=f.calls.find(c=>c.meshes).meshes;
+  assert.equal(meshes.length,2);assert.equal(runtime.triangleCount,3);
+  assert.deepEqual(meshes[1].positions,[-1,0,0,1,0,0,0,2,0]);
+  runtime.destroy();
+});
+
+test('large preparation yields to cancellation before a GPU allocation',async()=>{
+  const f=fixture(),controller=new AbortController();
+  const models=Array.from({length:30000},()=>source('a'));
+  setTimeout(()=>controller.abort(),0);
+  await assert.rejects(createSceneInspectionRuntime({...options(models),signal:controller.signal,instancing:true},f.deps),/abort/i);
+  assert.equal(f.calls.some(c=>c.meshes),false);
+});
+
+test('more than six sources use sequential loading and a resource budget',async()=>{
+ const f=fixture();const runtime=await createSceneInspectionRuntime(options(Array.from({length:7},(_,i)=>source(String(i),{size:.1}))),f.deps);
+ assert.equal(runtime.sourceCount,7);assert.equal(f.calls.filter(c=>c.url).length,7);runtime.destroy();
+});
+test('invalid primitive selections fail without allocating a renderer',async()=>{
+ for(const primitiveIndices of [[],[-1],[.5],[0,0],[Infinity],[99]]){
+  const f=fixture();await assert.rejects(createSceneInspectionRuntime(options([source('a',{primitiveIndices})]),f.deps),/selection/i);
+  assert.equal(f.calls.some(c=>c.meshes),false);
+ }
+});
+test('different selections share a source while reusing identical selected geometry',async()=>{
+ const f=fixture(),original=f.deps.renderer;let projections=0;
+ f.deps.renderer=async config=>({...await original(config),getSnapshot:()=>({instanceCount:config.instances.length})});
+ f.deps.meshes=(...args)=>{projections++;return createProductStudioMeshes(...args);};
+ const runtime=await createSceneInspectionRuntime({...options([source('a',{primitiveIndices:[0]}),source('a',{primitiveIndices:[1]}),source('a',{primitiveIndices:[0],anchor:[40,0,0]})]),instancing:true},f.deps);
+ assert.equal(projections,2);assert.equal(runtime.sourceCount,1);assert.equal(runtime.instanceCount,4);assert.equal(runtime.primitiveCount,3);runtime.destroy();
 });
