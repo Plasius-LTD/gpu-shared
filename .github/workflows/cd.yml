@@ -1142,26 +1142,32 @@ jobs:
           SOURCE_SHA: ${{ needs.finalize_verify.outputs.source_sha }}
           RELEASE_TAG: ${{ needs.finalize_verify.outputs.release_tag }}
         run: |
-          set -euo pipefail
-          test "${GITHUB_REF}" = "refs/heads/main"
-          test "${GITHUB_REPOSITORY}" = "Plasius-LTD/gpu-shared"
-          [[ "${RELEASE_ID}" =~ ^[1-9][0-9]*$ ]]
-          [[ "${SOURCE_SHA}" =~ ^[a-f0-9]{40}$ ]]
-          [[ "${RELEASE_FINGERPRINT}" =~ ^[a-f0-9]{64}$ ]]
-          MAIN_SHA="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq '.object.sha')"
-          test "${MAIN_SHA}" = "${GITHUB_SHA}"
-          TAG="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}")"
-          test "$(jq -r '.object.type' <<<"${TAG}")" = "commit"
-          test "$(jq -r '.object.sha' <<<"${TAG}")" = "${SOURCE_SHA}"
-          RELEASE="$(gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}")"
-          IDENTITY="$(jq -c '[.id,.tag_name,.target_commitish,.draft,.prerelease,.name,.body,([.assets[]|[.id,.name,.size,.digest,.updated_at]]|sort_by(.[0]))]' <<<"${RELEASE}")"
-          FINGERPRINT="$(printf '%s' "${IDENTITY}" | sha256sum | cut -d' ' -f1)"
-          test "${FINGERPRINT}" = "${RELEASE_FINGERPRINT}"
-          test "$(jq -r '.tag_name' <<<"${RELEASE}")" = "${RELEASE_TAG}"
-          if [ "$(jq -r '.draft' <<<"${RELEASE}")" = "false" ]; then
-            echo "Verified release is already complete."
-            exit 0
-          fi
-          gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" --method PATCH -F draft=false -f make_latest=false > /dev/null
-          test "$(gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" --jq '.draft')" = "false"
-          echo "Verified existing release finalized; npm bytes and source tags were not changed."
+          node --input-type=commonjs <<'NODE'
+          const { execFileSync } = require('node:child_process');
+          const { createHash } = require('node:crypto');
+          const { GITHUB_REF, GITHUB_REPOSITORY, GITHUB_SHA, RELEASE_ID,
+            SOURCE_SHA, RELEASE_TAG, RELEASE_FINGERPRINT } = process.env;
+          const check = (value, message) => { if (!value) throw new Error(message); };
+          check(GITHUB_REF === 'refs/heads/main' && GITHUB_REPOSITORY === 'Plasius-LTD/gpu-shared', 'Invalid workflow identity.');
+          check(/^[1-9][0-9]*$/.test(RELEASE_ID) && /^[a-f0-9]{40}$/.test(SOURCE_SHA)
+            && /^[a-f0-9]{64}$/.test(RELEASE_FINGERPRINT), 'Invalid verified identity.');
+          const api = (endpoint, args = []) => JSON.parse(execFileSync('gh',
+            ['api', `repos/${GITHUB_REPOSITORY}/${endpoint}`, ...args], { encoding: 'utf8' }));
+          check(api('git/ref/heads/main').object.sha === GITHUB_SHA, 'Workflow main has advanced.');
+          const tag = api(`git/ref/tags/${RELEASE_TAG}`);
+          check(tag.object.type === 'commit' && tag.object.sha === SOURCE_SHA, 'Source tag changed.');
+          const release = api(`releases/${RELEASE_ID}`);
+          const identity = [release.id, release.tag_name, release.target_commitish, release.draft,
+            release.prerelease, release.name ?? null, release.body ?? null,
+            [...release.assets].sort((a, b) => a.id - b.id).map(a => [a.id, a.name, a.size, a.digest ?? null, a.updated_at])];
+          check(createHash('sha256').update(JSON.stringify(identity)).digest('hex') === RELEASE_FINGERPRINT,
+            'Release metadata changed.');
+          check(release.tag_name === RELEASE_TAG, 'Release tag changed.');
+          if (!release.draft) {
+            console.log('Verified release is already complete.');
+          } else {
+            api(`releases/${RELEASE_ID}`, ['--method', 'PATCH', '-F', 'draft=false', '-f', 'make_latest=false']);
+            check(api(`releases/${RELEASE_ID}`).draft === false, 'Release remains draft.');
+            console.log('Verified existing release finalized; npm bytes and source tags were not changed.');
+          }
+          NODE

@@ -102,9 +102,9 @@ test('privileged finalizer only clears the verified draft and refuses stale rele
 const fs=require('node:fs'),path=require('node:path'),root=__dirname;
 const input=JSON.parse(fs.readFileSync(path.join(root,'input.json'),'utf8')),args=process.argv.slice(2),endpoint=args[1],marker=path.join(root,'mutation');
 if(args.includes('PATCH')){if(!args.includes('draft=false')||!args.includes('make_latest=false'))process.exit(3);fs.writeFileSync(marker,'draft=false');console.log('{}');}
-else if(endpoint.endsWith('/git/ref/heads/main'))console.log(input.main);
+else if(endpoint.endsWith('/git/ref/heads/main'))console.log(JSON.stringify({object:{sha:input.main}}));
 else if(endpoint.includes('/git/ref/tags/'))console.log(JSON.stringify(input.tag));
-else if(endpoint.includes('/releases/'))console.log(args.includes('--jq')?'false':JSON.stringify(input.release));
+else if(endpoint.includes('/releases/'))console.log(JSON.stringify({...input.release,draft:fs.existsSync(marker)?false:input.release.draft}));
 else process.exit(4);
 `,{mode:0o700});
    const execute=()=>execFileSync('bash',['-c',shell],{env:{...process.env,PATH:root+path.delimiter+process.env.PATH,GITHUB_REF:'refs/heads/main',GITHUB_REPOSITORY:repo,GITHUB_SHA:head,RELEASE_ID:'45',SOURCE_SHA:sha,RELEASE_TAG:'v1.6.0',RELEASE_FINGERPRINT:fingerprint},stdio:'pipe'});
