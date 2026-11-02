@@ -33,3 +33,5 @@
 
 - [ADR 0023: Resource-budgeted scalable scene preparation](adr-0023-scalable-scene-preparation.md)
 - [ADR 0024: Material-study terminal failure ownership](adr-0024-material-study-terminal-failure.md)
+
+- [ADR 0025: Shared scene camera input](adr-0025-shared-scene-camera-input.md)

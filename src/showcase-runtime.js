@@ -1,3 +1,4 @@
+import { createNativeDemoCamera } from './material-study-helpers/native-demo-camera.js';
 import { isModelConversionEnabled } from "./feature-flags.js";
 import { resolveShowcaseAssetUrl } from "./asset-url.js";
 import { loadGltfModel } from "./gltf-loader.js";
@@ -1548,8 +1549,8 @@ function buildCamera(state, canvas) {
   const yaw = state.camera.yaw ?? preset.yaw;
   const pitch = state.camera.pitch ?? preset.pitch;
   const distance = (state.camera.distance ?? preset.distance) * Math.max(1, 1.3 / (canvas.width / canvas.height));
-  const target = state.camera.target ?? vec3(...preset.target);
-  const eye = vec3(
+  const target = state.cameraOverride ? vec3(...state.cameraOverride.target) : state.camera.target ?? vec3(...preset.target);
+  const eye = state.cameraOverride ? vec3(...state.cameraOverride.eye) : vec3(
     target.x + Math.sin(yaw) * Math.cos(pitch) * distance,
     target.y + Math.sin(pitch) * distance,
     target.z + Math.cos(yaw) * Math.cos(pitch) * distance
@@ -1563,7 +1564,7 @@ function buildCamera(state, canvas) {
     forward,
     right,
     up,
-    fov: 54,
+    fov: state.cameraOverride?.fov ?? 54,
     aspect: canvas.width / canvas.height,
   };
 }
@@ -4653,12 +4654,20 @@ export async function mountGpuShowcase(options = {}, featureFlags = null) {
   state.demoDescription = resolveSceneDescription(state, options, shipModel).description;
   syncTextState(state, shipModel, featureAdapters);
 
+  let cameraControls = null, cameraRevision = 0;
   const nativeRenderer = await loadNativeShowcaseRenderer({
     enabled: nativeEnabled,
     canvas: dom.canvas,
     navigator: options.__navigator ?? globalThis.navigator,
     loader: options.__nativeRendererLoader,
-    onUnavailable(message) { dom.status.textContent = message; state.paused = true; state.rendererUnavailable = true; dom.pauseButton.disabled = true; },
+    onUnavailable(message) {
+      dom.status.textContent = message;
+      state.paused = true;
+      state.rendererUnavailable = true;
+      dom.pauseButton.disabled = true;
+      cameraControls?.setEnabled(false);
+      options.cameraControls?.onError?.(new Error(message));
+    },
   });
   state.rendererFallbackReason = nativeEnabled ? "webgpu-unavailable" : "native-rollout-disabled";
   const ctx = nativeRenderer ?? dom.canvas.getContext("2d");
@@ -4670,6 +4679,17 @@ export async function mountGpuShowcase(options = {}, featureFlags = null) {
   if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
     state.paused = true;
     dom.pauseButton.textContent = state.translate(gpuSharedTranslationKeys.resume);
+  }
+  const readInitialCamera = () => {
+    const view = buildCamera(state, dom.canvas);
+    return { eye: [view.eye.x,view.eye.y,view.eye.z], target: [view.target.x,view.target.y,view.target.z], fov: view.fov };
+  };
+  if (options.cameraControls?.enabled && !state.rendererUnavailable) {
+    dom.canvas.tabIndex = 0;
+    cameraControls = createNativeDemoCamera({canvas: dom.canvas, camera: readInitialCamera(),
+      onHintChange: options.cameraControls.onHintChange,
+      onChange(camera) { state.cameraOverride = camera; cameraRevision++; options.cameraControls.onChange?.(); },
+    });
   }
   let animationFrameId = 0;
   let destroyed = false;
@@ -4701,7 +4721,7 @@ export async function mountGpuShowcase(options = {}, featureFlags = null) {
 
     state.demoDescription = resolveSceneDescription(state, options, shipModel).description;
     resizeCanvasToDisplaySize(dom.canvas, state);
-    const sceneKey = `${state.time}:${state.focus}:${dom.canvas.width}:${dom.canvas.height}`;
+    const sceneKey = `${state.time}:${state.focus}:${dom.canvas.width}:${dom.canvas.height}:${cameraRevision}`;
     if (!state.rendererUnavailable && (!nativeRenderer || sceneKey !== lastNativeSceneKey)) renderScene(
       ctx,
       dom.canvas,
@@ -4731,18 +4751,27 @@ export async function mountGpuShowcase(options = {}, featureFlags = null) {
   const handleFocusChange = () => {
     state.focus = dom.focusMode.value;
     applyFocusCamera(state);
+    state.cameraOverride = null;
+    cameraControls?.setCamera(readInitialCamera());
   };
 
   dom.pauseButton.addEventListener("click", handlePauseClick);
   dom.stressToggle.addEventListener("change", handleStressChange);
   dom.focusMode.addEventListener("change", handleFocusChange);
 
+  const chrome = [];
+  for (const [target,selector] of [[options.controlsRoot,'.plasius-demo__toolbar'],[options.diagnosticsRoot,'.plasius-demo__diagnostics']]) {
+    const node = target ? root.querySelector(selector) : null;
+    if (node && target !== root && !node.contains(target)) { target.appendChild(node); chrome.push([target,node]); }
+  }
   animationFrameId = requestAnimationFrame(renderFrame);
   const destroy = () => {
     if (destroyed) {
       return;
     }
     destroyed = true;
+    cameraControls?.destroy();
+    for (const [target,node] of chrome) if (node.parentNode === target) target.removeChild(node);
     nativeRenderer?.destroy();
     if (animationFrameId) {
       cancelAnimationFrame(animationFrameId);
@@ -4775,6 +4804,7 @@ export async function mountGpuShowcase(options = {}, featureFlags = null) {
     state,
     shipModel,
     canvas: dom.canvas,
+    cameraControls,
     destroy,
   };
 }

@@ -10,13 +10,14 @@ function setup(extra={}) {
  const frames=[], renderers=[], cameras=[];
  const canvas={clientWidth:800,clientHeight:500,width:0,height:0};
  const deps={load:async()=>model,createRenderer:async options=>{ const r={...options,destroyed:0,render:f=>{frames.push(f);return {vertexCount:f.vertices.length/12};},destroy(){this.destroyed++;}};renderers.push(r);return r; },
-  createCamera:options=>{const c={...options,read:()=>options.camera,destroyed:0,destroy(){this.destroyed++;}};cameras.push(c);return c;},...extra};
+  createCamera:options=>{const c={...options,read:()=>options.camera,resets:0,reset(){this.resets++;},destroyed:0,destroy(){this.destroyed++;}};cameras.push(c);return c;},...extra};
  return {canvas,deps,frames,renderers,cameras};
 }
 test('shared study preserves camera, defaults, bare-wood endpoint and independent fray', async()=>{
  const s=setup(); const study=await createStudyRuntime({canvas:s.canvas,modelUrl:'https://example.test/wooden_crate_01.gltf'},s.deps);
  assert.equal(study.read().ropeFray,.3);assert.equal(study.read().varnishWear,.9);
  assert.equal(s.frames[0].water,false);assert.equal(s.frames[0].surfaces.at(-1).materialIndex,4);
+ study.resetCamera();assert.equal(s.cameras[0].resets,1);
  const camera=s.frames[0].camera; await study.update({varnishWear:1});
  assert.equal(study.read().varnishWear,1);assert.equal(s.frames.at(-1).camera,camera);
  assert.equal(s.renderers[0].destroyed,1);assert.equal(s.cameras.length,1);
@@ -25,7 +26,7 @@ test('shared study preserves camera, defaults, bare-wood endpoint and independen
  s.canvas.clientWidth=0; study.resize(); s.canvas.clientWidth=10000;study.resize();assert.ok(s.canvas.width<=1440);
  await assert.rejects(study.update({ropeFray:2}),/ageing/);
  await assert.rejects(study.update({fibres:'yes'}),/boolean/);
- study.destroy();study.destroy();study.resize();s.cameras[0].onChange();
+ study.destroy();study.destroy();study.resize();study.resetCamera();assert.equal(s.cameras[0].resets,1);s.cameras[0].onChange();
  assert.equal(s.renderers[1].destroyed,1);assert.equal(s.cameras[0].destroyed,1);
  await assert.rejects(study.update({ropeFray:.5}),{name:'AbortError'});
 });

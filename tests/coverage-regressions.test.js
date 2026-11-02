@@ -781,6 +781,46 @@ test("native showcase submits world geometry, freezes on pause and disposes rend
   } finally { Object.assign(globalThis,originals); }
 });
 
+test("paused harbour redraws after a direct camera gesture and resets its view without restarting vessels", async () => {
+  const originals=Object.fromEntries(['document','window','fetch','requestAnimationFrame','cancelAnimationFrame'].map(key=>[key,globalThis[key]]));
+  const h=createSceneHarness(), frames=[], draws=[], events=new Map(), captures=new Set();
+  const controlsRoot={appendChild(node){node.parentNode=this;},removeChild(node){node.parentNode=null;}};
+  const diagnosticsRoot={...controlsRoot};
+  const toolbar={contains:()=>false}, diagnostics={contains:()=>false};
+  h.elements['.plasius-demo__toolbar']=toolbar;h.elements['.plasius-demo__diagnostics']=diagnostics;
+  const canvas=h.elements['#demoCanvas'];
+  Object.assign(canvas,{style:{},ownerDocument:h.documentStub,
+    addEventListener:(type,fn)=>events.set(type,fn),removeEventListener:type=>events.delete(type),
+    focus(){h.documentStub.activeElement=this;},setPointerCapture:id=>captures.add(id),
+    hasPointerCapture:id=>captures.has(id),releasePointerCapture:id=>captures.delete(id)});
+  Object.assign(globalThis,{document:h.documentStub,window:h.windowStub,
+    fetch:async()=>({ok:true,json:async()=>createTriangleGltfDocument().document}),
+    requestAnimationFrame:fn=>{frames.push(fn);return frames.length;},cancelAnimationFrame:()=>{}});
+  let runtime, loseDevice;
+  const errors=[];
+  try {
+    runtime=await mountGpuShowcase({root:h.root,controlsRoot,diagnosticsRoot,cameraControls:{enabled:true,onError:error=>errors.push(error)},__navigator:{gpu:{}},
+      __featureFlags:{'gpu-demo.scene-fidelity.enabled':true},
+      __nativeRendererLoader:async()=>({createNativeSceneRenderer:async({onUnavailable})=>{loseDevice=onUnavailable;return {render:value=>{draws.push(value);return {};},destroy(){}};}})});
+    assert.equal(toolbar.parentNode,controlsRoot);assert.equal(diagnostics.parentNode,diagnosticsRoot);
+    frames.shift()(16);h.listenerRegistry.get('pauseButton:click')();frames.shift()(32);
+    const eye=draws[0].camera.eye, ships=JSON.stringify(runtime.state.ships);
+    const send=(type,extra={})=>events.get(type)?.({target:canvas,pointerType:'mouse',pointerId:1,button:0,clientX:0,clientY:0,preventDefault(){},...extra});
+    send('pointerdown');send('pointermove',{clientX:60,clientY:20});frames.shift()(48);
+    assert.equal(draws.length,2);assert.notDeepEqual(draws[1].camera.eye,eye);
+    assert.equal(JSON.stringify(runtime.state.ships),ships);
+    runtime.cameraControls.reset();frames.shift()(64);assert.deepEqual(draws[2].camera.eye,eye);
+    h.elements['#focusMode'].value='cloth';h.listenerRegistry.get('focusMode:change')();frames.shift()(80);
+    const cloth=runtime.cameraControls.read();runtime.cameraControls.move(30,20);runtime.cameraControls.reset();
+    assert.deepEqual(runtime.cameraControls.read(),cloth);
+    loseDevice('GPU unavailable');
+    assert.equal(errors.length,1);assert.equal(captures.size,0);
+    send('pointerdown');send('pointermove',{clientX:100});
+    assert.deepEqual(runtime.cameraControls.read(),cloth);
+    runtime.destroy();assert.equal(toolbar.parentNode,null);assert.equal(diagnostics.parentNode,null);assert.equal(events.size,0);assert.equal(captures.size,0);runtime=null;
+  } finally {runtime?.destroy();Object.assign(globalThis,originals);}
+});
+
 for (const condition of ["reduced-motion", "hidden-tab", "device-loss", "missing-fleet-asset", "webgpu-unavailable"]) test(`harbour traffic honours ${condition}`, async () => {
   const originals=Object.fromEntries(['document','window','fetch','requestAnimationFrame','cancelAnimationFrame'].map(key=>[key,globalThis[key]]));
   const harness=createSceneHarness(), frames=[];

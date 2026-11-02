@@ -6,23 +6,28 @@ const modes = ['orbit', 'truck', 'pan', 'dolly', 'zoom'];
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const vector = v => Array.isArray(v) && v.length === 3 && v.every(Number.isFinite);
 
-/** DOM input adapter only. Camera state, transforms and lens belong to gpu-camera. */
-export function createNativeDemoCamera({ canvas, camera, onChange, onHintChange = () => {} } = {}) {
-  if (!canvas?.addEventListener || typeof onChange !== 'function' || typeof onHintChange !== 'function' || !camera ||
-      !vector(camera.eye) || !vector(camera.target) || !Number.isFinite(camera.fov) ||
+function validateCamera(camera) {
+  if (!camera || !vector(camera.eye) || !vector(camera.target) || !Number.isFinite(camera.fov) ||
       camera.fov < 12 || camera.fov > 90 ||
       !Number.isFinite(Math.hypot(...camera.eye.map((v,i) => v-camera.target[i]))) ||
-      Math.hypot(...camera.eye.map((v,i) => v-camera.target[i])) < .03) {
+      Math.hypot(...camera.eye.map((v,i) => v-camera.target[i])) < .03)
     throw new Error('Invalid native demo camera.');
-  }
+}
+
+/** DOM input adapter only. Camera state, transforms and lens belong to gpu-camera. */
+export function createNativeDemoCamera({ canvas, camera, onChange, onHintChange = () => {} } = {}) {
+  if (!canvas?.addEventListener || typeof onChange !== 'function' || typeof onHintChange !== 'function')
+    throw new Error('Invalid native demo camera.');
+  validateCamera(camera);
   const manager = createCameraManager();
-  const initial = { id: 'inspection', transform: { position: [...camera.eye], target: [...camera.target], up: [0,1,0] },
+  let initial = { id: 'inspection', transform: { position: [...camera.eye], target: [...camera.target], up: [0,1,0] },
     projection: { kind: 'perspective', fovY: camera.fov, near: .01, far: 100 } };
   manager.registerCamera(initial);
-  const radius = Math.hypot(...camera.eye.map((v,i) => v-camera.target[i]));
-  const bounds = { minDistance: .03, maxDistance: Math.max(2,radius*10), minPolarAngle: .02, maxPolarAngle: Math.PI-.02 };
-  const gestures = createCameraControls({ camera: initial, viewMode: 'editor', ...bounds,
+  let radius = Math.hypot(...camera.eye.map((v,i) => v-camera.target[i]));
+  let bounds = { minDistance: .03, maxDistance: Math.max(2,radius*10), minPolarAngle: .02, maxPolarAngle: Math.PI-.02 };
+  let gestures = createCameraControls({ camera: initial, viewMode: 'editor', ...bounds,
     smoothTime: 0, draggingSmoothTime: 0, rotateSensitivity: .008, dollySensitivity: .004 });
+  let enabled = true;
   let mode = 'orbit', disposed = false, hintVisible = false, hintTimer;
   const points = new Map(), listeners = [];
   const originalTouchAction = canvas.style.touchAction;
@@ -32,7 +37,7 @@ export function createNativeDemoCamera({ canvas, camera, onChange, onHintChange 
     const c = state(); return { eye: c.transform.position, target: c.transform.target, fov: c.projection.fovY };
   };
   function move(dx, dy, operation = mode) {
-    if (disposed || !Number.isFinite(dx) || !Number.isFinite(dy) || (!dx && !dy)) return;
+    if (disposed || !enabled || !Number.isFinite(dx) || !Number.isFinite(dy) || (!dx && !dy)) return;
     dx=clamp(dx,-300,300); dy=clamp(dy,-300,300);
     const c=state(), height=Math.max(1,canvas.clientHeight);
     const distance=Math.hypot(...c.transform.position.map((v,i)=>v-c.transform.target[i]));
@@ -49,7 +54,7 @@ export function createNativeDemoCamera({ canvas, camera, onChange, onHintChange 
     if (operation === 'zoom') manager.updateCamera(initial.id,{projection:{fovY:clamp(c.projection.fovY*Math.exp(dy*.008),12,90)}});
     onChange(read());
   }
-  const reset = () => { if (!disposed) { manager.updateCamera(initial.id,initial); onChange(read()); } };
+  const reset = () => { if (!disposed && enabled) { cancel(); manager.updateCamera(initial.id,initial); onChange(read()); } };
   const setMode = value => { if (!modes.includes(value)) throw new Error('Invalid camera mode.'); mode=value; };
   const focused = e => canvas.ownerDocument.activeElement === canvas && e.target === canvas;
   const listen = (type,fn,options) => { canvas.addEventListener(type,fn,options); listeners.push([type,fn,options]); };
@@ -60,13 +65,14 @@ export function createNativeDemoCamera({ canvas, camera, onChange, onHintChange 
     if (hintVisible) { hintVisible=false; onHintChange(false); }
   };
   const showHint = () => {
+    if (!enabled || disposed) return;
     clearTimeout(hintTimer);
     hintVisible=true; onHintChange(true);
     hintTimer=setTimeout(hideHint,5000);
   };
   listen('focus',showHint);
   listen('pointerdown', e => {
-    if (e.button>2 || points.size>=2 || !Number.isFinite(e.clientX) || !Number.isFinite(e.clientY)) return;
+    if (!enabled || e.button>2 || points.size>=2 || !Number.isFinite(e.clientX) || !Number.isFinite(e.clientY)) return;
     canvas.focus({preventScroll:true});
     points.set(e.pointerId,{x:e.clientX,y:e.clientY,operation:e.pointerType==='touch'?'orbit':e.button===1||e.button===2||e.shiftKey?'truck':e.altKey?'pan':'orbit'});
     gestures.setCamera(state()); gestures.handlePointerDown(normalizePointerEvent(e));
@@ -95,14 +101,14 @@ export function createNativeDemoCamera({ canvas, camera, onChange, onHintChange 
   });
   for(const event of ['pointerup','pointercancel','lostpointercapture'])listen(event,e=>release(e.pointerId));
   listen('blur',()=>{cancel();hideHint();});
-  listen('contextmenu',e=>e.preventDefault());
+  listen('contextmenu',e=>{if(enabled)e.preventDefault();});
   listen('wheel',e=>{
-    if(!focused(e) || e.ctrlKey || e.metaKey || !Number.isFinite(e.deltaY))return;
+    if(!enabled || !focused(e) || e.ctrlKey || e.metaKey || !Number.isFinite(e.deltaY))return;
     const pixels=e.deltaY*(e.deltaMode===1?16:e.deltaMode===2?canvas.clientHeight:1);
     move(0,pixels*.25,e.shiftKey?'zoom':'dolly'); e.preventDefault();
   },{passive:false});
   listen('keydown',e=>{
-    if(!focused(e) || e.ctrlKey || e.metaKey || e.altKey)return;
+    if(!enabled || !focused(e) || e.ctrlKey || e.metaKey || e.altKey)return;
     const arrows={ArrowLeft:[-24,0],ArrowRight:[24,0],ArrowUp:[0,-24],ArrowDown:[0,24]};
     if(arrows[e.key])move(...arrows[e.key],e.shiftKey?'truck':mode);
     else if(['+','=','-','_'].includes(e.key))move(0,e.key==='+'||e.key==='='?-24:24,mode==='zoom'?'zoom':'dolly');
@@ -113,7 +119,25 @@ export function createNativeDemoCamera({ canvas, camera, onChange, onHintChange 
     else return;
     e.preventDefault();
   });
-  return {read,move,reset,setMode,getMode:()=>mode,destroy(){
+  function setCamera(next) {
+    if (disposed) return;
+    validateCamera(next); cancel();
+    initial = { ...initial, transform: { position: [...next.eye], target: [...next.target], up: [0,1,0] },
+      projection: { ...initial.projection, fovY: next.fov } };
+    radius = Math.hypot(...next.eye.map((v,i)=>v-next.target[i]));
+    bounds = { ...bounds, maxDistance: Math.max(2,radius*10) };
+    gestures = createCameraControls({ camera: initial, viewMode: 'editor', ...bounds,
+      smoothTime: 0, draggingSmoothTime: 0, rotateSensitivity: .008, dollySensitivity: .004 });
+    manager.updateCamera(initial.id,initial); onChange(read());
+  }
+  function setEnabled(value) {
+    if (disposed) return;
+    if (typeof value !== 'boolean') throw new Error('Camera enabled must be boolean.');
+    enabled=value;
+    if (!enabled) { cancel(); hideHint(); }
+    canvas.style.touchAction=enabled?'none':originalTouchAction;
+  }
+  return {read,move,reset,setMode,setCamera,setEnabled,getMode:()=>mode,destroy(){
     if(disposed)return;
     disposed=true; cancel(); hideHint();
     for(const args of listeners)canvas.removeEventListener(...args);

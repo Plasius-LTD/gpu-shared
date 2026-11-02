@@ -13,6 +13,7 @@ export interface MaterialStudy {
   read(): MaterialStudyState;
   update(patch: MaterialStudyUpdate): Promise<void>;
   resize(): void;
+  resetCamera(): void;
   destroy(): void;
 }
 export interface MaterialStudyOptions {

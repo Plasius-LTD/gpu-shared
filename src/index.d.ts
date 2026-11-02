@@ -407,7 +407,32 @@ export function createGpuSharedTranslator(
   translate?: GpuSharedTranslate
 ): (key: GpuSharedTranslationKey, args?: GpuSharedTranslationArgs) => string;
 
+/** Direct manipulation is opt-in; the host retains labels and transient gesture hints. */
+export interface SceneCameraPose {
+  eye: [number, number, number];
+  target: [number, number, number];
+  fov: number;
+}
+export interface SceneCameraControls {
+  read(): SceneCameraPose;
+  reset(): void;
+  /** Replaces the reset pose. Cancels any active gesture. */
+  setCamera(camera: SceneCameraPose): void;
+  /** Suspend before exclusive renderer work and resume after completion. */
+  setEnabled(enabled: boolean): void;
+}
+export interface SceneCameraOptions {
+  enabled: boolean;
+  onHintChange?: (visible: boolean) => void;
+  onChange?: () => void;
+  onError?: (error: unknown) => void;
+}
+
 export interface MountGpuShowcaseOptions {
+  cameraControls?: SceneCameraOptions;
+  /** Optional sibling containers for harbour controls and diagnostics, owned by the host. */
+  controlsRoot?: HTMLElement;
+  diagnosticsRoot?: HTMLElement;
   __showcaseFeatureLoaders?: {
     cloth?: () => Promise<unknown>;
     fluid?: () => Promise<unknown>;
@@ -452,6 +477,7 @@ export interface MountGpuShowcaseOptions {
 }
 
 export interface MountGpuShowcaseResult {
+  readonly cameraControls?: SceneCameraControls | null;
   readonly state: Record<string, unknown>;
   readonly shipModel?: GltfModel;
   readonly canvas: HTMLCanvasElement;
@@ -465,6 +491,7 @@ export interface MountGpuShowcaseResult {
 }
 
 export interface MountGpuProductStudioResult {
+  readonly cameraControls?: SceneCameraControls | null;
   readonly state: Readonly<{
     featureFlags: unknown;
     modelName: string;
@@ -488,6 +515,7 @@ export interface MountGpuProductStudioResult {
 }
 
 export interface MountGpuAnimationAdventureResult {
+  readonly cameraControls?: SceneCameraControls | null;
   readonly state: Readonly<{
     demoMode: "animation-adventure";
     renderMode: "canvas-2d" | "webgpu-pbr";
