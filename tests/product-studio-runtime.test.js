@@ -731,3 +731,33 @@ test("Admitted enabled, disabled, unavailable and rollback snapshots retain unco
     assert.equal(root.innerHTML, "<p>previous</p>");
   }
 });
+
+
+test("Product Studio camera updates the renderer, coalesces draws and suspends for exclusive work", async () => {
+  const f=lifecycleFixture(); const events=new Map(), captures=new Set(), frames=new Map(), updates=[];
+  const original=f.document.createElement.bind(f.document);
+  f.document.defaultView={requestAnimationFrame:fn=>{frames.set(1,fn);return 1;},cancelAnimationFrame:id=>frames.delete(id)};
+  f.document.createElement=name=>name==='canvas'?Object.assign(original(name),{
+    ownerDocument:f.document,clientHeight:400,
+    addEventListener:(type,fn)=>events.set(type,fn),removeEventListener:type=>events.delete(type),
+    focus(){f.document.activeElement=this;},setPointerCapture:id=>captures.add(id),
+    hasPointerCapture:id=>captures.has(id),releasePointerCapture:id=>captures.delete(id),
+  }):original(name);
+  f.options.cameraControls={enabled:true};
+  f.options.__rendererLoader=async()=>({createWavefrontPathTracingComputeRenderer:async()=>({
+    updateCamera:value=>updates.push(value),renderOnce:()=>{f.calls.rendered++;return {};},destroy:()=>f.calls.destroyed++,
+  })});
+  const result=await mountGpuProductStudio(f.options);
+  const send=(type,extra={})=>events.get(type)?.({target:result.canvas,pointerType:'mouse',pointerId:1,button:0,clientX:0,clientY:0,preventDefault(){},...extra});
+  send('pointerdown');send('pointermove',{clientX:40});send('pointermove',{clientX:60});
+  assert.equal(frames.size,1);assert.equal(updates.length,0);
+  frames.get(1)();frames.clear();assert.equal(updates.length,1);assert.equal(f.calls.rendered,2);
+  assert.notEqual(updates[0].position[0],0);
+  send('pointermove',{clientX:80});result.cameraControls.setEnabled(false);
+  assert.equal(frames.size,0);assert.equal(captures.size,0);
+  result.cameraControls.reset();assert.equal(frames.size,0);
+  result.cameraControls.setEnabled(true);result.cameraControls.reset();
+  frames.get(1)();frames.clear();assert.deepEqual(updates.at(-1).position,[0,1.12,5.05]);
+  send('pointerdown');send('pointermove',{clientX:30});result.destroy();
+  assert.equal(frames.size,0);assert.equal(events.size,0);assert.equal(captures.size,0);
+});

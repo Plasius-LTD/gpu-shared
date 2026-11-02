@@ -293,3 +293,27 @@ there is no npm write-token fallback. Production publication remains gated by
 the npm trusted-publisher binding and the protected-branch-only GitHub
 production environment.
 <!-- END PLASIUS RELEASE INTEGRITY -->
+
+
+### Direct scene camera controls
+
+The prebuilt harbour, Product Studio and canvas animation mounts accept
+`cameraControls: { enabled: true, onHintChange, onChange, onError }`. They reuse
+`@plasius/gpu-camera` and `@plasius/gpu-camera-controls`: drag to orbit,
+right/middle/Shift-drag to truck, Alt-drag to pan, focused wheel to dolly and
+Shift-wheel to change the lens. Touch uses one finger to orbit and two fingers
+to truck and pinch. Focused keyboard arrows, Shift-arrows, +/−, Home and modes
+1–5 provide equivalents; ? replays the five-second guide, Escape dismisses it.
+The host supplies accessible canvas labels and translated visible help.
+
+A mounted scene exposes `cameraControls.reset()`, `read()`, `setCamera(pose)` and
+`setEnabled(boolean)`. A pose contains `eye`, `target` and `fov` (12–90 degrees).
+Rebasing adopts a new reset pose and releases active pointers. Suspend input before
+exclusive `renderer.renderFrame()` work and resume it in `finally`; queued camera
+redraws are cancelled on suspension. Destroying the mount releases the controller.
+Canvas animation interaction requires a renderer with `setInspectionCamera`.
+
+Harbour mounts can accept `controlsRoot` and `diagnosticsRoot` sibling elements to
+place the toolbar and diagnostics in your own layout. These containers remain
+host-owned; teardown removes only the inserted runtime nodes. The material study
+also provides `resetCamera()`, preserving its material settings and GPU resources.

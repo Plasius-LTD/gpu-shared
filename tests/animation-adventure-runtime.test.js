@@ -550,3 +550,28 @@ test("mountGpuAnimationAdventure passes enabled camera modes through to gpu-rend
     options: { activeControl: true },
   });
 });
+
+test('direct adventure cameras own pointer input and change the actual renderer inspection pose',async()=>{
+  const f=createFakeDocument(), events=new Map(), captured=new Set(), poses=[];
+  const original=f.document.createElement.bind(f.document);
+  f.document.createElement=name=>name==='canvas'?Object.assign(original(name),{
+    ownerDocument:f.document,clientHeight:400,
+    addEventListener:(type,fn)=>events.set(type,fn),removeEventListener:type=>events.delete(type),
+    focus(){f.document.activeElement=this;},setPointerCapture:id=>captured.add(id),
+    hasPointerCapture:id=>captured.has(id),releasePointerCapture:id=>captured.delete(id),
+  }):original(name);
+  let destroyed=0;
+  const renderer={resize(){},start(){},getSnapshot:()=>({}),setInspectionCamera:pose=>poses.push(pose),destroy:()=>destroyed++};
+  const options={root:f.root,cameraControls:{enabled:true},animationAdventure:{route:[{position:[0,0,0]},{position:[8,0,-2]}]},
+    __rendererLoader:async()=>({createAnimatedSceneRenderer:()=>renderer})};
+  const result=await mountGpuAnimationAdventure(options);
+  assert.equal(poses.length,1);const initial=structuredClone(poses[0]);
+  const send=(type,extra={})=>events.get(type)?.({target:result.canvas,pointerType:'touch',pointerId:1,button:0,clientX:100,clientY:100,preventDefault(){},...extra});
+  send('pointerdown');send('pointermove',{clientX:150,clientY:125});
+  assert.notDeepEqual(poses.at(-1).position,initial.position);
+  result.cameraControls.reset();assert.deepEqual(poses.at(-1),initial);
+  result.destroy();result.destroy();assert.equal(events.size,0);assert.equal(captured.size,0);assert.equal(destroyed,1);
+  delete renderer.setInspectionCamera;
+  await assert.rejects(mountGpuAnimationAdventure(options),/inspection camera/);
+  assert.equal(destroyed,2);assert.equal(f.root.innerHTML,'<p>previous</p>');
+});

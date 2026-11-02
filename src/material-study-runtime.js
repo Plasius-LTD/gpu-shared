@@ -97,6 +97,7 @@ export async function createStudyRuntime({canvas,modelUrl,signal,onHintChange,on
   } catch(error) {destroy();throw error;}
   return Object.freeze({
     read:()=>({...profile,...toggles,looseEndCount}),resize:draw,destroy,
+    resetCamera(){if(!disposed&&!busy)camera?.reset();},
     async update(patch={}) {
       ensure();if(busy)throw new Error('Material study is busy.');
       const {ropeFray=profile.ropeFray,varnishWear=profile.varnishWear,...options}=patch;

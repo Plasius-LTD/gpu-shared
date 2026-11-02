@@ -1,3 +1,4 @@
+import { createNativeDemoCamera } from './material-study-helpers/native-demo-camera.js';
 import {
   GPU_SHOWCASE_CAMERA_MODES_FEATURE,
   GPU_SHOWCASE_PROFESSIONAL_ANIMATION_ADVENTURE_FEATURE,
@@ -437,6 +438,27 @@ export async function mountGpuAnimationAdventure(options = {}, featureFlags = op
   const renderer = professionalMode
     ? await rendererModule.createProfessionalAnimatedSceneRenderer(rendererOptions)
     : rendererModule.createAnimatedSceneRenderer(rendererOptions);
+  let cameraControls = null, destroyed = false;
+  try {
+    if (options.cameraControls?.enabled) {
+      if (typeof renderer.setInspectionCamera !== 'function') throw new Error('Renderer does not support an inspection camera.');
+      const positions = route.length ? route.map(point=>point.position) : [[0,0,0]];
+      const minimum = [0,1,2].map(axis=>Math.min(...positions.map(point=>point[axis])));
+      const maximum = [0,1,2].map(axis=>Math.max(...positions.map(point=>point[axis])));
+      const target = minimum.map((value,axis)=>(value+maximum[axis])/2);
+      target[1] += .7;
+      const distance = Math.max(8,Math.hypot(...maximum.map((value,axis)=>value-minimum[axis]))*1.6);
+      const update = pose => renderer.setInspectionCamera({position:pose.eye,target:pose.target,fovYDegrees:pose.fov});
+      canvas.tabIndex = 0;
+      cameraControls = createNativeDemoCamera({canvas,camera:{eye:[target[0],target[1]+distance*.4,target[2]+distance],target,fov:45},
+        onHintChange:options.cameraControls.onHintChange,
+        onChange(pose) { update(pose); options.cameraControls.onChange?.(); },
+      });
+      update(cameraControls.read());
+    }
+  } catch (error) {
+    cameraControls?.destroy();renderer.destroy();root.classList?.remove?.('plasius-animation-adventure');root.innerHTML=previousHtml;throw error;
+  }
   renderer.resize(canvas.width, canvas.height, 1);
   renderer.start();
   const rendererSnapshot = renderer.getSnapshot();
@@ -472,6 +494,7 @@ export async function mountGpuAnimationAdventure(options = {}, featureFlags = op
       rendererSnapshot,
     },
     renderer,
+    cameraControls,
     props,
     setCameraViewMode(viewMode) {
       renderer.setCameraViewMode?.(viewMode);
@@ -480,6 +503,9 @@ export async function mountGpuAnimationAdventure(options = {}, featureFlags = op
       renderer.applyCameraControl?.(control, controlOptions);
     },
     destroy() {
+      if (destroyed) return;
+      destroyed = true;
+      cameraControls?.destroy();
       renderer.destroy();
       root.classList?.remove?.("plasius-animation-adventure");
       root.innerHTML = previousHtml;

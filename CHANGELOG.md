@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Add direct mouse, touch and keyboard camera controls to harbour, Product Studio and canvas animation mounts, with safe reset/rebase, exclusive-render input suspension and host-managed gesture hints.
+- Allow harbour controls and diagnostics to mount in host-owned panels and expose material-study camera reset without rebuilding the scene.
+- Patch build-tool glob and minimatch with cancellation and bounded-pattern regression coverage.
+
 - **Added**
   - (placeholder)
 

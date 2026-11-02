@@ -1,3 +1,4 @@
+import { createNativeDemoCamera } from './material-study-helpers/native-demo-camera.js';
 import { isModelConversionEnabled } from "./feature-flags.js";
 import { loadGltfModel } from "./gltf-loader.js";
 import { isPvoxAssetUrl, loadPvoxModel } from "./pvox-loader.js";
@@ -452,6 +453,12 @@ export async function mountGpuProductStudio(options = {}, featureFlags = null) {
   let renderer = null;
   let restoreSnapshotHook = null;
   let closed = false;
+  let cameraControls = null, cameraFrame = null;
+  const windowRef = documentRef.defaultView ?? globalThis;
+  const cancelCameraFrame = () => {
+    if (cameraFrame !== null) windowRef.cancelAnimationFrame(cameraFrame);
+    cameraFrame = null;
+  };
   const owner = { cleanup };
   productStudioOwners.set(root, owner);
 
@@ -471,6 +478,10 @@ export async function mountGpuProductStudio(options = {}, featureFlags = null) {
     const snapshot = restoreSnapshotHook;
     restoreSnapshotHook = null;
     if (snapshot) release(snapshot);
+    release(cancelCameraFrame);
+    const acquiredCamera = cameraControls;
+    cameraControls = null;
+    if (acquiredCamera) release(() => acquiredCamera.destroy());
     const acquiredRenderer = renderer;
     renderer = null;
     if (acquiredRenderer) release(() => acquiredRenderer.destroy());
@@ -561,6 +572,32 @@ export async function mountGpuProductStudio(options = {}, featureFlags = null) {
     assertCurrent();
     const rendererStats = renderer.renderOnce();
     assertCurrent();
+    if (options.cameraControls?.enabled) {
+      if (typeof renderer.updateCamera !== 'function') throw new Error('Renderer does not support interactive cameras.');
+      canvas.tabIndex = 0;
+      cameraControls = createNativeDemoCamera({ canvas,
+        camera: { eye: [0,1.12,5.05], target: [0,.72,0], fov: 43 },
+        onHintChange: options.cameraControls.onHintChange,
+        onChange() {
+          options.cameraControls.onChange?.();
+          if (cameraFrame !== null || closed) return;
+          cameraFrame = windowRef.requestAnimationFrame(() => {
+            cameraFrame = null;
+            if (closed) return;
+            try {
+              const camera = cameraControls.read();
+              renderer.updateCamera({ position: camera.eye, target: camera.target, up: [0,1,0], fovYDegrees: camera.fov });
+              renderer.renderOnce();
+            } catch (error) {
+              cameraControls.setEnabled(false);
+              options.cameraControls.onError?.(error);
+            }
+          });
+        },
+      });
+      const setEnabled = cameraControls.setEnabled;
+      cameraControls.setEnabled = enabled => { if (!enabled) cancelCameraFrame(); setEnabled(enabled); };
+    }
     const state = Object.freeze({
       featureFlags,
       modelName: model.name,
@@ -585,6 +622,7 @@ export async function mountGpuProductStudio(options = {}, featureFlags = null) {
       canvas,
       renderer,
       meshes,
+      cameraControls,
       destroy() { cleanup(); },
     });
   } catch (error) {

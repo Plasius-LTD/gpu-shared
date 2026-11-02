@@ -28,6 +28,33 @@ function fixture(options = {}) {
 const distance = c => Math.hypot(...c.eye.map((v,i) => v-c.target[i]));
 const near = (a,b) => assert.ok(Math.abs(a-b)<1e-5, `${a} ~= ${b}`);
 
+test('exclusive rendering suspends input, releases captures and leaves page shortcuts alone', () => {
+  const f=fixture(); f.send('pointerdown');
+  f.controls.setEnabled(false);
+  assert.equal(f.captures.size,0);
+  assert.equal(f.canvas.style.touchAction,'auto');
+  for(const [type,data] of [['pointerdown',{}],['pointermove',{clientX:80}],['wheel',{deltaY:30}],['keydown',{key:'ArrowLeft'}]])
+    assert.ok(!f.send(type,data).prevented);
+  f.controls.move(80,10); f.controls.reset();
+  assert.deepEqual(f.controls.read(),f.camera); assert.equal(f.changes(),0);
+  f.controls.setEnabled(true); assert.equal(f.canvas.style.touchAction,'none');
+  f.send('pointerdown'); f.send('pointermove',{clientX:30});
+  assert.notDeepEqual(f.controls.read(),f.camera); f.controls.destroy();
+});
+
+test('rebasing adopts a new reset pose and bounds without retaining an active gesture', () => {
+  const f=fixture(); f.send('pointerdown');
+  const next={eye:[50,20,30],target:[40,10,20],fov:55};
+  f.controls.setCamera(next); assert.equal(f.captures.size,0);
+  assert.deepEqual(f.controls.read(),next);
+  f.send('pointermove',{clientX:100}); assert.deepEqual(f.controls.read(),next);
+  f.controls.move(40,30); f.controls.reset(); assert.deepEqual(f.controls.read(),next);
+  assert.throws(()=>f.controls.setCamera({...next,fov:NaN}),/Invalid native demo camera/);
+  assert.deepEqual(f.controls.read(),next);
+  f.controls.destroy(); const n=f.changes();f.controls.setCamera(f.camera);f.controls.setEnabled(true);
+  assert.equal(f.changes(),n);assert.equal(f.canvas.style.touchAction,'auto');
+});
+
 test('shared camera orbits, pans in place and trucks in its current view plane', () => {
   const { controls, camera } = fixture();
   controls.move(80,20);
