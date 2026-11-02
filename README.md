@@ -317,3 +317,7 @@ Harbour mounts can accept `controlsRoot` and `diagnosticsRoot` sibling elements 
 place the toolbar and diagnostics in your own layout. These containers remain
 host-owned; teardown removes only the inserted runtime nodes. The material study
 also provides `resetCamera()`, preserving its material settings and GPU resources.
+
+Release maintainers can finalise an already-published, cryptographically verified
+npm version after main advances using the existing CD workflow's verification-only
+phase. See [release recovery](docs/maintainers/releasing.md#finalising-a-registry-verified-draft-after-main-advances).

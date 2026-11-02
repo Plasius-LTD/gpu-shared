@@ -11,6 +11,11 @@ on:
         options:
           - prepare
           - publish
+          - finalize
+      published_run_id:
+        description: "Finalize only: original approved run that published the existing npm bytes"
+        required: false
+        type: string
       bump:
         description: "Version bump type"
         required: true
@@ -1040,3 +1045,123 @@ jobs:
           else
             gh release edit "${TAG}" --draft=false --latest --prerelease=false
           fi
+
+
+  finalize_snapshot:
+    if: inputs.phase == 'finalize'
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: write
+    outputs:
+      artifact_id: ${{ steps.snapshot.outputs.artifact-id }}
+    steps:
+      # GitHub only exposes drafts to callers with push access. This fixed,
+      # dependency-free collector does GET requests only; it executes no repo code.
+      - name: Collect draft release evidence without mutation
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF}" = "refs/heads/main"
+          test "${GITHUB_REPOSITORY}" = "Plasius-LTD/gpu-shared"
+          [[ "${RELEASE_TAG}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$ ]]
+          mkdir finalization-input
+          RELEASES="$(gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100")"
+          test "$(jq --arg tag "${RELEASE_TAG}" '[.[]|select(.tag_name==$tag)]|length' <<<"${RELEASES}")" = "1"
+          jq --arg tag "${RELEASE_TAG}" '.[]|select(.tag_name==$tag)' <<<"${RELEASES}" > finalization-input/release.json
+          for NAME in sbom.cdx.json zero-three-evidence.json; do
+            ID="$(jq -er --arg name "${NAME}" '.assets[]|select(.name==$name)|.id' finalization-input/release.json)"
+            [[ "${ID}" =~ ^[1-9][0-9]*$ ]]
+            gh api "repos/${GITHUB_REPOSITORY}/releases/assets/${ID}" -H 'Accept: application/octet-stream' > "finalization-input/${NAME}"
+          done
+      - name: Seal snapshot for read-only verification
+        id: snapshot
+        uses: actions/upload-artifact@v7
+        with:
+          name: finalization-input-${{ github.run_id }}-${{ github.run_attempt }}
+          path: finalization-input/
+          retention-days: 1
+          if-no-files-found: error
+
+  finalize_verify:
+    if: inputs.phase == 'finalize'
+    needs: finalize_snapshot
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      actions: read
+      attestations: read
+      contents: read
+    outputs:
+      release_id: ${{ steps.verify.outputs.release_id }}
+      release_fingerprint: ${{ steps.verify.outputs.release_fingerprint }}
+      source_sha: ${{ steps.verify.outputs.source_sha }}
+      release_tag: ${{ steps.verify.outputs.release_tag }}
+    steps:
+      - name: Checkout reviewed finalization policy
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Use release Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          package-manager-cache: false
+      - name: Download exact draft snapshot
+        uses: actions/download-artifact@v8
+        with:
+          artifact-ids: ${{ needs.finalize_snapshot.outputs.artifact_id }}
+          path: finalization-input
+          merge-multiple: true
+      - name: Verify existing immutable publication
+        id: verify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_SHA: ${{ inputs.expected_commit_sha }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          PUBLISHED_RUN_ID: ${{ inputs.published_run_id }}
+        run: node scripts/release/verify-finalization.cjs
+
+  finalize_release:
+    if: inputs.phase == 'finalize'
+    needs: finalize_verify
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: write
+    steps:
+      - name: Recheck identity and finalize the verified draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_ID: ${{ needs.finalize_verify.outputs.release_id }}
+          RELEASE_FINGERPRINT: ${{ needs.finalize_verify.outputs.release_fingerprint }}
+          SOURCE_SHA: ${{ needs.finalize_verify.outputs.source_sha }}
+          RELEASE_TAG: ${{ needs.finalize_verify.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF}" = "refs/heads/main"
+          test "${GITHUB_REPOSITORY}" = "Plasius-LTD/gpu-shared"
+          [[ "${RELEASE_ID}" =~ ^[1-9][0-9]*$ ]]
+          [[ "${SOURCE_SHA}" =~ ^[a-f0-9]{40}$ ]]
+          [[ "${RELEASE_FINGERPRINT}" =~ ^[a-f0-9]{64}$ ]]
+          MAIN_SHA="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/main" --jq '.object.sha')"
+          test "${MAIN_SHA}" = "${GITHUB_SHA}"
+          TAG="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}")"
+          test "$(jq -r '.object.type' <<<"${TAG}")" = "commit"
+          test "$(jq -r '.object.sha' <<<"${TAG}")" = "${SOURCE_SHA}"
+          RELEASE="$(gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}")"
+          IDENTITY="$(jq -c '[.id,.tag_name,.target_commitish,.draft,.prerelease,.name,.body,([.assets[]|[.id,.name,.size,.digest,.updated_at]]|sort_by(.[0]))]' <<<"${RELEASE}")"
+          FINGERPRINT="$(printf '%s' "${IDENTITY}" | sha256sum | cut -d' ' -f1)"
+          test "${FINGERPRINT}" = "${RELEASE_FINGERPRINT}"
+          test "$(jq -r '.tag_name' <<<"${RELEASE}")" = "${RELEASE_TAG}"
+          if [ "$(jq -r '.draft' <<<"${RELEASE}")" = "false" ]; then
+            echo "Verified release is already complete."
+            exit 0
+          fi
+          gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" --method PATCH -F draft=false -f make_latest=false > /dev/null
+          test "$(gh api "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}" --jq '.draft')" = "false"
+          echo "Verified existing release finalized; npm bytes and source tags were not changed."
