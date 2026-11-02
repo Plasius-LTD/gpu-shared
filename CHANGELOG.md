@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.7.0] - 2026-11-02
+
 - Add a verification-only CD recovery phase for existing npm publications whose GitHub release remains draft after main advances; preserve all normal publication gates and immutable artifact evidence (#199).
 
 - Add direct mouse, touch and keyboard camera controls to harbour, Product Studio and canvas animation mounts, with safe reset/rebase, exclusive-render input suspension and host-managed gesture hints.
@@ -1038,3 +1052,4 @@ All notable changes to this project will be documented in this file.
 [1.4.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.4.0
 [1.5.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.5.0
 [1.6.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.6.0
+[1.7.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.7.0
