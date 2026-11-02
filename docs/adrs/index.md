@@ -35,3 +35,5 @@
 - [ADR 0024: Material-study terminal failure ownership](adr-0024-material-study-terminal-failure.md)
 
 - [ADR 0025: Shared scene camera input](adr-0025-shared-scene-camera-input.md)
+
+- [ADR 0026: Verified release finalisation](adr-0026-verified-release-finalization.md)
