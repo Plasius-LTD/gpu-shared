@@ -414,6 +414,8 @@ export interface SceneCameraPose {
   fov: number;
 }
 export interface SceneCameraControls {
+  /** Product Studio: after setEnabled(false), drain the current preview before exclusive GPU work. */
+  whenIdle?(): Promise<void>;
   read(): SceneCameraPose;
   reset(): void;
   /** Replaces the reset pose. Cancels any active gesture. */

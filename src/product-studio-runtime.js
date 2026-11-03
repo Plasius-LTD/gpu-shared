@@ -454,8 +454,10 @@ export async function mountGpuProductStudio(options = {}, featureFlags = null) {
   let restoreSnapshotHook = null;
   let closed = false;
   let cameraControls = null, cameraFrame = null;
+  let cameraJob = null, cameraDirty = false, cameraEnabled = true;
   const windowRef = documentRef.defaultView ?? globalThis;
   const cancelCameraFrame = () => {
+    cameraDirty = false;
     if (cameraFrame !== null) windowRef.cancelAnimationFrame(cameraFrame);
     cameraFrame = null;
   };
@@ -570,33 +572,65 @@ export async function mountGpuProductStudio(options = {}, featureFlags = null) {
       ...lightingOptions,
     });
     assertCurrent();
-    const rendererStats = renderer.renderOnce();
+    if (typeof renderer.renderFrame !== "function") {
+      throw new Error("Product Studio requires awaited renderer frames.");
+    }
+    // Interactive previews have their own work budget. The renderer retains the
+    // requested sample target for exact fixed references.
+    const previewOptions = Object.freeze({
+      samplesPerPixel: Math.min(2, Number.isFinite(options.samplesPerPixel) ? options.samplesPerPixel : 8),
+      awaitGPUCompletion: true,
+      readStats: false,
+      readOutputProbe: false,
+    });
+    const rendererStats = await renderer.renderFrame(previewOptions);
     assertCurrent();
     if (options.cameraControls?.enabled) {
       if (typeof renderer.updateCamera !== 'function') throw new Error('Renderer does not support interactive cameras.');
       canvas.tabIndex = 0;
+      function scheduleCamera() {
+        if (closed || !cameraEnabled || cameraJob || cameraFrame !== null || !cameraDirty) return;
+        cameraFrame = windowRef.requestAnimationFrame(() => {
+          cameraFrame = null;
+          if (closed || !cameraEnabled) return;
+          cameraDirty = false;
+          const job = Promise.resolve().then(() => {
+            if (closed || !cameraEnabled) return;
+            const camera = cameraControls.read();
+            renderer.updateCamera({ position: camera.eye, target: camera.target, up: [0,1,0], fovYDegrees: camera.fov });
+            return renderer.renderFrame(previewOptions);
+          });
+          cameraJob = job;
+          void job.catch(error => {
+            if (closed) return;
+            cameraControls.setEnabled(false);
+            options.cameraControls.onError?.(error);
+          }).finally(() => {
+            cameraJob = null;
+            scheduleCamera();
+          });
+        });
+      }
       cameraControls = createNativeDemoCamera({ canvas,
         camera: { eye: [0,1.12,5.05], target: [0,.72,0], fov: 43 },
         onHintChange: options.cameraControls.onHintChange,
         onChange() {
           options.cameraControls.onChange?.();
-          if (cameraFrame !== null || closed) return;
-          cameraFrame = windowRef.requestAnimationFrame(() => {
-            cameraFrame = null;
-            if (closed) return;
-            try {
-              const camera = cameraControls.read();
-              renderer.updateCamera({ position: camera.eye, target: camera.target, up: [0,1,0], fovYDegrees: camera.fov });
-              renderer.renderOnce();
-            } catch (error) {
-              cameraControls.setEnabled(false);
-              options.cameraControls.onError?.(error);
-            }
-          });
+          cameraDirty = true;
+          scheduleCamera();
         },
       });
+      // Suspend input before awaiting this boundary for exclusive reference work.
+      cameraControls.whenIdle = async () => {
+        await cameraJob;
+        assertCurrent();
+      };
       const setEnabled = cameraControls.setEnabled;
-      cameraControls.setEnabled = enabled => { if (!enabled) cancelCameraFrame(); setEnabled(enabled); };
+      cameraControls.setEnabled = enabled => {
+        cameraEnabled = enabled === true;
+        if (!cameraEnabled) cancelCameraFrame();
+        setEnabled(enabled);
+      };
     }
     const state = Object.freeze({
       featureFlags,
