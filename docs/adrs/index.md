@@ -37,3 +37,5 @@
 - [ADR 0025: Shared scene camera input](adr-0025-shared-scene-camera-input.md)
 
 - [ADR 0026: Verified release finalisation](adr-0026-verified-release-finalization.md)
+
+- [ADR 0027: Awaited Product Studio preview ownership](adr-0027-product-preview-backpressure.md)

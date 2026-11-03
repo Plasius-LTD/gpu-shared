@@ -25,7 +25,7 @@ test("Getting-started scene loads generated geometry, preserves materials and re
               if (process.env.SCENE_FAILURE === "init") throw new Error("GPU unavailable");
               calls.allocated++;
               return {
-                renderOnce() { calls.render++; if (process.env.SCENE_FAILURE === "draw") throw new Error("GPU unavailable"); return {}; },
+                renderFrame() { calls.render++; if (process.env.SCENE_FAILURE === "draw") throw new Error("GPU unavailable"); return {}; },
                 destroy() { calls.destroy++; },
               };
             },
@@ -75,8 +75,8 @@ test("Getting-started scene loads generated geometry, preserves materials and re
         assert.equal(root.innerHTML, "<p>original host</p>");
         assert.deepEqual([...root.classList.values], ["caller-owned"]);
       } else {
-        assert.equal(calls.render, 1);
-        assert.match(status.textContent, /submitted/i);
+        assert.equal(calls.render, 2);
+        assert.match(status.textContent, /rendered at 64 samples/i);
         assert.match(root.children[0].attributes["aria-label"], /terracotta, copper and blue ceramic/);
       }
       scene.dispose();

@@ -110,8 +110,10 @@ try {
   });
   gallery.canvas.setAttribute("role", "img");
   gallery.canvas.setAttribute("aria-label",
-    "Three faceted sculptures: terracotta, copper and blue ceramic, in a lit studio");
-  status.textContent = "Gallery submitted. The image appears when the GPU finishes.";
+    "Faceted sculptures in terracotta, copper and blue ceramic, in a lit studio");
+  const renderer = /** @type {import("@plasius/gpu-renderer").WavefrontPathTracingComputeRenderer} */ (gallery.renderer);
+  await renderer.renderFrame({ awaitGPUCompletion: true });
+  status.textContent = "Gallery rendered at 64 samples per pixel.";
 } catch (error) {
   dispose();
   status.textContent = error instanceof Error ? error.message : "Unable to render the gallery.";
@@ -132,10 +134,11 @@ model, adds a floor, two walls and an emissive light, and delegates rendering to
 `@plasius/gpu-renderer`. Despite the API's name, it accepts your own scene; the
 provided URL prevents the default product asset from being loaded.
 
-This entry submits one bounded render with a fixed studio camera. It does not
-attach camera controls or progressively refine. Its promise resolves after
-submission, so the status deliberately does not claim GPU completion. The Blob
-URL is released after loading, and `dispose()` releases the scene when unmounted.
+The mount first awaits a small preview (at most two samples per pixel). It does
+not attach camera controls or progressively refine unless requested. The example
+then awaits the complete 64-sample reference through the renderer; the configured
+sample target is unchanged by preview rendering. The Blob URL is released after
+loading, and `dispose()` releases the scene when unmounted.
 A rejected mount releases any acquired renderer and restores the host markup and
 pre-existing classes before rejecting. The caller can show the failure without
 needing a handle from a failed mount. Destroy is idempotent; a new mount on the
@@ -309,8 +312,14 @@ The host supplies accessible canvas labels and translated visible help.
 A mounted scene exposes `cameraControls.reset()`, `read()`, `setCamera(pose)` and
 `setEnabled(boolean)`. A pose contains `eye`, `target` and `fov` (12–90 degrees).
 Rebasing adopts a new reset pose and releases active pointers. Suspend input before
-exclusive `renderer.renderFrame()` work and resume it in `finally`; queued camera
-redraws are cancelled on suspension. Destroying the mount releases the controller.
+exclusive `renderer.renderFrame()` work. Product Studio also exposes
+`cameraControls.whenIdle()`: await it after suspension to drain the current preview
+before starting the reference. Resume input after successful completion; on GPU
+failure, retain the error state and dispose/remount through your recovery UI.
+Queued camera redraws are cancelled on suspension. Product Studio permits only
+one awaited preview at a time and coalesces newer poses; its two-sample preview
+budget never changes the fixed-reference target. Destroying the mount releases
+the controller and prevents deferred redraws.
 Canvas animation interaction requires a renderer with `setInspectionCamera`.
 
 Harbour mounts can accept `controlsRoot` and `diagnosticsRoot` sibling elements to

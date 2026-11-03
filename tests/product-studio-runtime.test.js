@@ -341,15 +341,15 @@ test("mountGpuProductStudio loads the model and delegates mesh BVH renderer inpu
         async createWavefrontPathTracingComputeRenderer(options) {
           rendererOptions = options;
           return {
-            renderOnce() {
+            renderFrame(renderOptions) {
               return {
                 frame: 1,
                 width: options.width,
                 height: options.height,
                 maxDepth: options.maxDepth,
-                samplesPerPixel: options.samplesPerPixel,
+                samplesPerPixel: renderOptions.samplesPerPixel,
                 screenRays: options.width * options.height,
-                primaryRays: options.width * options.height * options.samplesPerPixel,
+                primaryRays: options.width * options.height * renderOptions.samplesPerPixel,
                 transportContributions: {
                   directExplicitLuminance: 0.42,
                   cachedIndirectLuminance: 0.31,
@@ -391,7 +391,7 @@ test("mountGpuProductStudio loads the model and delegates mesh BVH renderer inpu
   assert.equal(rendererOptions.featureFlags.enabled["renderer.environment.productStudioImportance.enabled"], true);
   assert.equal(rendererOptions.maxDepth, 2);
   assert.equal(rendererOptions.samplesPerPixel, 8);
-  assert.equal(result.state.rendererStats.samplesPerPixel, 8);
+  assert.equal(result.state.rendererStats.samplesPerPixel, 2);
   assert.deepEqual(result.state.rendererStats.transportContributions, {
     directExplicitLuminance: 0.42,
     cachedIndirectLuminance: 0.31,
@@ -400,7 +400,7 @@ test("mountGpuProductStudio loads the model and delegates mesh BVH renderer inpu
     deterministicChecksum: 123456,
   });
   assert.equal(result.state.rendererStats.screenRays, 640 * 360);
-  assert.equal(result.state.rendererStats.primaryRays, 640 * 360 * 8);
+  assert.equal(result.state.rendererStats.primaryRays, 640 * 360 * 2);
   assert.equal(result.productModel, result.model);
   const styleText = document.getElementById("plasius-product-studio-wavefront-style").textContent;
   assert.match(styleText, /aspect-ratio:\s*16 \/ 9/);
@@ -446,7 +446,7 @@ test("mountGpuProductStudio selects the PVOX loader without falling back to GLTF
       async createWavefrontPathTracingComputeRenderer(options) {
         rendererOptions = options;
         return {
-          renderOnce: () => ({ frame: 1 }),
+          renderFrame: () => ({ frame: 1 }),
           destroy() {},
         };
       },
@@ -470,7 +470,7 @@ test('actual Product Studio loader consumes enabled/disabled remote conversion d
     const {document,root}=createFakeDocument();let uploaded;
     const result=await mountGpuProductStudio({document,root,assetUrl:'https://example.test/model.gltf',
       __lightingLoader:async()=>null,__rendererLoader:async()=>({createWavefrontPathTracingComputeRenderer:async options=>{
-        uploaded=options.meshes;return {renderOnce(){return {};},destroy(){}};
+        uploaded=options.meshes;return {renderFrame(){return {};},destroy(){}};
       }}),
     },{'gpu.model.conversion.enabled':enabled});
     assert.equal(result.model.importProfile,enabled?'gltf-static-resources-v1':undefined);
@@ -493,7 +493,7 @@ function lifecycleFixture(overrides = {}) {
         async createWavefrontPathTracingComputeRenderer() {
           calls.allocated++;
           return {
-            renderOnce() { calls.rendered++; return {}; },
+            renderFrame() { calls.rendered++; return {}; },
             destroy() { calls.destroyed++; },
           };
         },
@@ -531,7 +531,7 @@ for (const stage of ["model", "pvox", "module", "lighting", "lighting-options", 
         if (stage === "renderer") throw failure;
         calls.allocated++;
         return {
-          renderOnce() { throw failure; },
+          renderFrame() { throw failure; },
           destroy() { calls.destroyed++; },
         };
       },
@@ -583,7 +583,7 @@ test("Product Studio cleanup errors preserve startup failure and do not skip hos
       __rendererLoader: async () => ({
         async createWavefrontPathTracingComputeRenderer() {
           return {
-            renderOnce() { if (drawFails) throw failure; return {}; },
+            renderFrame() { if (drawFails) throw failure; return {}; },
             destroy() { destroyed++; throw new Error("destroy failed"); },
           };
         },
@@ -620,7 +620,7 @@ for (const stage of ["model", "renderer"]) {
     const current = await mountGpuProductStudio({ ...next.options, root, document });
     const canvas = root.children[0];
     gate.resolve(stage === "model" ? createModelFixture() : {
-      renderOnce() { calls.rendered++; return {}; },
+      renderFrame() { calls.rendered++; return {}; },
       destroy() { calls.destroyed++; },
     });
     await rejected;
@@ -684,7 +684,7 @@ test("Class cleanup failure cannot mask startup failure or skip renderer and mar
     __rendererLoader: async () => ({
       async createWavefrontPathTracingComputeRenderer() {
         return {
-          renderOnce() { throw failure; },
+          renderFrame() { throw failure; },
           destroy() { destroyed++; },
         };
       },
@@ -703,7 +703,7 @@ test("Renderer disposal can reenter destroy without releasing resources twice", 
     __rendererLoader: async () => ({
       async createWavefrontPathTracingComputeRenderer() {
         return {
-          renderOnce() { return {}; },
+          renderFrame() { return {}; },
           destroy() { destroyed++; handle.destroy(); },
         };
       },
@@ -745,19 +745,129 @@ test("Product Studio camera updates the renderer, coalesces draws and suspends f
   }):original(name);
   f.options.cameraControls={enabled:true};
   f.options.__rendererLoader=async()=>({createWavefrontPathTracingComputeRenderer:async()=>({
-    updateCamera:value=>updates.push(value),renderOnce:()=>{f.calls.rendered++;return {};},destroy:()=>f.calls.destroyed++,
+    updateCamera:value=>updates.push(value),renderFrame:()=>{f.calls.rendered++;return {};},destroy:()=>f.calls.destroyed++,
   })});
   const result=await mountGpuProductStudio(f.options);
   const send=(type,extra={})=>events.get(type)?.({target:result.canvas,pointerType:'mouse',pointerId:1,button:0,clientX:0,clientY:0,preventDefault(){},...extra});
   send('pointerdown');send('pointermove',{clientX:40});send('pointermove',{clientX:60});
   assert.equal(frames.size,1);assert.equal(updates.length,0);
-  frames.get(1)();frames.clear();assert.equal(updates.length,1);assert.equal(f.calls.rendered,2);
+  frames.get(1)();frames.clear();await new Promise(resolve => setImmediate(resolve));assert.equal(updates.length,1);assert.equal(f.calls.rendered,2);
   assert.notEqual(updates[0].position[0],0);
   send('pointermove',{clientX:80});result.cameraControls.setEnabled(false);
   assert.equal(frames.size,0);assert.equal(captures.size,0);
   result.cameraControls.reset();assert.equal(frames.size,0);
   result.cameraControls.setEnabled(true);result.cameraControls.reset();
-  frames.get(1)();frames.clear();assert.deepEqual(updates.at(-1).position,[0,1.12,5.05]);
+  frames.get(1)();frames.clear();await new Promise(resolve => setImmediate(resolve));assert.deepEqual(updates.at(-1).position,[0,1.12,5.05]);
   send('pointerdown');send('pointermove',{clientX:30});result.destroy();
   assert.equal(frames.size,0);assert.equal(events.size,0);assert.equal(captures.size,0);
 });
+
+test('Product Studio awaits a bounded preview without changing its fixed-reference target', async () => {
+  const f = lifecycleFixture({ samplesPerPixel: 128 });
+  const gate = deferred();
+  const rendered = [];
+  let configured;
+  f.options.__rendererLoader = async () => ({
+    async createWavefrontPathTracingComputeRenderer(options) {
+      configured = options;
+      return {
+        renderOnce(o) { rendered.push({ kind: 'unawaited', options: o }); return {}; },
+        async renderFrame(o) { rendered.push({ kind: 'awaited', options: o }); await gate.promise; return { samplesPerPixel: o.samplesPerPixel }; },
+        destroy() {},
+      };
+    },
+  });
+  let mounted = false;
+  const pending = mountGpuProductStudio(f.options).then(value => { mounted = true; return value; });
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(configured.samplesPerPixel, 128, 'fixed reference target must stay at 128');
+  assert.equal(mounted, false, 'mount must not report ready while preview is queued');
+  assert.equal(rendered.length, 1);
+  assert.equal(rendered[0].kind, 'awaited');
+  assert.equal(rendered[0].options.samplesPerPixel, 2);
+  assert.equal(rendered[0].options.awaitGPUCompletion, true);
+  gate.resolve();
+  const result = await pending;
+  assert.equal(result.state.rendererStats.samplesPerPixel, 2);
+  result.destroy();
+});
+
+test('Product Studio coalesces camera poses until GPU completion and cancels deferred input for references', async () => {
+  const f = lifecycleFixture({ samplesPerPixel: 128 });
+  const events = new Map(), frames = new Map(), poses = [], jobs = [];
+  let nextFrame = 0;
+  const makeElement = f.document.createElement.bind(f.document);
+  f.document.defaultView = { requestAnimationFrame(fn) { frames.set(++nextFrame, fn); return nextFrame; }, cancelAnimationFrame(id) { frames.delete(id); } };
+  f.document.createElement = name => name === 'canvas' ? Object.assign(makeElement(name), {
+    ownerDocument: f.document, clientHeight: 400,
+    addEventListener: (name, fn) => events.set(name, fn), removeEventListener: name => events.delete(name),
+    focus() { f.document.activeElement = this; }, setPointerCapture() {}, hasPointerCapture() { return false; }, releasePointerCapture() {},
+  }) : makeElement(name);
+  const errors = [];
+  f.options.cameraControls = { enabled: true, onError: error => errors.push(error) };
+  let initial = true;
+  f.options.__rendererLoader = async () => ({ async createWavefrontPathTracingComputeRenderer() { return {
+    updateCamera(pose) { poses.push(pose); },
+    renderOnce() { jobs.push('unbounded'); return {}; },
+    renderFrame(options) { assert.equal(options.samplesPerPixel, 2); if(initial) { initial = false; return Promise.resolve({}); } const job = deferred(); jobs.push(job); return job.promise; },
+    destroy() {},
+  }; } });
+  const result = await mountGpuProductStudio(f.options);
+  const flush = async () => { const callbacks = [...frames.values()]; frames.clear(); callbacks.forEach(fn => fn()); await new Promise(resolve => setImmediate(resolve)); };
+  const move = x => events.get('pointermove')?.({ target: result.canvas, pointerType: 'mouse', pointerId: 1, clientX: x, clientY: 0, preventDefault() {} });
+  events.get('pointerdown')({ target: result.canvas, pointerType: 'mouse', pointerId: 1, button: 0, clientX: 0, clientY: 0, preventDefault() {} });
+  move(20); await flush();
+  assert.equal(jobs.length, 1);
+  assert.notEqual(jobs[0], 'unbounded', 'camera redraw must await bounded work');
+  move(40); await flush(); move(60); await flush();
+  assert.equal(jobs.length, 1, 'no second camera frame before GPU completion');
+  jobs[0].resolve({}); await flush(); await flush();
+  assert.equal(jobs.length, 2, 'latest pending pose is drawn once');
+  assert.notDeepEqual(poses[0], poses[1]);
+  move(80); result.cameraControls.setEnabled(false);
+  let idle = false;
+  const idleJob = result.cameraControls.whenIdle().then(() => { idle = true; });
+  await flush(); assert.equal(idle, false, 'reference must wait for queued preview');
+  jobs[1].resolve({}); await idleJob; await flush(); await flush();
+  assert.equal(jobs.length, 2, 'reference suspension discards pending preview');
+  result.cameraControls.setEnabled(true); result.cameraControls.reset(); await flush();
+  assert.equal(jobs.length, 3);
+  const failure = new Error('GPU preview failed');
+  const failedIdle = assert.rejects(result.cameraControls.whenIdle(), failure);
+  jobs[2].reject(failure); await failedIdle; await flush();
+  assert.deepEqual(errors, [failure]);
+  result.cameraControls.reset(); await flush();
+  assert.equal(jobs.length, 3, 'failed previews suspend input until explicit recovery');
+  result.cameraControls.setEnabled(true); result.cameraControls.reset(); await flush();
+  assert.equal(jobs.length, 4);
+  result.destroy(); jobs[3].reject(new Error('disposed GPU')); await flush();
+  assert.deepEqual(errors, [failure], 'late disposed work cannot report a new scene error');
+  assert.equal(jobs.length, 4);
+  assert.equal(frames.size, 0);
+  await assert.rejects(result.cameraControls.whenIdle(), /superseded/);
+});
+
+for (const previewFails of [false, true]) {
+  test(`superseding an awaited preview preserves the new scene when old work ${previewFails ? 'fails' : 'completes'}`, async () => {
+    const f = lifecycleFixture(), acquired = deferred(), preview = deferred();
+    const failure = new Error('old preview device lost');
+    f.options.__rendererLoader = async () => ({ async createWavefrontPathTracingComputeRenderer() { return {
+      renderFrame() { acquired.resolve(); return preview.promise; },
+      destroy() { f.calls.destroyed++; },
+    }; } });
+    const old = mountGpuProductStudio(f.options);
+    const rejected = assert.rejects(old, previewFails ? failure : /superseded/);
+    await acquired.promise;
+    const next = lifecycleFixture();
+    const current = await mountGpuProductStudio({ ...next.options, root: f.root, document: f.document });
+    const canvas = f.root.children[0];
+    if(previewFails) preview.reject(failure); else preview.resolve({});
+    await rejected;
+    assert.equal(f.calls.destroyed, 1);
+    assert.equal(next.calls.destroyed, 0);
+    assert.equal(f.root.children[0], canvas);
+    current.destroy();
+    assert.equal(next.calls.destroyed, 1);
+    assert.equal(f.root.innerHTML, '<p>previous</p>');
+  });
+}

@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Bound Product Studio mount/camera previews, coalesce input until GPU completion, and expose a preview-drain boundary before exact fixed references without reducing their sample target (#202).
+
 - **Added**
   - (placeholder)
 
