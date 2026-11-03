@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.8.0] - 2026-11-03
+
 - Bound Product Studio mount/camera previews, coalesce input until GPU completion, and expose a preview-drain boundary before exact fixed references without reducing their sample target (#202).
 
 - **Added**
@@ -1055,3 +1069,4 @@ All notable changes to this project will be documented in this file.
 [1.5.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.5.0
 [1.6.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.6.0
 [1.7.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.7.0
+[1.8.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.8.0
