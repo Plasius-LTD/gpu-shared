@@ -1,3 +1,4 @@
+import { createProductStudioMotionPerformance } from './product-studio-performance.js';
 import { createNativeDemoCamera } from './material-study-helpers/native-demo-camera.js';
 import { isModelConversionEnabled } from "./feature-flags.js";
 import { loadGltfModel } from "./gltf-loader.js";
@@ -456,6 +457,7 @@ export async function mountGpuProductStudio(options = {}, featureFlags = null) {
   let cameraControls = null, cameraFrame = null;
   let cameraJob = null, cameraDirty = false, cameraEnabled = true;
   const windowRef = documentRef.defaultView ?? globalThis;
+  const now = () => (windowRef.performance ?? globalThis.performance).now();
   const cancelCameraFrame = () => {
     cameraDirty = false;
     if (cameraFrame !== null) windowRef.cancelAnimationFrame(cameraFrame);
@@ -548,6 +550,9 @@ export async function mountGpuProductStudio(options = {}, featureFlags = null) {
       throw new Error("Product Studio renderer loader must provide createWavefrontPathTracingComputeRenderer.");
     }
 
+    const sampleTarget = Number.isFinite(options.samplesPerPixel) ? options.samplesPerPixel : 8;
+    const motionPerformance = await createProductStudioMotionPerformance(options.motionPerformance, sampleTarget, options.__showcaseFeatureLoaders?.performance, now);
+    assertCurrent();
     const size = resolveRenderSize(options);
     const lightingOptions = await resolveWavefrontLightingOptions(options);
     assertCurrent();
@@ -557,7 +562,7 @@ export async function mountGpuProductStudio(options = {}, featureFlags = null) {
       height: size.height,
       maxDepth: Number.isFinite(options.maxDepth) ? options.maxDepth : DEFAULT_RENDER_MAX_DEPTH,
       tileSize: Number.isFinite(options.tileSize) ? options.tileSize : 128,
-      samplesPerPixel: Number.isFinite(options.samplesPerPixel) ? options.samplesPerPixel : 8,
+      samplesPerPixel: sampleTarget,
       denoise: options.denoise !== false,
       presentationOutput: options.presentationOutput,
       displayQuality: true,
@@ -578,19 +583,26 @@ export async function mountGpuProductStudio(options = {}, featureFlags = null) {
     // Interactive previews have their own work budget. The renderer retains the
     // requested sample target for exact fixed references.
     const previewOptions = Object.freeze({
-      samplesPerPixel: Math.min(2, Number.isFinite(options.samplesPerPixel) ? options.samplesPerPixel : 8),
+      samplesPerPixel: Math.min(2, sampleTarget),
       awaitGPUCompletion: true,
       readStats: false,
       readOutputProbe: false,
     });
-    const rendererStats = await renderer.renderFrame(previewOptions);
+    async function renderPreview(queuedAt) {
+      const frameOptions = motionPerformance?.frameOptions(queuedAt) ?? previewOptions;
+      const stats = await renderer.renderFrame(frameOptions);
+      if (!closed) motionPerformance?.complete(queuedAt, frameOptions, stats);
+      return stats;
+    }
+    const rendererStats = await renderPreview(now());
     assertCurrent();
     if (options.cameraControls?.enabled) {
       if (typeof renderer.updateCamera !== 'function') throw new Error('Renderer does not support interactive cameras.');
       canvas.tabIndex = 0;
-      function scheduleCamera() {
+      function scheduleCamera(continueMotion = false) {
         if (closed || !cameraEnabled || cameraJob || cameraFrame !== null || !cameraDirty) return;
-        cameraFrame = windowRef.requestAnimationFrame(() => {
+        const queuedAt = now();
+        const renderCamera = () => {
           cameraFrame = null;
           if (closed || !cameraEnabled) return;
           cameraDirty = false;
@@ -598,7 +610,7 @@ export async function mountGpuProductStudio(options = {}, featureFlags = null) {
             if (closed || !cameraEnabled) return;
             const camera = cameraControls.read();
             renderer.updateCamera({ position: camera.eye, target: camera.target, up: [0,1,0], fovYDegrees: camera.fov });
-            return renderer.renderFrame(previewOptions);
+            return renderPreview(queuedAt);
           });
           cameraJob = job;
           void job.catch(error => {
@@ -607,9 +619,13 @@ export async function mountGpuProductStudio(options = {}, featureFlags = null) {
             options.cameraControls.onError?.(error);
           }).finally(() => {
             cameraJob = null;
-            scheduleCamera();
+            scheduleCamera(motionPerformance !== null);
           });
-        });
+        };
+        // Awaited GPU completion is already a pacing boundary. Keep a busy motion
+        // stream supplied with its latest pose without adding a second rAF wait.
+        if (continueMotion) renderCamera();
+        else cameraFrame = windowRef.requestAnimationFrame(renderCamera);
       }
       cameraControls = createNativeDemoCamera({ canvas,
         camera: { eye: [0,1.12,5.05], target: [0,.72,0], fov: 43 },
@@ -657,6 +673,7 @@ export async function mountGpuProductStudio(options = {}, featureFlags = null) {
       renderer,
       meshes,
       cameraControls,
+      getMotionPerformanceSnapshot: () => motionPerformance?.snapshot() ?? null,
       destroy() { cleanup(); },
     });
   } catch (error) {

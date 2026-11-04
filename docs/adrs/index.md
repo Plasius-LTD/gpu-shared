@@ -39,3 +39,5 @@
 - [ADR 0026: Verified release finalisation](adr-0026-verified-release-finalization.md)
 
 - [ADR 0027: Awaited Product Studio preview ownership](adr-0027-product-preview-backpressure.md)
+
+- [ADR 0028: Consumer-owned motion performance](adr-0028-consumer-motion-performance.md)

@@ -430,7 +430,26 @@ export interface SceneCameraOptions {
   onError?: (error: unknown) => void;
 }
 
+/** Consumer-owned motion cadence; does not alter exact fixed-reference requests. */
+export interface ProductStudioMotionPerformanceOptions {
+  /** Integer FPS target from 1 to 1000. Completion cadence is hardware dependent. */
+  readonly targetFrameRate: number;
+}
+export interface ProductStudioMotionPerformanceSnapshot {
+  readonly targetFrameRate: number;
+  readonly targetFrameTimeMs: number;
+  readonly frameTimeMs: number;
+  readonly frameTimeBudgetMs: number;
+  readonly requestedSamplesPerPixel: number;
+  /** Null when the renderer did not report a completed count. */
+  readonly renderedSamplesPerPixel: number | null;
+  readonly overBudget: boolean;
+  readonly completedFrames: number;
+}
+
 export interface MountGpuShowcaseOptions {
+  /** Requires __showcaseFeatureLoaders.performance supplying published gpu-performance APIs. */
+  motionPerformance?: ProductStudioMotionPerformanceOptions;
   cameraControls?: SceneCameraOptions;
   /** Optional sibling containers for harbour controls and diagnostics, owned by the host. */
   controlsRoot?: HTMLElement;
@@ -479,6 +498,7 @@ export interface MountGpuShowcaseOptions {
 }
 
 export interface MountGpuShowcaseResult {
+  getMotionPerformanceSnapshot?(): ProductStudioMotionPerformanceSnapshot | null;
   readonly cameraControls?: SceneCameraControls | null;
   readonly state: Record<string, unknown>;
   readonly shipModel?: GltfModel;
@@ -493,6 +513,7 @@ export interface MountGpuShowcaseResult {
 }
 
 export interface MountGpuProductStudioResult {
+  getMotionPerformanceSnapshot(): ProductStudioMotionPerformanceSnapshot | null;
   readonly cameraControls?: SceneCameraControls | null;
   readonly state: Readonly<{
     featureFlags: unknown;

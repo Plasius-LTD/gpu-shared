@@ -871,3 +871,61 @@ for (const previewFails of [false, true]) {
     assert.equal(f.root.innerHTML, '<p>previous</p>');
   });
 }
+
+test('Product Studio budgets completed motion with host policy, preserves references and excludes disposed work', async () => {
+  const f = lifecycleFixture({ samplesPerPixel: 128, motionPerformance: { targetFrameRate: 24 } });
+  const performanceModule = await import('@plasius/gpu-performance');
+  let time = 0, governor, initial = true;
+  const frames = new Map(), jobs = [], draws = [];
+  let nextFrame = 0;
+  f.document.defaultView = { performance: { now: () => time },
+    requestAnimationFrame(fn) { frames.set(++nextFrame, fn); return nextFrame; }, cancelAnimationFrame(id) { frames.delete(id); } };
+  const original = f.document.createElement.bind(f.document);
+  f.document.createElement = name => name === 'canvas' ? Object.assign(original(name), {
+    ownerDocument: f.document, clientHeight: 400, addEventListener() {}, removeEventListener() {},
+  }) : original(name);
+  f.options.cameraControls = { enabled: true };
+  f.options.__showcaseFeatureLoaders = { performance: async () => ({ ...performanceModule,
+    createGpuPerformanceGovernor(options) { governor = performanceModule.createGpuPerformanceGovernor(options); return governor; } }) };
+  f.options.__rendererLoader = async () => ({ async createWavefrontPathTracingComputeRenderer(config) {
+    assert.equal(config.samplesPerPixel, 128);
+    return { updateCamera() { time += 2; }, destroy() { f.calls.destroyed++; },
+      renderFrame(options) {
+        draws.push(options);
+        if(initial) { initial = false; time += 10; return Promise.resolve({ renderedSamplesPerPixel: 1 }); }
+        const job = deferred(); jobs.push(job); return job.promise;
+      },
+    };
+  } });
+  const result = await mountGpuProductStudio(f.options);
+  assert.equal(draws[0].samplesPerPixel, 128);
+  assert.equal(draws[0].minimumSamplesPerPixel, 1);
+  assert.equal(draws[0].frameTimeBudgetMs, 1000/24);
+  assert.equal(result.getMotionPerformanceSnapshot().renderedSamplesPerPixel, 1);
+  const flush = async () => { const callbacks = [...frames.values()]; frames.clear(); callbacks.forEach(fn => fn()); await new Promise(resolve => setImmediate(resolve)); };
+  time = 10000; result.cameraControls.reset(); time += 5; await flush();
+  assert.equal(draws[1].frameTimeBudgetMs, 1000/24 - 7);
+  result.cameraControls.reset(); await flush(); assert.equal(jobs.length, 1);
+  time = 10030; jobs[0].resolve({ renderedSamplesPerPixel: 4 }); await result.cameraControls.whenIdle();
+  assert.equal(governor.getState().metrics.latestFrameTimeMs, 30, 'idle time is excluded; scheduling/update work included');
+  assert.equal(result.getMotionPerformanceSnapshot().renderedSamplesPerPixel, 4);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(jobs.length, 2, 'queued motion starts as soon as the awaited GPU slot is free, without another animation-frame delay');
+  result.cameraControls.setEnabled(false); time += 10; jobs[1].resolve({ renderedSamplesPerPixel: 2 });
+  await result.cameraControls.whenIdle(); await flush(); assert.equal(jobs.length, 2);
+  // Exclusive reference callers still use the unmodified renderer without a motion budget.
+  const reference = result.renderer.renderFrame({ samplesPerPixel: 128, awaitGPUCompletion: true });
+  assert.equal(draws.at(-1).frameTimeBudgetMs, undefined);
+  jobs[2].resolve({ renderedSamplesPerPixel: 128 }); await reference;
+  assert.equal(result.getMotionPerformanceSnapshot().completedFrames, 3);
+  result.cameraControls.setEnabled(true); result.cameraControls.reset(); await flush();
+  result.destroy(); time += 100; jobs[3].resolve({ renderedSamplesPerPixel: 2 }); await flush();
+  assert.equal(result.getMotionPerformanceSnapshot().completedFrames, 3, 'disposed completion cannot update telemetry');
+  assert.equal(f.calls.destroyed, 1);
+});
+
+test('an explicitly requested unavailable performance module fails mount and restores ownership', async () => {
+  const f = lifecycleFixture({ motionPerformance: { targetFrameRate: 24 } });
+  await assert.rejects(mountGpuProductStudio(f.options), /performance.*loader/i);
+  assert.equal(f.root.innerHTML, '<p>previous</p>');
+});

@@ -13,3 +13,5 @@
 - [TDR 0007: glTF adapter migration](tdr-0007-gltf-adapter-migration.md)
 
 - [TDR 0009: Instanced inspection qualification](tdr-0009-instanced-inspection-qualification.md)
+
+- [TDR 0013: Motion performance qualification](tdr-0013-motion-performance-qualification.md)
