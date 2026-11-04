@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.9.0] - 2026-11-04
+
 - Add optional consumer-owned Product Studio motion targets using injected gpu-performance governance and renderer frame budgets, with completed-sample diagnostics and unchanged exact references (#206).
 
 - **Added**
@@ -1072,3 +1086,4 @@ All notable changes to this project will be documented in this file.
 [1.6.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.6.0
 [1.7.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.7.0
 [1.8.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.8.0
+[1.9.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.9.0
