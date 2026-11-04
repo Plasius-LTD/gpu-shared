@@ -201,3 +201,50 @@ scale. The repository demo also accepts `?capture=1&renderScale=1` and bounds it
 capture buffer to 1080p by default. Frame intervals and native submission counts
 are measurements of their named stages, not GPU completion or physical core counts.
 Keep telemetry and validation-specific comparisons in your host's diagnostic UI.
+
+## Motion performance budget
+
+Product Studio accepts a consumer-owned cadence independently of renderer rollout
+or development targets. Install `@plasius/gpu-performance` in the host and inject
+its published module lazily:
+
+```js
+import { mountGpuProductStudio } from "@plasius/gpu-shared";
+
+const root = document.querySelector('#studio');
+if (!(root instanceof HTMLElement)) throw new Error('Studio container is missing.');
+const studio = await mountGpuProductStudio({
+  root,
+  productAssetUrl: '/models/product.gltf',
+  samplesPerPixel: 128,
+  cameraControls: { enabled: true },
+  motionPerformance: { targetFrameRate: 24 },
+  __showcaseFeatureLoaders: {
+    performance: () => import('@plasius/gpu-performance'),
+  },
+});
+```
+
+The governor negotiates that exact integer target (1–1000 FPS) and controls the
+sample ceiling. Awaited renderer frames use the remaining time budget after host
+scheduling and camera updates, with at least one complete sample per pixel.
+Actual completed time feeds the governor. More renderer throughput can yield
+more samples without changing the application's target; resolution, transport,
+geometry and depth are preserved. The integration uses the existing published
+uniform sampling budget; it does not claim per-pixel selective refinement.
+
+`studio.getMotionPerformanceSnapshot()` returns the latest completed preview's
+requested/actual SPP, target interval, available render budget, total elapsed
+completion time and over-budget status. Missing renderer counts remain `null`.
+These are local completion measurements, not physical display scanout FPS or a
+universal minimum-cadence guarantee. If minimum coverage exceeds budget it still
+renders and reports the overrun. No telemetry delivery is installed.
+
+Omit `motionPerformance` to preserve the default two-SPP previews and a `null`
+performance snapshot. An explicitly requested policy requires the injected
+module; invalid configuration or missing APIs fail the mount visibly. Shared
+does not take a normal dependency on gpu-performance, avoiding a dependency cycle.
+
+For exact references, suspend camera controls, await `cameraControls.whenIdle()`,
+then submit the requested count directly to the renderer without a frame budget.
+Resume input afterward using the host's existing success/error handling.

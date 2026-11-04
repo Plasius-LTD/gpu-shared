@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Add optional consumer-owned Product Studio motion targets using injected gpu-performance governance and renderer frame budgets, with completed-sample diagnostics and unchanged exact references (#206).
+
 - **Added**
   - (placeholder)
 
