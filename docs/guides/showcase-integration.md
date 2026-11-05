@@ -218,7 +218,7 @@ const studio = await mountGpuProductStudio({
   productAssetUrl: '/models/product.gltf',
   samplesPerPixel: 128,
   cameraControls: { enabled: true },
-  motionPerformance: { targetFrameRate: 24 },
+  motionPerformance: { targetFrameRate: 24, minimumBounceDepth: 1 },
   __showcaseFeatureLoaders: {
     performance: () => import('@plasius/gpu-performance'),
   },
@@ -228,10 +228,16 @@ const studio = await mountGpuProductStudio({
 The governor negotiates that exact integer target (1–1000 FPS) and controls the
 sample ceiling. Awaited renderer frames use the remaining time budget after host
 scheduling and camera updates, with at least one complete sample per pixel.
-Actual completed time feeds the governor. More renderer throughput can yield
-more samples without changing the application's target; resolution, transport,
-geometry and depth are preserved. The integration uses the existing published
-uniform sampling budget; it does not claim per-pixel selective refinement.
+Actual completed time feeds the governor. To scale depth as well, set
+`motionPerformance: { targetFrameRate: 24, minimumBounceDepth: 1 }`. This
+requires a renderer that advertises `supportsFrameMaxDepth`. Sustained pressure
+removes extra samples first, then reduces depth at one sample per pixel.
+Recovery restores depth first, then extra samples. The preview returns to the
+configured depth after camera input has been quiet for 150 ms. Resolution,
+geometry and material settings stay fixed. This uses a uniform sample budget.
+
+For the joint policy, the motion snapshot also reports `requestedMaxDepth` and
+`renderedMaxDepth`. A frame can still overrun at the minimum quality.
 
 `studio.getMotionPerformanceSnapshot()` returns the latest completed preview's
 requested/actual SPP, target interval, available render budget, total elapsed

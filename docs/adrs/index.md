@@ -1,5 +1,7 @@
 # ADR Index
 
+- [ADR-0029 Joint Product Studio motion quality](./adr-0029-joint-product-studio-motion-quality.md)
+
 - [ADR-0021 Product Studio startup ownership](./adr-0021-product-studio-startup-ownership.md)
 
 - [ADR-0020 Bounded adapter preflight cancellation](./adr-0020-bounded-adapter-preflight-cancellation.md)
