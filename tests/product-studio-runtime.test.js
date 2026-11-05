@@ -929,3 +929,66 @@ test('an explicitly requested unavailable performance module fails mount and res
   await assert.rejects(mountGpuProductStudio(f.options), /performance.*loader/i);
   assert.equal(f.root.innerHTML, '<p>previous</p>');
 });
+
+test('joint motion caps apply only during movement and settle after the pending GPU job', async () => {
+  const f = lifecycleFixture({ maxDepth: 4, samplesPerPixel: 8,
+    motionPerformance: { targetFrameRate: 60, minimumBounceDepth: 1 } });
+  let time = 0, id = 0;
+  const frames = new Map(), timers = new Map(), draws = [];
+  const pending = deferred();
+  f.document.defaultView = { performance: { now: () => time },
+    requestAnimationFrame(fn) { frames.set(++id, fn); return id; }, cancelAnimationFrame(id) { frames.delete(id); },
+    setTimeout(fn) { timers.set(++id, fn); return id; }, clearTimeout(id) { timers.delete(id); } };
+  const original = f.document.createElement.bind(f.document);
+  f.document.createElement = name => name === 'canvas' ? Object.assign(original(name), {
+    ownerDocument: f.document, clientHeight: 400, addEventListener() {}, removeEventListener() {},
+  }) : original(name);
+  f.options.cameraControls = { enabled: true };
+  f.options.__showcaseFeatureLoaders = { performance: () => import('@plasius/gpu-performance') };
+  f.options.__rendererLoader = async () => ({ async createWavefrontPathTracingComputeRenderer(config) {
+    return { supportsFrameMaxDepth: true, config, updateCamera() {}, destroy() {},
+      renderFrame(options) {
+        draws.push(options);
+        return draws.length === 2 ? pending.promise
+          : { maxDepth: options.maxDepth ?? config.maxDepth, renderedSamplesPerPixel: options.samplesPerPixel };
+      } };
+  } });
+  const flush = async (work) => {
+    const callbacks = [...work.values()]; work.clear(); callbacks.forEach(fn => fn());
+    await new Promise(resolve => setImmediate(resolve));
+  };
+  const result = await mountGpuProductStudio(f.options);
+  assert.equal(draws[0].maxDepth, undefined);
+  assert.equal(result.getMotionPerformanceSnapshot(), null);
+  result.cameraControls.reset(); await flush(frames);
+  assert.equal(draws[1].maxDepth, result.renderer.config.maxDepth);
+  assert.equal(draws[1].samplesPerPixel, result.renderer.config.samplesPerPixel);
+  assert.equal(draws[1].minimumSamplesPerPixel, 1);
+  time = 25; await flush(timers); await flush(frames);
+  assert.equal(draws.length, 2, 'settle cannot submit over the active GPU job');
+  pending.resolve({ maxDepth: result.renderer.config.maxDepth, renderedSamplesPerPixel: 1 });
+  await flush(frames);
+  assert.equal(draws.length, 3);
+  assert.equal(draws[2].maxDepth, undefined, 'settled frame uses configured depth');
+  assert.equal(draws[2].samplesPerPixel, 2);
+  assert.equal(result.getMotionPerformanceSnapshot().completedFrames, 1, 'only movement trains the governor');
+  assert.equal(result.getMotionPerformanceSnapshot().overBudget, true);
+  result.cameraControls.reset();
+  assert.equal(timers.size, 1);
+  result.cameraControls.setEnabled(false);
+  await result.cameraControls.whenIdle();
+  await flush(timers); await flush(frames);
+  assert.equal(draws.length, 3, 'exclusive reference cancels pending motion and settle');
+  await result.renderer.renderFrame({ samplesPerPixel: 8, awaitGPUCompletion: true });
+  assert.equal(draws[3].maxDepth, undefined);
+  assert.equal(result.getMotionPerformanceSnapshot().completedFrames, 1);
+  result.destroy();
+});
+
+test('joint motion refuses a renderer that cannot limit frame depth', async () => {
+  const f = lifecycleFixture({ motionPerformance: { targetFrameRate: 60, minimumBounceDepth: 1 } });
+  f.options.__showcaseFeatureLoaders = { performance: () => import('@plasius/gpu-performance') };
+  await assert.rejects(mountGpuProductStudio(f.options), /per-frame.*depth/i);
+  assert.equal(f.calls.rendered, 0);
+  assert.equal(f.calls.destroyed, 1);
+});
