@@ -41,3 +41,4 @@
 - [ADR 0027: Awaited Product Studio preview ownership](adr-0027-product-preview-backpressure.md)
 
 - [ADR 0028: Consumer-owned motion performance](adr-0028-consumer-motion-performance.md)
+- [ADR 0030: Inspection motion quality](adr-0030-inspection-motion-quality.md)

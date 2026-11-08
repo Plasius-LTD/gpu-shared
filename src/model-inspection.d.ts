@@ -7,8 +7,27 @@ export interface ModelInspectionQuality {
   height: number;
   denoise: boolean;
 }
+export interface InspectionMotionPerformance {
+  targetFrameRate: number;
+  /** Ascending permitted motion scales in (0,1], ending at1. Defaults to[1]. */
+  renderScales?: readonly number[];
+  /** Fraction of frame time offered to execution/adaptation, default 0.9. */
+  headroomRatio?: number;
+}
+export interface InspectionMotionSnapshot {
+  targetFrameRate: number;
+  targetFrameTimeMs: number;
+  frameTimeMs: number; queueDelayMs: number; inputLatencyMs: number;
+  renderScale: number;
+  requestedSamplesPerPixel: number;
+  renderedSamplesPerPixel: number;
+  width: number;
+  height: number;
+  overBudget: boolean;
+  completedFrames: number;
+}
 export interface ModelInspectionProgress {
-  phase: 'rendering' | 'refining' | 'complete' | 'paused';
+  phase: 'rendering' | 'refining' | 'complete' | 'paused' | 'moving';
   samples: number;
   target: number;
   width: number;
@@ -17,6 +36,8 @@ export interface ModelInspectionProgress {
   denoise: boolean;
   /** Renderer-owned requested GPU allocations; not physical VRAM residency. */
   allocations?: WavefrontGpuAllocationSnapshot;
+  /** Reduced previews never count toward the full stationary target. */
+  motion?: InspectionMotionSnapshot | null;
 }
 export interface ModelInspectionOptions {
   canvas: HTMLCanvasElement;
@@ -28,6 +49,9 @@ export interface ModelInspectionOptions {
   height?: number;
   /** Positive byte budget for renderer-owned GPU resources. Defaults to 1 GiB. */
   memoryBudgetBytes?: number;
+  /** Larger tiles trade queue memory for throughput. Renderer admission remains enforced. */
+  tileSize?: 128 | 256 | 384 | 512;
+  motionPerformance?: InspectionMotionPerformance;
   quality?: Partial<Omit<ModelInspectionQuality, "width" | "height">>;
   onProgress?: (progress: ModelInspectionProgress) => void;
   onHintChange?: (visible: boolean) => void;

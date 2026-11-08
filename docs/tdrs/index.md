@@ -15,3 +15,4 @@
 - [TDR 0009: Instanced inspection qualification](tdr-0009-instanced-inspection-qualification.md)
 
 - [TDR 0013: Motion performance qualification](tdr-0013-motion-performance-qualification.md)
+- [TDR 0015: Inspection motion qualification](tdr-0015-inspection-motion-qualification.md)

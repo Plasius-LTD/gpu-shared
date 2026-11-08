@@ -91,7 +91,8 @@
   },
   "peerDependencies": {
     "@plasius/gpu-model-voxel": "^0.1.0",
-    "@plasius/gpu-renderer": "^0.2.59",
+    "@plasius/gpu-performance": "^0.1.15",
+    "@plasius/gpu-renderer": "^0.2.63",
     "@plasius/translations": "^1.0.23"
   },
   "peerDependenciesMeta": {
@@ -103,13 +104,16 @@
     },
     "@plasius/translations": {
       "optional": true
+    },
+    "@plasius/gpu-performance": {
+      "optional": true
     }
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@plasius/gpu-lighting": "^0.2.14",
-    "@plasius/gpu-performance": "0.1.14",
-    "@plasius/gpu-renderer": "^0.2.59",
+    "@plasius/gpu-performance": "0.1.15",
+    "@plasius/gpu-renderer": "0.2.63",
     "@plasius/translations": "^1.0.23",
     "c8": "^11.0.0",
     "eslint": "^10.9.1",
