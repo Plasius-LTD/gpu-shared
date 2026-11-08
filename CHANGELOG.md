@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.10.0] - 2026-11-08
+
 - Coalesce unchanged camera progress notifications before allocation snapshots and keep moving previews distinct from stationary refinement.
 
 ### Added
@@ -1092,3 +1106,4 @@ All notable changes to this project will be documented in this file.
 [1.7.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.7.0
 [1.8.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.8.0
 [1.9.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.9.0
+[1.10.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.10.0
