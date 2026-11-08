@@ -6,7 +6,8 @@ import { createInspectionRuntime } from './model-inspection-runtime.js';
 import { createSceneInspectionRuntime } from './scene-inspection.js';
 
 const dependencies = { load: loadGltfModel, meshes: createProductStudioMeshes,
-  renderer: createWavefrontPathTracingComputeRenderer, camera: createNativeDemoCamera };
+  renderer: createWavefrontPathTracingComputeRenderer, camera: createNativeDemoCamera,
+  performance: () => import('@plasius/gpu-performance') };
 
 /** Lazy subpath entry. No DOM, asset request or GPU allocation on import. */
 export function createModelInspection(options) {

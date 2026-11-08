@@ -9,7 +9,8 @@ async function qualityContract() {
   inspection.setPaused(true);inspection.destroy();
 }
 void qualityContract;
-const scene: Promise<SceneInspection> = createSceneInspection({ canvas, enabled: true, instancing: true, memoryBudgetBytes: 1024 ** 3,
+const scene: Promise<SceneInspection> = createSceneInspection({ canvas, enabled: true, instancing: true, memoryBudgetBytes: 1024 ** 3, tileSize: 512,
+  motionPerformance: { targetFrameRate: 24, renderScales: [.5, .64, .8, 1] },
   onProgress(progress) { const bytes: number | undefined = progress.allocations?.allocatedBytes; void bytes; },
   models: [{ modelUrl: 'https://example.test/scene.gltf', integrity: {}, anchor: [0, 0, 0], size: 2 }] });
 void scene.then(value => {

@@ -200,3 +200,68 @@ test('inspection delegates geometry admission to the renderer byte budget rather
   assert.equal(runtime.triangleCount,600000);
   assert.equal(f.calls.find(c=>c?.meshes).memoryBudgetBytes,512*1024*1024);runtime.destroy();
 });
+
+test('motion policy drives previews, then restores full stationary samples without allocation',async(t)=>{
+ t.mock.timers.enable({apis:['setTimeout','Date']});
+ const f=fixture(),progress=[],frames=[];const perf=await import('@plasius/gpu-performance');
+ f.deps.performance=async()=>perf;f.deps.now=()=>Date.now();
+ f.renderer.getSnapshot=()=>({renderScale:1});
+ f.renderer.renderFrame=async o=>{frames.push(o);return {renderedSamplesPerPixel:o.samplesPerPixel,width:800*(o.renderScale??1),height:500*(o.renderScale??1)};};
+ const runtime=await createInspectionRuntime({...options(),width:800,height:500,tileSize:512,quality:{samplesPerPixel:6},motionPerformance:{targetFrameRate:24,renderScales:[.5,.64,1]},onProgress:p=>progress.push(p)},f.deps);
+ const allocations=f.calls.filter(c=>c?.meshes).length;
+ const camera=f.calls.find(c=>c?.onChange),flush=async()=>{for(let i=0;i<30;i++)await Promise.resolve();};
+ camera.onChange();await flush();assert.equal(progress.at(-1).phase,'moving');assert.equal(progress.at(-1).samples,0);
+ assert.equal(frames.at(-1).frameTimeBudgetMs,(1000/24)*.9);assert.equal(f.calls.find(c=>c?.meshes).tileSize,512);
+ t.mock.timers.tick(200);await flush();assert.equal(frames.at(-1).renderScale,1);assert.equal(progress.at(-1).samples,1);
+ t.mock.timers.tick(20);await flush();t.mock.timers.tick(20);await flush();
+ assert.equal(progress.at(-1).samples,6);assert.equal(progress.at(-1).phase,'complete');assert.equal(progress.at(-1).motion,null);
+ assert.equal(f.calls.filter(c=>c?.meshes).length,allocations);runtime.destroy();
+});
+
+test('motion requires renderer scale support and tile size validates before model loading',async()=>{
+ const f=fixture();f.deps.performance=()=>import('@plasius/gpu-performance');
+ await assert.rejects(createInspectionRuntime({...options(),motionPerformance:{targetFrameRate:24}},f.deps),/frame render scale/);
+ for(const tileSize of [0,32,1024,NaN])await assert.rejects(createInspectionRuntime({...options(),tileSize},fixture().deps),/tileSize/);
+});
+
+test('motion coalesces pending camera inputs and pause resumes the full reference',async(t)=>{
+ t.mock.timers.enable({apis:['setTimeout','Date']});
+ const f=fixture(),progress=[],frames=[];f.deps.performance=()=>import('@plasius/gpu-performance');f.deps.now=()=>Date.now();f.renderer.getSnapshot=()=>({renderScale:1});
+ const render=async o=>{frames.push(o);return {renderedSamplesPerPixel:o.samplesPerPixel,width:800,height:500};};f.renderer.renderFrame=render;
+ const runtime=await createInspectionRuntime({...options(),quality:{samplesPerPixel:6},motionPerformance:{targetFrameRate:24},onProgress:p=>progress.push(p)},f.deps);
+ const camera=f.calls.find(c=>c?.onChange),flush=async()=>{for(let i=0;i<40;i++)await Promise.resolve();};
+ let release;f.renderer.renderFrame=o=>{frames.push(o);return new Promise(resolve=>{release=()=>resolve({renderedSamplesPerPixel:o.samplesPerPixel,width:800,height:500});});};
+ camera.onChange();camera.onChange();camera.onChange();assert.equal(frames.length,2);
+ f.renderer.renderFrame=render;release();await flush();assert.equal(frames.length,3);assert.equal(progress.at(-1).phase,'moving');assert.equal(progress.at(-1).samples,0);
+ runtime.setPaused(true);t.mock.timers.tick(400);await flush();assert.equal(frames.length,3);
+ runtime.setPaused(false);t.mock.timers.tick(20);await flush();assert.equal(progress.at(-1).samples,1);assert.equal(progress.at(-1).motion,null);
+ assert.equal(f.calls.filter(c=>c?.meshes).length,1);runtime.destroy();
+});
+
+test('motion GPU failure never reports stationary completion and destroys resources',async()=>{
+ const f=fixture(),progress=[],errors=[];f.deps.performance=()=>import('@plasius/gpu-performance');f.renderer.getSnapshot=()=>({renderScale:1});
+ f.renderer.renderFrame=async o=>({renderedSamplesPerPixel:o.samplesPerPixel,width:800,height:500});
+ const runtime=await createInspectionRuntime({...options(),motionPerformance:{targetFrameRate:24},onProgress:p=>progress.push(p),onError:e=>errors.push(e.message)},f.deps);
+ f.renderer.renderFrame=async()=>{throw new Error('device lost');};f.calls.find(c=>c?.onChange).onChange();
+ for(let i=0;i<30;i++)await Promise.resolve();
+ assert.deepEqual(errors,['device lost']);assert.ok(progress.every(p=>p.phase!=='complete'));assert.equal(f.calls.filter(c=>c==='destroy').length,1);runtime.destroy();
+});
+
+test('pending motion input reports moving once instead of flooding progress and allocation snapshots',async(t)=>{
+ const f=fixture(),progress=[];let snapshots=0;
+ f.deps.performance=()=>import('@plasius/gpu-performance');
+ f.renderer.getSnapshot=()=>{snapshots++;return {renderScale:1};};
+ const render=async o=>({renderedSamplesPerPixel:o.samplesPerPixel,width:800,height:500});
+ f.renderer.renderFrame=render;
+ const runtime=await createInspectionRuntime({...options(),motionPerformance:{targetFrameRate:24},onProgress:p=>progress.push(p)},f.deps);
+ t.after(()=>runtime.destroy());
+ let release;f.renderer.renderFrame=o=>new Promise(resolve=>{release=()=>resolve({renderedSamplesPerPixel:o.samplesPerPixel,width:800,height:500});});
+ const camera=f.calls.find(c=>c?.onChange);progress.length=0;const before=snapshots;
+ for(let input=0;input<100;input++)camera.onChange();
+ assert.deepEqual(progress.map(p=>p.phase),['moving']);
+ assert.ok(snapshots-before<=1,'unchanged input must not rebuild allocation snapshots');
+ f.renderer.renderFrame=render;release();for(let i=0;i<40;i++)await Promise.resolve();
+ assert.equal(progress.at(-1).phase,'moving');assert.equal(progress.at(-1).samples,0);
+ assert.equal(progress.at(-1).motion.completedFrames,2);
+ runtime.destroy();
+});

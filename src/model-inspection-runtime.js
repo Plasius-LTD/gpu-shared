@@ -1,11 +1,14 @@
+import { createInspectionMotionPerformance } from './inspection-motion-performance.js';
 import { inspectionBatchCapacity, inspectionBatchSize, inspectionQuality } from './model-inspection-quality.js';
 
 /** Framework-independent inspection lifecycle; all rendering stays in gpu-renderer. */
 export async function createInspectionRuntime({ canvas, modelUrl, integrity, enabled,
-  signal, onHintChange, onError = () => {}, onProgress = () => {}, quality,
+  signal, onHintChange, onError = () => {}, onProgress = () => {}, quality, motionPerformance, tileSize = 128,
   width = 800, height = 600, memoryBudgetBytes = 1024*1024*1024 } = {}, deps) {
   if (enabled !== true) throw new Error('Model inspection must be explicitly enabled.');
   if(!Number.isSafeInteger(memoryBudgetBytes)||memoryBudgetBytes<=0) throw new Error('GPU memory budget must be a positive safe integer.');
+  if (![128,256,384,512].includes(tileSize)) throw new Error('tileSize must be128,256,384 or512.');
+  const now = deps.now ?? (() => performance.now());
   const url = new URL(modelUrl);
   if (!['http:', 'https:'].includes(url.protocol) || !canvas) throw new Error('Invalid inspection canvas or asset URL.');
   let desired = inspectionQuality({...quality,width,height});
@@ -26,10 +29,20 @@ export async function createInspectionRuntime({ canvas, modelUrl, integrity, ena
   });
   let renderer, camera, meshes, instances, applied, disposed=false, pending, timer, paused=false;
   let generation=0, renderedGeneration=-1, samples=0, changedAt=Date.now();
+  let motion=null, moving=false, restoreReference=false, queuedAt=now();
   const destroyRenderer = value => { value?.destroy(); value?.device?.destroy(); };
+  let lastProgress;
   const progress = phase => {
-    if (!disposed) onProgress(Object.freeze({phase,samples,target:desired.samplesPerPixel,
+    if (disposed) return;
+    const motionSnapshot = restoreReference ? motion?.snapshot() : null;
+    // Pointer bursts do not change visible progress until a preview completes.
+    // Avoid rebuilding allocation snapshots and notifying host UIs for duplicates.
+    if (lastProgress?.phase === phase && lastProgress.samples === samples &&
+        lastProgress.settings === desired && lastProgress.motion === motionSnapshot) return;
+    lastProgress = { phase, samples, settings: desired, motion: motionSnapshot };
+    onProgress(Object.freeze({phase,samples,target:desired.samplesPerPixel,
       width:desired.width,height:desired.height,maxDepth:desired.maxDepth,denoise:desired.denoise,
+      ...(motion?{motion:motionSnapshot}:{}),
       ...(renderer?.getSnapshot?{allocations:renderer.getSnapshot().allocations}:{}),}));
   };
   const destroy = () => {
@@ -49,7 +62,7 @@ export async function createInspectionRuntime({ canvas, modelUrl, integrity, ena
   async function allocate(settings) {
     destroyRenderer(renderer);renderer=undefined;
     const value=await wait(deps.renderer({canvas,meshes,...settings,memoryBudgetBytes,...(instances?{instances}:{}),
-      samplesPerPixel:inspectionBatchCapacity(settings),progressive:true,displayQuality:true,tileSize:128,
+      samplesPerPixel:inspectionBatchCapacity(settings),progressive:true,displayQuality:true,tileSize,
       environmentPortalMode:'disabled',environmentPortals:[],
       environmentColor:[0.58,0.66,0.76,1],ambientColor:[0.04,0.046,0.052,1],
       environmentLighting:{horizonColor:[0.7,0.78,0.86,1],zenithColor:[0.18,0.24,0.34,1],
@@ -61,6 +74,7 @@ export async function createInspectionRuntime({ canvas, modelUrl, integrity, ena
     }));
     renderer=value;applied=settings;
     if(instances && renderer.getSnapshot?.().instanceCount!==instances.length) throw new Error('This renderer version does not support scene instancing.');
+    if(motion && (typeof renderer.renderFrame!=='function' || typeof renderer.getSnapshot?.().renderScale!=='number')) throw new Error('Motion inspection requires renderer frame render scale support.');
     if(typeof renderer.resetAccumulation!=='function') throw new Error('This renderer version does not support progressive inspection.');
   }
   async function run() {
@@ -71,11 +85,29 @@ export async function createInspectionRuntime({ canvas, modelUrl, integrity, ena
         if(disposed) return;
         if(id!==generation) continue;
         if(renderedGeneration!==id){renderer.updateCamera(readCamera());renderer.resetAccumulation();samples=0;renderedGeneration=id;}
+        const inMotion=motion && moving && Date.now()-changedAt<200;
+        if(inMotion){
+          const requestedAt=queuedAt;
+          const frameOptions=motion.frameOptions(requestedAt,Math.min(settings.samplesPerPixel,inspectionBatchCapacity(settings)));
+          restoreReference=true;progress('moving');
+          const stats=await wait(renderer.renderFrame(frameOptions));
+          if(disposed)return;
+          motion.complete(requestedAt,frameOptions,stats);
+          if(id!==generation)continue;
+          progress(paused?'paused':'moving');break;
+        }
+        if(restoreReference){renderer.resetAccumulation();samples=0;restoreReference=false;}
+        moving=false;
         const batch=inspectionBatchSize(settings,samples);
         if(batch<1) return;
         progress(samples===0?'rendering':'refining');
-        renderer.renderOnce({samplesPerPixel:batch});
-        await wait(renderer.device.queue.onSubmittedWorkDone());
+        if(motion){
+          const stats=await wait(renderer.renderFrame({samplesPerPixel:batch,renderScale:1,awaitGPUCompletion:true,readStats:false,readOutputProbe:false}));
+          if(stats.renderedSamplesPerPixel!==batch)throw new Error('Stationary inspection did not complete its requested sample batch.');
+        }else{
+          renderer.renderOnce({samplesPerPixel:batch});
+          await wait(renderer.device.queue.onSubmittedWorkDone());
+        }
         if(disposed) return;
         if(id!==generation) continue;
         samples+=batch;
@@ -93,12 +125,14 @@ export async function createInspectionRuntime({ canvas, modelUrl, integrity, ena
     pending=run().finally(()=>{pending=undefined;schedule();});
     return pending;
   }
-  function draw() {
+  function draw(isMotion=false) {
     if(disposed) return Promise.resolve();
-    generation++;samples=0;changedAt=Date.now();clearTimeout(timer);progress(paused?'paused':'rendering');
+    generation++;samples=0;changedAt=Date.now();queuedAt=now();moving=motion!==null&&isMotion;clearTimeout(timer);progress(paused?'paused':moving?'moving':'rendering');
     return pump();
   }
   try {
+    combined.throwIfAborted();
+    motion=await wait(createInspectionMotionPerformance(motionPerformance,deps.performance,now));
     combined.throwIfAborted();
     const model=await wait(deps.load(url,{signal:combined,integrity:{...integrity}}));
     combined.throwIfAborted();
@@ -107,7 +141,7 @@ export async function createInspectionRuntime({ canvas, modelUrl, integrity, ena
     meshes=deps.meshes(model,{targetCenter:[0,0,0],targetSize:2.2}).filter(mesh=>mesh.id>=1000);
     instances=model.sceneInstances;
     camera=deps.camera({canvas,camera:{eye:[3,1.5,4.2],target:[0,0,0],fov:38},onHintChange,
-      onChange:()=>{void draw().catch(()=>{});}});
+      onChange:()=>{void draw(true).catch(()=>{});}});
     await draw();combined.throwIfAborted();
     return Object.freeze({triangleCount,primitiveCount:model.primitives.length,draw,
       getAllocationSnapshot:()=>renderer?.getSnapshot?.().allocations??null,

@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Coalesce unchanged camera progress notifications before allocation snapshots and keep moving previews distinct from stationary refinement.
+
+### Added
+- Opt-in inspection motion budgets reuse gpu-performance to adapt resolution and samples, then restore the full stationary reference without reallocating the scene. Explicit tile sizes permit qualified throughput/memory tradeoffs.
+
 - **Added**
   - (placeholder)
 

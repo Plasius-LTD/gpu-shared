@@ -32,7 +32,7 @@ npm install @plasius/gpu-shared @plasius/gpu-renderer
 
 Use a browser bundler, such as the one in your existing application, and serve it
 over HTTPS or localhost in a WebGPU-capable browser. The renderer is an optional
-peer of `gpu-shared` (compatible range `^0.2.49`) and is needed for this example.
+peer of `gpu-shared` (compatible range `^0.2.63`) and is needed for this example.
 Installing the packages in Node does not provide a browser GPU.
 
 ## Create a scene: a material gallery
@@ -335,3 +335,26 @@ also provides `resetCamera()`, preserving its material settings and GPU resource
 Release maintainers can finalise an already-published, cryptographically verified
 npm version after main advances using the existing CD workflow's verification-only
 phase. See [release recovery](docs/maintainers/releasing.md#finalising-a-registry-verified-draft-after-main-advances).
+
+### Inspection motion budgets
+
+`createModelInspection` and `createSceneInspection` accept an optional motion
+policy. Install the optional `@plasius/gpu-performance` peer (compatible range
+`^0.1.15`) before opting in with
+`motionPerformance: { targetFrameRate: 24, headroomRatio: 0.8, renderScales: [0.4, 0.5, 0.64, 0.8, 1] }`.
+The existing `@plasius/gpu-performance` governor selects motion resolution and
+additional samples from measured frame execution. `headroomRatio` reserves capacity
+for variation by offering this fraction of the interval to samples and adaptation
+(default 0.9). Input queue age remains separate from execution cost. After 200 ms
+of quiet input, the
+inspector restores the requested full resolution, bounce depth, denoise setting
+and stationary sample target. Motion previews do not count toward that target.
+
+Use `onProgress` to distinguish `phase: 'moving'` and its `motion` settings/overruns
+from a completed reference. A frame-rate target is not a device-independent
+guarantee. Omitting the policy preserves progressive fixed inspection.
+`tileSize` defaults to128;256,384 and512 are available when qualified for the
+consumer's workloads. Larger tiles allocate larger queues; the existing device
+limits and `memoryBudgetBytes` admission still apply.
+
+Motion progress notifications coalesce unchanged pointer bursts before taking GPU allocation snapshots. The moving phase remains distinct from stationary refinement; completed preview quality changes remain observable. This bounds host UI work without delaying camera submission.
