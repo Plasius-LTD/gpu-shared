@@ -47,6 +47,11 @@
       "types": "./src/model-inspection.d.ts",
       "import": "./dist/model-inspection.js",
       "require": "./dist/model-inspection.cjs"
+    },
+    "./game-scene": {
+      "types": "./src/game-scene.d.ts",
+      "import": "./dist/game-scene.js",
+      "require": "./dist/game-scene.cjs"
     }
   },
   "scripts": {
@@ -54,7 +59,7 @@
     "demo": "python3 -m http.server --directory ..",
     "demo:example": "node demo/example.js",
     "generate:assets": "node scripts/generate-showcase-assets.mjs",
-    "typecheck": "node --check src/index.js && node --check src/feedback-diagnostics.js && node --check src/showcase-runtime.js && node --check src/gltf-loader.js && node --check src/pvox-loader.js && node --check src/product-studio-runtime.js && node --check src/animation-adventure-runtime.js && node --check demo/main.js && tsc -p tsconfig.types.json",
+    "typecheck": "node --check src/index.js && node --check src/game-scene.js && node --check src/feedback-diagnostics.js && node --check src/showcase-runtime.js && node --check src/gltf-loader.js && node --check src/pvox-loader.js && node --check src/product-studio-runtime.js && node --check src/animation-adventure-runtime.js && node --check demo/main.js && tsc -p tsconfig.types.json",
     "zero-three": "node scripts/verify-zero-three.cjs --package --evidence-out release-artifacts/zero-three-evidence.json",
     "zero-three:source": "node scripts/verify-zero-three.cjs --source-only",
     "zero-three:test": "node --test tests/zero-three.test.cjs",
@@ -87,12 +92,12 @@
     "@plasius/gpu-camera-controls": "^0.1.1",
     "@plasius/gpu-model-gltf": "0.6.1",
     "@plasius/gpu-model-runtime": "0.3.1",
-    "@plasius/schema": "^1.4.3"
+    "@plasius/schema": "^1.4.9"
   },
   "peerDependencies": {
     "@plasius/gpu-model-voxel": "^0.1.0",
     "@plasius/gpu-performance": "^0.1.15",
-    "@plasius/gpu-renderer": "^0.2.63",
+    "@plasius/gpu-renderer": "^0.2.66",
     "@plasius/translations": "^1.0.23"
   },
   "peerDependenciesMeta": {
@@ -113,7 +118,7 @@
     "@eslint/js": "^10.0.1",
     "@plasius/gpu-lighting": "^0.2.14",
     "@plasius/gpu-performance": "0.1.15",
-    "@plasius/gpu-renderer": "0.2.63",
+    "@plasius/gpu-renderer": "0.2.66",
     "@plasius/translations": "^1.0.23",
     "c8": "^11.0.0",
     "eslint": "^10.9.1",

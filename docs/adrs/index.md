@@ -42,3 +42,5 @@
 
 - [ADR 0028: Consumer-owned motion performance](adr-0028-consumer-motion-performance.md)
 - [ADR 0030: Inspection motion quality](adr-0030-inspection-motion-quality.md)
+
+- [ADR 0031: Bounded game-snapshot presentation](adr-0031-game-snapshot-presentation.md)

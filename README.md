@@ -32,7 +32,7 @@ npm install @plasius/gpu-shared @plasius/gpu-renderer
 
 Use a browser bundler, such as the one in your existing application, and serve it
 over HTTPS or localhost in a WebGPU-capable browser. The renderer is an optional
-peer of `gpu-shared` (compatible range `^0.2.63`) and is needed for this example.
+peer of `gpu-shared` (compatible range `^0.2.66`) and is needed for this example.
 Installing the packages in Node does not provide a browser GPU.
 
 ## Create a scene: a material gallery
@@ -272,6 +272,20 @@ connect to Plasius account or feature services.
 Public declarations: [root helpers](https://github.com/Plasius-LTD/gpu-shared/blob/main/src/index.d.ts),
 [inspection](https://github.com/Plasius-LTD/gpu-shared/blob/main/src/model-inspection.d.ts),
 [material study](https://github.com/Plasius-LTD/gpu-shared/blob/main/src/material-study.d.ts).
+
+## Present game snapshots
+
+Import `@plasius/gpu-shared/game-scene` when a game view opens. It presents strict
+versioned snapshots through native raster rendering, with prepared geometry,
+spatial transforms and a host-owned camera. One GPU frame is outstanding at a
+time; newer input replaces the single waiting snapshot. Resize redraws a paused
+scene, and cancellation or device loss disposes presentation.
+
+This entry installs no camera gestures, input loop or game rules. Hosts supply
+access decisions, accessible controls and semantic HUD state. See the
+[game scene guide](docs/guides/game-scene.md), [public types](src/game-scene.d.ts)
+and [design](docs/design/game-scene-adapter.md). The renderer is loaded only after
+explicit admission; metadata/catalogue imports need not load any GPU runtime.
 
 ## Development
 
