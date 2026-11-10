@@ -9,5 +9,11 @@
     "strict": true,
     "target": "ES2022"
   },
-  "include": ["tests/feedback-diagnostics.types.ts", "tests/material-study.types.ts", "tests/model-inspection.types.ts", "tests/product-preview.types.ts"]
+  "include": [
+    "tests/feedback-diagnostics.types.ts",
+    "tests/material-study.types.ts",
+    "tests/model-inspection.types.ts",
+    "tests/product-preview.types.ts",
+    "tests/game-scene.types.ts"
+  ]
 }

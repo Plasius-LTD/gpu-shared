@@ -4,6 +4,7 @@ export async function loadNativeShowcaseRenderer({
   navigator = globalThis.navigator,
   loader = () => import("@plasius/gpu-renderer"),
   onUnavailable,
+  maxVertices,
 }) {
   if (!enabled || !navigator?.gpu) return null;
   const module = await loader();
@@ -12,7 +13,9 @@ export async function loadNativeShowcaseRenderer({
       "The installed GPU renderer does not provide native surface rendering.",
     );
   }
-  return module.createNativeSceneRenderer({ canvas, navigator, onUnavailable });
+  return module.createNativeSceneRenderer({ canvas, navigator, onUnavailable,
+    ...(maxVertices === undefined ? {} : { maxVertices }),
+  });
 }
 
 export function packShowcaseSurfaces(triangles) {

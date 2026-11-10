@@ -1,7 +1,7 @@
 import { defineConfig } from "tsup";
 
 export default defineConfig({
-  entry: ["src/index.js", "src/feedback-diagnostics.js", "src/material-study.js", "src/model-inspection.js"],
+  entry: ["src/index.js", "src/feedback-diagnostics.js", "src/material-study.js", "src/model-inspection.js", "src/game-scene.js"],
   sourcemap: true,
   clean: true,
   format: ["esm", "cjs"],

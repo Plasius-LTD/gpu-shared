@@ -16,3 +16,5 @@
 
 - [TDR 0013: Motion performance qualification](tdr-0013-motion-performance-qualification.md)
 - [TDR 0015: Inspection motion qualification](tdr-0015-inspection-motion-qualification.md)
+
+- [TDR 0016: Game-scene contract verification](tdr-0016-game-scene-qualification.md)

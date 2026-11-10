@@ -98,7 +98,7 @@ test("Getting-started scene loads generated geometry, preserves materials and re
 });
 
 test("Consumer JavaScript examples typecheck against the public package declarations", () => {
-  const readme = ["README.md", "docs/guides/model-inspection.md", "docs/guides/showcase-integration.md", "docs/guides/material-study.md", "docs/guides/feedback-diagnostics.md"]
+  const readme = ["README.md", "docs/guides/model-inspection.md", "docs/guides/showcase-integration.md", "docs/guides/material-study.md", "docs/guides/feedback-diagnostics.md", "docs/guides/game-scene.md"]
     .map(file => readFileSync(path.join(root, file), "utf8")).join("\n");
   const examples = [...readme.matchAll(/```js\n([\s\S]*?)\n```/g)];
   assert.ok(examples.length > 0, "The package needs an executable usage example");

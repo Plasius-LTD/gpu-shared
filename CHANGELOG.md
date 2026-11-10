@@ -5,7 +5,11 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - **Added**
-  - (placeholder)
+  - Separate game-scene adapter for strict versioned snapshots, reusable spatial
+    geometry transforms, latest-snapshot frame scheduling, paused-scene resize,
+    bounded initialization and renderer-owned completion/cancellation.
+  - Public ESM/CommonJS entry and TypeScript contracts; preserve existing showcase
+    APIs while requiring released gpu-renderer 0.2.66 for native completion.
 
 - **Changed**
   - (placeholder)
