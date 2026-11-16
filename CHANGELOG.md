@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Start inspection motion at the smallest host-approved workload and recover detail through measured gpu-performance admission, preserving full stationary quality.
+
 - **Added**
   - (placeholder)
 

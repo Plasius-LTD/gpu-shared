@@ -354,7 +354,7 @@ phase. See [release recovery](docs/maintainers/releasing.md#finalising-a-registr
 
 `createModelInspection` and `createSceneInspection` accept an optional motion
 policy. Install the optional `@plasius/gpu-performance` peer (compatible range
-`^0.1.15`) before opting in with
+`^0.1.16`) before opting in with
 `motionPerformance: { targetFrameRate: 24, headroomRatio: 0.8, renderScales: [0.4, 0.5, 0.64, 0.8, 1] }`.
 The existing `@plasius/gpu-performance` governor selects motion resolution and
 additional samples from measured frame execution. `headroomRatio` reserves capacity
@@ -363,6 +363,14 @@ for variation by offering this fraction of the interval to samples and adaptatio
 of quiet input, the
 inspector restores the requested full resolution, bounce depth, denoise setting
 and stationary sample target. Motion previews do not count toward that target.
+
+Motion starts at the smallest host-approved scale with one sample. The governor
+then recovers resolution and additional samples when measured headroom permits.
+Initial adjacent cost estimates use pixel count times sample count; later paired
+execution timings replace estimates. This avoids requesting an expensive full
+frame before the device has supplied motion timings. Costs may vary by camera
+view, and conservative estimates can retain a lower motion level. Faster engine
+execution feeds the same governor without changing the product target.
 
 Use `onProgress` to distinguish `phase: 'moving'` and its `motion` settings/overruns
 from a completed reference. A frame-rate target is not a device-independent
