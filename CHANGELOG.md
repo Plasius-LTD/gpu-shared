@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Restart inspection motion within the host-approved budget after stationary refinement, while retaining quality recovery during continuous movement and exact stationary settings.
+- Cancel obsolete reference work between bounded GPU tiles before rendering the newest camera pose, and prevent long GPU waits from misclassifying queued movement as idle.
+- Require released `@plasius/gpu-renderer` 0.2.69 for cooperative reference cancellation.
+
 - **Added**
   - (placeholder)
 
