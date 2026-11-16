@@ -96,7 +96,7 @@
   },
   "peerDependencies": {
     "@plasius/gpu-model-voxel": "^0.1.0",
-    "@plasius/gpu-performance": "^0.1.15",
+    "@plasius/gpu-performance": "^0.1.16",
     "@plasius/gpu-renderer": "^0.2.66",
     "@plasius/translations": "^1.0.23"
   },
@@ -117,7 +117,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@plasius/gpu-lighting": "^0.2.14",
-    "@plasius/gpu-performance": "0.1.15",
+    "@plasius/gpu-performance": "0.1.16",
     "@plasius/gpu-renderer": "0.2.66",
     "@plasius/translations": "^1.0.23",
     "c8": "^11.0.0",

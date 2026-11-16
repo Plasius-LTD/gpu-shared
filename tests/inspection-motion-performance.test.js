@@ -4,7 +4,7 @@ import * as performanceModule from '@plasius/gpu-performance';
 import {createInspectionMotionPerformance} from '../src/inspection-motion-performance.js';
 test('inspection uses the host frame target and governor for resolution and optional samples',async()=>{
  let time=0;const motion=await createInspectionMotionPerformance({targetFrameRate:24,renderScales:[.5,.64,.8,1]},async()=>performanceModule,()=>time);
- const initial=motion.frameOptions(time,4);assert.equal(initial.samplesPerPixel,4);assert.equal(initial.renderScale,1);assert.equal(initial.frameTimeBudgetMs,(1000/24)*.9);
+ const initial=motion.frameOptions(time,4);assert.equal(initial.samplesPerPixel,1);assert.equal(initial.renderScale,.5);assert.equal(initial.frameTimeBudgetMs,(1000/24)*.9);
  for(let i=0;i<48;i++){const start=time,options=motion.frameOptions(start,4);time+=70;motion.complete(start,options,{renderedSamplesPerPixel:1,width:400,height:250});}
  const constrained=motion.frameOptions(time,4);assert.equal(constrained.samplesPerPixel,1);assert.equal(constrained.renderScale,.5);
  assert.equal(motion.snapshot().overBudget,true);assert.equal(motion.snapshot().targetFrameRate,24);
@@ -22,6 +22,9 @@ test('inspection validates motion policy without loading optional code when disa
 });
 test('sub-budget timing variation retains motion quality instead of cascading to reduced resolution',async()=>{
  let time=0;const motion=await createInspectionMotionPerformance({targetFrameRate:24,renderScales:[.5,.64,.8,1]},async()=>performanceModule,()=>time);
+ // First establish full quality through real low-cost completed frames.
+ for(let i=0;i<240;i++){const start=time,options=motion.frameOptions(start,4);time+=5;motion.complete(start,options,{renderedSamplesPerPixel:options.samplesPerPixel,width:800,height:500});}
+ assert.equal(motion.frameOptions(time,4).renderScale,1);
  for(let i=0;i<240;i++){
   const start=time,options=motion.frameOptions(start,4);time+=(i%48<24?12:28);
   motion.complete(start,options,{renderedSamplesPerPixel:2,width:800,height:500});
@@ -30,6 +33,9 @@ test('sub-budget timing variation retains motion quality instead of cascading to
 });
 test('queued input age is separate from executed frame time and cannot double-count pressure',async()=>{
  let time=0;const motion=await createInspectionMotionPerformance({targetFrameRate:24,renderScales:[.5,.64,.8,1]},async()=>performanceModule,()=>time);
+ // First establish full quality through real low-cost completed frames.
+ for(let i=0;i<240;i++){const start=time,options=motion.frameOptions(start,4);time+=5;motion.complete(start,options,{renderedSamplesPerPixel:options.samplesPerPixel,width:800,height:500});}
+ assert.equal(motion.frameOptions(time,4).renderScale,1);
  for(let i=0;i<120;i++){
   const requested=time-15,options=motion.frameOptions(requested,4);time+=30;
   motion.complete(requested,options,{renderedSamplesPerPixel:2,width:800,height:500});
@@ -65,4 +71,26 @@ test('host execution reserve reduces work before camera frames exceed the cadenc
   }
   assert.ok(motion.frameOptions(time, 4).renderScale < 1);
   assert.equal(motion.snapshot().targetFrameRate, 24);
+});
+
+
+test('cold forest motion begins within budget and recovers only affordable work',async()=>{
+ let time=0;
+ const motion=await createInspectionMotionPerformance({targetFrameRate:24,headroomRatio:.7,renderScales:[.32,.4,.5,.64,.8,1]},async()=>performanceModule,()=>time);
+ const initial=motion.frameOptions(time,4);
+ assert.equal(initial.renderScale,.32);assert.equal(initial.samplesPerPixel,1);
+ for(let i=0;i<360;i++){
+  const start=time,options=motion.frameOptions(start,4);
+  // Controlled cost model represents a 70ms full-resolution one-sample view.
+  const cost=70*options.renderScale**2*options.samplesPerPixel;
+  time+=cost;motion.complete(start,options,{renderedSamplesPerPixel:options.samplesPerPixel,width:Math.round(800*options.renderScale),height:Math.round(500*options.renderScale)});
+  assert.ok(cost<=1000/24,'startup and recovery must not submit known unaffordable work');
+ }
+ assert.ok(motion.frameOptions(time,4).renderScale>.32,'measured headroom restores motion detail');
+ for(let i=0;i<360;i++){
+  const start=time,options=motion.frameOptions(start,4);time+=2*options.renderScale**2*options.samplesPerPixel;
+  motion.complete(start,options,{renderedSamplesPerPixel:options.samplesPerPixel,width:800,height:500});
+ }
+ assert.equal(motion.frameOptions(time,4).renderScale,1);
+ assert.equal(motion.frameOptions(time,4).samplesPerPixel,4);
 });

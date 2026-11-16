@@ -18,9 +18,15 @@ export async function createInspectionMotionPerformance(policy, loader, now = ()
   const levels = scales.map(renderScale => ({ id: `scale-${renderScale}`, config: { renderScale, samplesPerPixel: 1 } }));
   // Inspection's existing bounded batch contract admits at most four samples.
   levels.push(...[2, 4].map(samplesPerPixel => ({ id: `spp-${samplesPerPixel}`, config: { renderScale: 1, samplesPerPixel } })));
-  const adapter = module.createQualityLadderAdapter({ id: 'inspection-motion', domain: 'custom', levels, recoveryBudget: { headroomRatio } });
+  // Start with bounded work; gpu-performance restores detail as real timings
+  // permit. Pixel/sample ratios constrain unseen upgrades until paired timings exist.
+  const work = level => level.config.renderScale ** 2 * level.config.samplesPerPixel;
+  const initialCostRatios = levels.slice(1).map((level, index) => work(level) / work(levels[index]));
+  const adapter = module.createQualityLadderAdapter({ id: 'inspection-motion', domain: 'custom', levels,
+    initialLevel: 0, recoveryBudget: { headroomRatio, initialCostRatios } });
   if (typeof adapter.recordFrameTime !== 'function') throw new Error('Motion performance requires measured quality recovery support.');
   const governor = module.createGpuPerformanceGovernor({
+    recoverInitialLevels: true,
     device: { deviceClass: 'unknown', mode: 'flat', supportsWebGpu: true },
     target: { minimumFrameRate: rate, maximumFrameRate: rate, frameBudgetRatio: headroomRatio, preferredFrameRates: [rate], supportedFrameRates: [rate], deviceRefreshRateHz: rate },
     // Camera work changes with each view. Sub-budget variation alone must not
