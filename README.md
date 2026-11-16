@@ -364,7 +364,15 @@ of quiet input, the
 inspector restores the requested full resolution, bounce depth, denoise setting
 and stationary sample target. Motion previews do not count toward that target.
 
-Motion starts at the smallest host-approved scale with one sample. The governor
+Motion-enabled inspection requires `@plasius/gpu-renderer` 0.2.69 or later and its
+cooperative frame-cancellation capability. New input abandons an obsolete reference at the next completed
+128-pixel tile, waits for that tile to drain, and renders the newest pose. A long
+GPU wait does not reclassify queued camera input as idle. Every tile and requested
+sample still runs when stationary; real device failures remain explicit errors.
+
+Each new motion session after stationary refinement starts at the smallest
+host-approved scale with one sample. Continuous camera input keeps the same
+measurement session and its recovered quality. The governor
 then recovers resolution and additional samples when measured headroom permits.
 Initial adjacent cost estimates use pixel count times sample count; later paired
 execution timings replace estimates. This avoids requesting an expensive full

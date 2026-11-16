@@ -46,3 +46,4 @@
 - [ADR 0031: Bounded game-snapshot presentation](adr-0031-game-snapshot-presentation.md)
 
 - [ADR 0032: Conservative inspection motion startup](adr-0032-conservative-inspection-motion-start.md)
+- [ADR 0033: Inspection motion session boundaries](adr-0033-inspection-motion-session-boundaries.md)

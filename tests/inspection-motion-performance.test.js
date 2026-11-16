@@ -94,3 +94,17 @@ test('cold forest motion begins within budget and recovers only affordable work'
  assert.equal(motion.frameOptions(time,4).renderScale,1);
  assert.equal(motion.frameOptions(time,4).samplesPerPixel,4);
 });
+
+test('each new motion session re-establishes host bounds without losing continuous recovery',async()=>{
+ let time=0;
+ const motion=await createInspectionMotionPerformance({targetFrameRate:24,headroomRatio:.7,renderScales:[.32,.5,1]},async()=>performanceModule,()=>time);
+ const complete=()=>{const start=time,options=motion.frameOptions(start,4);time+=2;motion.complete(start,options,{renderedSamplesPerPixel:options.samplesPerPixel,width:800*options.renderScale,height:500*options.renderScale});return options;};
+ for(let i=0;i<360;i++)complete();
+ assert.equal(complete().samplesPerPixel,4);
+ motion.begin();
+ assert.equal(motion.snapshot(),null,'new motion has no fabricated timing');
+ const first=complete();assert.equal(first.renderScale,.32);assert.equal(first.samplesPerPixel,1);
+ for(let i=0;i<360;i++)complete();
+ assert.equal(complete().samplesPerPixel,4,'the new session recovers through measured headroom');
+ motion.begin();assert.equal(complete().renderScale,.32);
+});

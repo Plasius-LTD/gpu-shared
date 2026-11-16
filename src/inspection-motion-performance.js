@@ -22,23 +22,34 @@ export async function createInspectionMotionPerformance(policy, loader, now = ()
   // permit. Pixel/sample ratios constrain unseen upgrades until paired timings exist.
   const work = level => level.config.renderScale ** 2 * level.config.samplesPerPixel;
   const initialCostRatios = levels.slice(1).map((level, index) => work(level) / work(levels[index]));
-  const adapter = module.createQualityLadderAdapter({ id: 'inspection-motion', domain: 'custom', levels,
-    initialLevel: 0, recoveryBudget: { headroomRatio, initialCostRatios } });
-  if (typeof adapter.recordFrameTime !== 'function') throw new Error('Motion performance requires measured quality recovery support.');
-  const governor = module.createGpuPerformanceGovernor({
-    recoverInitialLevels: true,
-    device: { deviceClass: 'unknown', mode: 'flat', supportsWebGpu: true },
-    target: { minimumFrameRate: rate, maximumFrameRate: rate, frameBudgetRatio: headroomRatio, preferredFrameRates: [rate], supportedFrameRates: [rate], deviceRefreshRateHz: rate },
-    // Camera work changes with each view. Sub-budget variation alone must not
-    // reduce quality; the governor's absolute latency/drop/thermal gates remain.
-    adaptation: { trendSensitivityMs: 1000 / rate, sampleWindowSize: 8,
-      minimumSamplesBeforeAdjustment: 4, degradeCooldownFrames: 2 },
-    modules: [adapter],
-  });
+  const createSession = () => {
+    const adapter = module.createQualityLadderAdapter({ id: 'inspection-motion', domain: 'custom', levels,
+      initialLevel: 0, recoveryBudget: { headroomRatio, initialCostRatios } });
+    if (typeof adapter.recordFrameTime !== 'function') throw new Error('Motion performance requires measured quality recovery support.');
+    const governor = module.createGpuPerformanceGovernor({
+      recoverInitialLevels: true,
+      device: { deviceClass: 'unknown', mode: 'flat', supportsWebGpu: true },
+      target: { minimumFrameRate: rate, maximumFrameRate: rate, frameBudgetRatio: headroomRatio, preferredFrameRates: [rate], supportedFrameRates: [rate], deviceRefreshRateHz: rate },
+      // Camera work changes with each view. Sub-budget variation alone must not
+      // reduce quality; the governor's absolute latency/drop/thermal gates remain.
+      adaptation: { trendSensitivityMs: 1000 / rate, sampleWindowSize: 8,
+        minimumSamplesBeforeAdjustment: 4, degradeCooldownFrames: 2 },
+      modules: [adapter],
+    });
+    return { adapter, governor };
+  };
+  let { adapter, governor } = createSession();
   const { targetFrameRate, targetFrameTimeMs } = governor.getTarget();
   const starts = new WeakMap();
   let latest = null, completedFrames = 0;
   return Object.freeze({
+    begin() {
+      // An idle device or new camera view must not inherit an earlier gesture's
+      // high sample count. The caller starts sessions only between GPU frames.
+      ({ adapter, governor } = createSession());
+      latest = null;
+      completedFrames = 0;
+    },
     frameOptions(queuedAt, sampleCapacity) {
       const startedAt = now();
       const level = adapter.getCurrentLevel().config;
