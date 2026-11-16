@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.11.2] - 2026-11-16
+
 - Restart inspection motion within the host-approved budget after stationary refinement, while retaining quality recovery during continuous movement and exact stationary settings.
 - Cancel obsolete reference work between bounded GPU tiles before rendering the newest camera pose, and prevent long GPU waits from misclassifying queued movement as idle.
 - Require released `@plasius/gpu-renderer` 0.2.69 for cooperative reference cancellation.
@@ -1147,3 +1161,4 @@ All notable changes to this project will be documented in this file.
 [1.10.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.10.0
 [1.11.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.11.0
 [1.11.1]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.11.1
+[1.11.2]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.11.2
