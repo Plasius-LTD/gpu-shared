@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.11.1] - 2026-11-16
+
 - Start inspection motion at the smallest host-approved workload and recover detail through measured gpu-performance admission, preserving full stationary quality.
 
 - **Added**
@@ -1128,3 +1142,4 @@ All notable changes to this project will be documented in this file.
 [1.9.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.9.0
 [1.10.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.10.0
 [1.11.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.11.0
+[1.11.1]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.11.1
