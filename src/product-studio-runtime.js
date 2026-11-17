@@ -12,6 +12,7 @@ const DEFAULT_TARGET_SIZE = 2.25;
 const DEFAULT_RENDER_WIDTH = 640;
 const DEFAULT_RENDER_HEIGHT = 360;
 const DEFAULT_RENDER_MAX_DEPTH = 2;
+const MOTION_SETTLE_MS = 150;
 const STUDIO_CLASS = "plasius-product-studio-wavefront";
 const productStudioOwners = new WeakMap();
 const snapshotHookStates = new WeakMap();
@@ -456,10 +457,18 @@ export async function mountGpuProductStudio(options = {}, featureFlags = null) {
   let closed = false;
   let cameraControls = null, cameraFrame = null;
   let cameraJob = null, cameraDirty = false, cameraEnabled = true;
+  let settleTimer = null, settlePending = false;
+  let motionEpoch = 0;
   const windowRef = documentRef.defaultView ?? globalThis;
   const now = () => (windowRef.performance ?? globalThis.performance).now();
+  const cancelSettle = () => {
+    settlePending = false;
+    if (settleTimer !== null) windowRef.clearTimeout(settleTimer);
+    settleTimer = null;
+  };
   const cancelCameraFrame = () => {
     cameraDirty = false;
+    cancelSettle();
     if (cameraFrame !== null) windowRef.cancelAnimationFrame(cameraFrame);
     cameraFrame = null;
   };
@@ -551,7 +560,11 @@ export async function mountGpuProductStudio(options = {}, featureFlags = null) {
     }
 
     const sampleTarget = Number.isFinite(options.samplesPerPixel) ? options.samplesPerPixel : 8;
-    const motionPerformance = await createProductStudioMotionPerformance(options.motionPerformance, sampleTarget, options.__showcaseFeatureLoaders?.performance, now);
+    const jointMotion = options.motionPerformance?.minimumBounceDepth !== undefined;
+    const loadMotionPerformance = (samples, depth) => createProductStudioMotionPerformance(
+      options.motionPerformance, samples, options.__showcaseFeatureLoaders?.performance, now, depth
+    );
+    const legacyMotionPerformance = jointMotion ? null : await loadMotionPerformance(sampleTarget);
     assertCurrent();
     const size = resolveRenderSize(options);
     const lightingOptions = await resolveWavefrontLightingOptions(options);
@@ -580,6 +593,13 @@ export async function mountGpuProductStudio(options = {}, featureFlags = null) {
     if (typeof renderer.renderFrame !== "function") {
       throw new Error("Product Studio requires awaited renderer frames.");
     }
+    if (jointMotion && renderer.supportsFrameMaxDepth !== true) {
+      throw new Error("Joint motion performance requires renderer per-frame bounce depth support.");
+    }
+    const motionPerformance = jointMotion
+      ? await loadMotionPerformance(renderer.config?.samplesPerPixel ?? sampleTarget, renderer.config?.maxDepth)
+      : legacyMotionPerformance;
+    assertCurrent();
     // Interactive previews have their own work budget. The renderer retains the
     // requested sample target for exact fixed references.
     const previewOptions = Object.freeze({
@@ -588,29 +608,35 @@ export async function mountGpuProductStudio(options = {}, featureFlags = null) {
       readStats: false,
       readOutputProbe: false,
     });
-    async function renderPreview(queuedAt) {
-      const frameOptions = motionPerformance?.frameOptions(queuedAt) ?? previewOptions;
+    async function renderPreview(queuedAt, moving) {
+      const epoch = motionEpoch;
+      const policy = moving ? motionPerformance : null;
+      const frameOptions = policy?.frameOptions(queuedAt) ?? previewOptions;
       const stats = await renderer.renderFrame(frameOptions);
-      if (!closed) motionPerformance?.complete(queuedAt, frameOptions, stats);
+      if (!closed && (!jointMotion || (cameraEnabled && epoch === motionEpoch))) {
+        policy?.complete(queuedAt, frameOptions, stats);
+      }
       return stats;
     }
-    const rendererStats = await renderPreview(now());
+    const rendererStats = await renderPreview(now(), !jointMotion);
     assertCurrent();
     if (options.cameraControls?.enabled) {
       if (typeof renderer.updateCamera !== 'function') throw new Error('Renderer does not support interactive cameras.');
       canvas.tabIndex = 0;
       function scheduleCamera(continueMotion = false) {
-        if (closed || !cameraEnabled || cameraJob || cameraFrame !== null || !cameraDirty) return;
+        if (closed || !cameraEnabled || cameraJob || cameraFrame !== null || (!cameraDirty && !settlePending)) return;
         const queuedAt = now();
         const renderCamera = () => {
           cameraFrame = null;
           if (closed || !cameraEnabled) return;
+          const moving = cameraDirty;
           cameraDirty = false;
+          settlePending = false;
           const job = Promise.resolve().then(() => {
             if (closed || !cameraEnabled) return;
             const camera = cameraControls.read();
             renderer.updateCamera({ position: camera.eye, target: camera.target, up: [0,1,0], fovYDegrees: camera.fov });
-            return renderPreview(queuedAt);
+            return renderPreview(queuedAt, moving);
           });
           cameraJob = job;
           void job.catch(error => {
@@ -632,7 +658,18 @@ export async function mountGpuProductStudio(options = {}, featureFlags = null) {
         onHintChange: options.cameraControls.onHintChange,
         onChange() {
           options.cameraControls.onChange?.();
+          if (closed || !cameraEnabled) return;
+          cancelSettle();
           cameraDirty = true;
+          if (jointMotion) {
+            settleTimer = windowRef.setTimeout(() => {
+              settleTimer = null;
+              if (closed || !cameraEnabled) return;
+              cameraDirty = false;
+              settlePending = true;
+              scheduleCamera();
+            }, MOTION_SETTLE_MS);
+          }
           scheduleCamera();
         },
       });
@@ -644,7 +681,10 @@ export async function mountGpuProductStudio(options = {}, featureFlags = null) {
       const setEnabled = cameraControls.setEnabled;
       cameraControls.setEnabled = enabled => {
         cameraEnabled = enabled === true;
-        if (!cameraEnabled) cancelCameraFrame();
+        if (!cameraEnabled) {
+          motionEpoch += 1;
+          cancelCameraFrame();
+        }
         setEnabled(enabled);
       };
     }

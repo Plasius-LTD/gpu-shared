@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 - **Added**
-  - (placeholder)
+  - Let the Product Studio motion governor scale samples and bounce depth together, then restore configured depth when input settles (#209).
 
 - **Changed**
   - (placeholder)

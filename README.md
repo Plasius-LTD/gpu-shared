@@ -19,8 +19,8 @@ you compose a scene in JavaScript or TypeScript with explicit rendering controls
 
 Product Studio can use a consumer-owned motion frame target through the injected
 `@plasius/gpu-performance` module. See [motion budgets](docs/guides/showcase-integration.md#motion-performance-budget)
-for adaptive preview samples and completion diagnostics. Exact reference samples
-remain independently controlled.
+for adaptive preview samples, optional bounce scaling and completion diagnostics.
+Exact reference samples and depth remain independently controlled.
 
 Apache-2.0 · ESM and CommonJS · TypeScript declarations included.
 
