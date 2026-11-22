@@ -88,17 +88,17 @@
   "author": "Plasius LTD <development@plasius.co.uk>",
   "license": "Apache-2.0",
   "dependencies": {
-    "@plasius/gpu-camera": "^0.1.18",
-    "@plasius/gpu-camera-controls": "^0.1.1",
+    "@plasius/gpu-camera": "^0.1.20",
+    "@plasius/gpu-camera-controls": "^0.1.2",
     "@plasius/gpu-model-gltf": "0.6.1",
-    "@plasius/gpu-model-runtime": "0.3.1",
-    "@plasius/schema": "^1.4.9"
+    "@plasius/gpu-model-runtime": "0.4.1",
+    "@plasius/schema": "^1.5.1"
   },
   "peerDependencies": {
-    "@plasius/gpu-model-voxel": "^0.1.0",
-    "@plasius/gpu-performance": "^0.1.16",
+    "@plasius/gpu-model-voxel": "^0.1.6",
+    "@plasius/gpu-performance": "^0.1.17",
     "@plasius/gpu-renderer": "^0.2.69",
-    "@plasius/translations": "^1.0.23"
+    "@plasius/translations": "^1.0.30"
   },
   "peerDependenciesMeta": {
     "@plasius/gpu-model-voxel": {
@@ -116,15 +116,15 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@plasius/gpu-lighting": "^0.2.14",
-    "@plasius/gpu-performance": "0.1.16",
+    "@plasius/gpu-lighting": "^0.2.17",
+    "@plasius/gpu-performance": "0.1.17",
     "@plasius/gpu-renderer": "0.2.69",
-    "@plasius/translations": "^1.0.23",
-    "c8": "^11.0.0",
-    "eslint": "^10.9.1",
-    "globals": "^17.11.0",
-    "react": "^19.2.8",
-    "tsup": "^8.5.1",
+    "@plasius/translations": "^1.0.30",
+    "c8": "^12.0.0",
+    "eslint": "^10.15.0",
+    "globals": "^17.14.0",
+    "react": "^19.3.1",
+    "tsup": "^9.0.0",
     "typescript": "^7.0.2"
   },
   "repository": {
@@ -151,8 +151,8 @@
   "overrides": {
     "brace-expansion": "^5.0.12",
     "esbuild": "^0.28.1",
-    "minimatch": "11.0.1",
-    "glob": "14.0.2"
+    "minimatch": "^11.0.9",
+    "glob": "^14.0.6"
   },
   "engines": {
     "node": ">=24"

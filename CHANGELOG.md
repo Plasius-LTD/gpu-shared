@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- Refresh supported security dependencies and published package baselines; preserve bounded-pattern validation and runtime contracts (weekly maintenance, 2026-11-22).
+
 - **Added**
   - (placeholder)
 
