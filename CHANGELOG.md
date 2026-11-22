@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+- **Added**
+  - (placeholder)
+
+- **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.11.3] - 2026-11-22
+
 - Refresh supported security dependencies and published package baselines; preserve bounded-pattern validation and runtime contracts (weekly maintenance, 2026-11-22).
 
 - **Added**
@@ -1164,3 +1178,4 @@ All notable changes to this project will be documented in this file.
 [1.11.0]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.11.0
 [1.11.1]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.11.1
 [1.11.2]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.11.2
+[1.11.3]: https://github.com/Plasius-LTD/gpu-shared/releases/tag/v1.11.3
