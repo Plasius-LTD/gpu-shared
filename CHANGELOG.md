@@ -78,7 +78,7 @@ All notable changes to this project will be documented in this file.
 - Opt-in inspection motion budgets reuse gpu-performance to adapt resolution and samples, then restore the full stationary reference without reallocating the scene. Explicit tile sizes permit qualified throughput/memory tradeoffs.
 
 - **Added**
-  - (placeholder)
+  - Let the Product Studio motion governor scale samples and bounce depth together, then restore configured depth when input settles (#209).
 
 - **Changed**
   - (placeholder)

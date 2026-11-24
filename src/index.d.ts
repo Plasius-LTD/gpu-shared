@@ -434,6 +434,8 @@ export interface SceneCameraOptions {
 export interface ProductStudioMotionPerformanceOptions {
   /** Integer FPS target from 1 to 1000. Completion cadence is hardware dependent. */
   readonly targetFrameRate: number;
+  /** Opt into depth adaptation. Integer from 1 to the configured renderer maxDepth. */
+  readonly minimumBounceDepth?: number;
 }
 export interface ProductStudioMotionPerformanceSnapshot {
   readonly targetFrameRate: number;
@@ -443,6 +445,9 @@ export interface ProductStudioMotionPerformanceSnapshot {
   readonly requestedSamplesPerPixel: number;
   /** Null when the renderer did not report a completed count. */
   readonly renderedSamplesPerPixel: number | null;
+  /** Present for the joint motion policy. */
+  readonly requestedMaxDepth?: number;
+  readonly renderedMaxDepth?: number | null;
   readonly overBudget: boolean;
   readonly completedFrames: number;
 }
